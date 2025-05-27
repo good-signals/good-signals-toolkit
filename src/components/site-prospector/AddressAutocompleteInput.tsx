@@ -30,20 +30,29 @@ const useGooglePlacesAutocomplete = () => {
 
   const autocompleteService = useMemo(() => {
     if (typeof window !== 'undefined' && window.google) {
+      console.log('[AddressAutocompleteInput] Google AutocompleteService initialized.');
       return new google.maps.places.AutocompleteService();
     }
+    console.warn('[AddressAutocompleteInput] Google AutocompleteService could not be initialized.');
     return null;
   }, []);
 
   const placesService = useMemo(() => {
     if (typeof window !== 'undefined' && window.google && window.google.maps) {
+      console.log('[AddressAutocompleteInput] Google PlacesService initialized.');
       return new google.maps.places.PlacesService(document.createElement('div'));
     }
+    console.warn('[AddressAutocompleteInput] Google PlacesService could not be initialized.');
     return null;
   }, []);
 
   const getPlacePredictions = async (input: string) => {
-    if (!autocompleteService || !input.trim()) {
+    if (!autocompleteService) {
+      console.warn('[AddressAutocompleteInput] Autocomplete service not available for predictions.');
+      setPredictions([]);
+      return;
+    }
+    if (!input.trim()) {
       setPredictions([]);
       return;
     }
@@ -53,12 +62,21 @@ const useGooglePlacesAutocomplete = () => {
       const request = {
         input,
         componentRestrictions: { country: ['us', 'ca'] },
-        types: ['address', 'establishment'] 
+        types: ['address', 'establishment']
       };
+      // Added detailed logging for the request
+      console.log('[AddressAutocompleteInput] Requesting predictions with:', JSON.stringify(request, null, 2));
 
       autocompleteService.getPlacePredictions(
         request,
         (results, status) => {
+          // Added detailed logging for the response
+          console.log(
+            '[AddressAutocompleteInput] Predictions received. Status:',
+            status,
+            'Results:',
+            results ? results.map(r => ({description: r.description, place_id: r.place_id, types: r.types })) : 'No results or error'
+          );
           setLoading(false);
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
             setPredictions(results);
@@ -66,13 +84,13 @@ const useGooglePlacesAutocomplete = () => {
             setPredictions([]);
             // Optionally log non-OK statuses for debugging, but avoid console.error for common cases like ZERO_RESULTS
             if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-              console.warn('Google Places Autocomplete returned status:', status);
+              console.warn('[AddressAutocompleteInput] Google Places Autocomplete returned status:', status);
             }
           }
         }
       );
     } catch (error) {
-      console.error('Error fetching predictions:', error);
+      console.error('[AddressAutocompleteInput] Error fetching predictions:', error);
       setLoading(false);
       setPredictions([]);
     }
@@ -81,13 +99,15 @@ const useGooglePlacesAutocomplete = () => {
   const getPlaceDetails = (placeId: string): Promise<AddressComponents> => {
     return new Promise((resolve, reject) => {
       if (!placesService) {
+        console.warn('[AddressAutocompleteInput] Places service not available for details.');
         reject(new Error('Places service not available'));
         return;
       }
-
+      console.log(`[AddressAutocompleteInput] Fetching details for placeId: ${placeId}`);
       placesService.getDetails(
-        { placeId, fields: ['address_components', 'geometry', 'formatted_address', 'name'] }, // Added 'name' field
+        { placeId, fields: ['address_components', 'geometry', 'formatted_address', 'name', 'types'] }, // Added 'types' to ensure it's available for logic
         (result, status) => {
+          console.log('[AddressAutocompleteInput] Place details received. Status:', status, 'Result:', result);
           if (status === google.maps.places.PlacesServiceStatus.OK && result) {
             const components: AddressComponents = {
               addressLine1: '',
@@ -117,34 +137,42 @@ const useGooglePlacesAutocomplete = () => {
             // Prioritize establishment name if available and no street/route, then constructed address, then formatted_address
             if (result.name && !constructedAddressLine1 && result.types?.includes('establishment')) {
                 components.addressLine1 = result.name;
-                // Attempt to append city for context if name is used and city is known
-                if(components.city && !result.name.toLowerCase().includes(components.city.toLowerCase())) {
-                    const mainAddressPartFromFormatted = result.formatted_address?.split(',')[0]?.trim();
-                    if (mainAddressPartFromFormatted && mainAddressPartFromFormatted !== result.name) {
-                         components.addressLine1 = mainAddressPartFromFormatted; // Prefer formatted address if it has more detail
+                // Attempt to derive a more complete address line 1 from formatted_address if possible
+                const mainAddressPartFromFormatted = result.formatted_address?.split(',')[0]?.trim();
+                if (mainAddressPartFromFormatted && mainAddressPartFromFormatted.toLowerCase() !== result.name.toLowerCase()) {
+                    // Check if formatted_address provides more than just the name (e.g., includes street info)
+                    // This logic attempts to get a more specific address line if the name is too generic
+                    const nameInFormatted = mainAddressPartFromFormatted.toLowerCase().includes(result.name.toLowerCase());
+                    if (nameInFormatted && mainAddressPartFromFormatted.length > result.name.length) {
+                         components.addressLine1 = mainAddressPartFromFormatted;
+                    } else if (!nameInFormatted) {
+                         // If name is not in the first part, but first part looks like an address, prefer it.
+                         // This is heuristic, might need refinement.
+                         if (mainAddressPartFromFormatted.match(/\d/) && mainAddressPartFromFormatted.match(/[a-zA-Z]/)) {
+                            components.addressLine1 = mainAddressPartFromFormatted;
+                         }
                     }
                 }
             } else if (constructedAddressLine1) {
                 components.addressLine1 = constructedAddressLine1;
             } else if (result.formatted_address) {
-              // Fallback for addressLine1 using the first part of formatted_address
               const formattedAddressParts = result.formatted_address.split(',');
               if (formattedAddressParts.length > 0) {
                 components.addressLine1 = formattedAddressParts[0].trim();
               }
-            } else if (result.name) { // Fallback to name if no addressLine1 could be constructed
+            } else if (result.name) { 
                 components.addressLine1 = result.name;
             }
 
 
-            // Ensure addressLine1 isn't empty if possible
             if (!components.addressLine1 && result.formatted_address) {
                 components.addressLine1 = result.formatted_address.split(',')[0].trim();
             }
-
+            console.log('[AddressAutocompleteInput] Parsed address components:', components);
 
             resolve(components);
           } else {
+            console.error(`[AddressAutocompleteInput] Error fetching place details: ${status}`, result);
             reject(new Error(`Error fetching place details: ${status}`));
           }
         }
@@ -169,12 +197,16 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setAddress(value);
-    setShowSuggestions(true);
-    getPlacePredictions(value);
+    if (value.trim() === "") {
+        setShowSuggestions(false);
+        setPredictions([]); // Clear predictions if input is empty
+    } else {
+        setShowSuggestions(true);
+        getPlacePredictions(value);
+    }
   };
 
   const handleSelectSuggestion = async (placeId: string, description: string) => {
-    // Use the description for the input field as it's usually more complete for display
     setAddress(description); 
     setShowSuggestions(false);
     setPredictions([]); 
@@ -183,8 +215,7 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       const addressDetails = await getPlaceDetails(placeId);
       onAddressSelect(addressDetails);
     } catch (error) {
-      console.error('Error selecting address/place:', error);
-      // Optionally, inform the user via a toast or error message display
+      console.error('[AddressAutocompleteInput] Error selecting address/place:', error);
     }
   };
 
@@ -197,11 +228,18 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         onChange={handleInputChange}
         placeholder="Start typing an address or place name..."
         className={`location-search-input ${error ? 'border-destructive' : ''}`}
-        onFocus={() => address && setShowSuggestions(true)}
+        onFocus={() => {
+            if (address && predictions.length > 0) { // Only show suggestions if there are any to show or input has value
+                 setShowSuggestions(true);
+            } else if (address) { // If address has value but no predictions, maybe trigger a new search
+                getPlacePredictions(address);
+                setShowSuggestions(true);
+            }
+        }}
         onBlur={() => {
-          // Delay hiding suggestions to allow for clicking on them
           setTimeout(() => setShowSuggestions(false), 200);
         }}
+        autoComplete="off" // Prevent browser's own autocomplete
       />
       {error && <p className="text-sm text-destructive mt-1">{error}</p>}
       
@@ -212,11 +250,14 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
             <div
               key={prediction.place_id}
               className="suggestion-item p-2 hover:bg-accent/50 cursor-pointer"
-              onClick={() => handleSelectSuggestion(prediction.place_id, prediction.description)}
+              onMouseDown={() => handleSelectSuggestion(prediction.place_id, prediction.description)} // Use onMouseDown to fire before onBlur
             >
               <span>{prediction.description}</span>
             </div>
           ))}
+          {!loading && predictions.length === 0 && address.trim() !== "" && (
+             <div className="p-2 text-muted-foreground">No suggestions found.</div>
+          )}
         </div>
       )}
     </div>
