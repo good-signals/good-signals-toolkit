@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,56 +11,61 @@ import { toast } from 'sonner';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signInWithEmail, signUpWithEmail, loading } = useAuth();
+  const { signInWithEmail, signUpWithEmail, loading, user: currentUser, session: currentSession } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState(''); // For sign-up
+  // Sign In states
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+
+  // Sign Up states
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyCategory, setCompanyCategory] = useState('');
+  const [companySubcategory, setCompanySubcategory] = useState('');
+
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please enter both email and password.");
+    if (!signInEmail || !signInPassword) {
+      toast.error("Please enter both email and password for sign in.");
       return;
     }
-    await signInWithEmail(email, password);
-    // Assuming signInWithEmail internally navigates or AuthProvider handles session update then navigation
-    // For now, let's explicitly navigate if successful (though onAuthStateChange might be better)
-    // The context's loading state can be used to prevent navigation until auth state is confirmed.
-    // Or we can check session in a useEffect here after successful signIn
-    // Simplest for now: rely on App.tsx or ProtectedRoute to redirect.
-    // If signIn is successful, the user state in AuthContext will change,
-    // and protected routes or App.tsx logic should redirect.
-    // Let's add a redirect here for immediate feedback, if login is successful it will eventually redirect from App.tsx or ProtectedRoute.
-    // We need to wait for the user object to be set in the context.
-    // A better approach is to observe user in useEffect and navigate.
-    // navigate('/'); // This might be too soon.
+    await signInWithEmail(signInEmail, signInPassword);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !fullName) {
-      toast.error("Please fill in all fields for sign up.");
+    if (!signUpEmail || !signUpPassword || !firstName || !lastName || !companyName) {
+      toast.error("Please fill in all required fields for sign up (Email, Password, First Name, Last Name, Company Name).");
       return;
     }
-    await signUpWithEmail(email, password, fullName);
-    // Similar to sign-in, navigation should ideally be handled by global state changes.
+    await signUpWithEmail(
+      signUpEmail,
+      signUpPassword,
+      firstName,
+      lastName,
+      companyName,
+      companyAddress || null, // Pass null if empty
+      companyCategory || null,
+      companySubcategory || null
+    );
   };
 
-  // Redirect if user becomes authenticated (e.g., after successful sign-in/sign-up and session update)
-  // This might be better handled in a wrapper component or App.tsx
-  const { user: currentUser, session: currentSession } = useAuth();
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentUser && currentSession) {
-      toast.success("Redirecting to dashboard...");
-      navigate('/'); // Or to a specific dashboard page
+      toast.success("Redirecting to Toolkit Hub...");
+      navigate('/toolkit-hub'); 
     }
   }, [currentUser, currentSession, navigate]);
 
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <Tabs defaultValue="signin" className="w-[400px]">
+      <Tabs defaultValue="signin" className="w-[400px] md:w-[500px]">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -79,8 +84,8 @@ const AuthPage: React.FC = () => {
                     id="signin-email"
                     type="email"
                     placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={signInEmail}
+                    onChange={(e) => setSignInEmail(e.target.value)}
                     required
                   />
                 </div>
@@ -89,8 +94,8 @@ const AuthPage: React.FC = () => {
                   <Input
                     id="signin-password"
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={signInPassword}
+                    onChange={(e) => setSignInPassword(e.target.value)}
                     required
                   />
                 </div>
@@ -107,46 +112,105 @@ const AuthPage: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Sign Up</CardTitle>
-              <CardDescription>Create a new account.</CardDescription>
+              <CardDescription>Create a new account and set up your company.</CardDescription>
             </CardHeader>
             <form onSubmit={handleSignUp}>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-fullname">Full Name</Label>
-                  <Input
-                    id="signup-fullname"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
+                <p className="text-sm font-medium text-foreground">Admin Information</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-firstname">First Name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="signup-firstname"
+                      type="text"
+                      placeholder="John"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-lastname">Last Name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="signup-lastname"
+                      type="text"
+                      placeholder="Doe"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">Email <span className="text-destructive">*</span></Label>
                   <Input
                     id="signup-email"
                     type="email"
                     placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={signUpEmail}
+                    onChange={(e) => setSignUpEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password">Password <span className="text-destructive">*</span></Label>
                   <Input
                     id="signup-password"
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={signUpPassword}
+                    onChange={(e) => setSignUpPassword(e.target.value)}
                     required
                   />
+                </div>
+                
+                <p className="text-sm font-medium text-foreground pt-4">Company Information</p>
+                 <div className="space-y-2">
+                  <Label htmlFor="signup-companyname">Company Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="signup-companyname"
+                    type="text"
+                    placeholder="Acme Corp"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-companyaddress">Company Address</Label>
+                  <Input
+                    id="signup-companyaddress"
+                    type="text"
+                    placeholder="123 Main St, Anytown, USA"
+                    value={companyAddress}
+                    onChange={(e) => setCompanyAddress(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-companycategory">Category</Label>
+                    <Input
+                      id="signup-companycategory"
+                      type="text"
+                      placeholder="e.g., Retail, Restaurant"
+                      value={companyCategory}
+                      onChange={(e) => setCompanyCategory(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-companysubcategory">Subcategory</Label>
+                    <Input
+                      id="signup-companysubcategory"
+                      type="text"
+                      placeholder="e.g., Coffee Shop, QSR"
+                      value={companySubcategory}
+                      onChange={(e) => setCompanySubcategory(e.target.value)}
+                    />
+                  </div>
                 </div>
               </CardContent>
               <CardFooter>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Signing Up...' : 'Sign Up'}
+                  {loading ? 'Signing Up...' : 'Sign Up & Create Company'}
                 </Button>
               </CardFooter>
             </form>
@@ -158,4 +222,3 @@ const AuthPage: React.FC = () => {
 };
 
 export default AuthPage;
-
