@@ -1,4 +1,3 @@
-
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -16,6 +15,8 @@ import AuthPage from "./pages/AuthPage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import AccountManagementPage from "./pages/AccountManagementPage"; // Import the new page
 import NotFound from "./pages/NotFound";
+import TargetSelectionPage from "./pages/TargetSelectionPage"; // Added
+import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage"; // Added
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -89,10 +90,26 @@ const AppContent = () => {
             } 
           />
           <Route 
-            path="account-management"  // Add this new route
+            path="account-management" // Add this new route
             element={
               <ProtectedRoute>
                 <AccountManagementPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="target-selection" // Added route
+            element={
+              <ProtectedRoute>
+                <TargetSelectionPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="target-metrics-builder" // Added route
+            element={
+              <ProtectedRoute>
+                <TargetMetricsBuilderPage />
               </ProtectedRoute>
             } 
           />
