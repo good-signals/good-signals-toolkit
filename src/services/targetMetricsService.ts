@@ -15,22 +15,7 @@ export async function getUserCustomMetricSettings(userId: string): Promise<UserC
     console.error('Error fetching user custom metric settings:', error);
     throw error;
   }
-  
-  // Convert the data to ensure it matches our type
-  const typedData: UserCustomMetricSetting[] = data?.map(item => ({
-    id: item.id,
-    user_id: item.user_id,
-    metric_identifier: item.metric_identifier,
-    category: item.category,
-    label: item.label,
-    target_value: item.target_value,
-    measurement_type: item.measurement_type as UserCustomMetricSetting['measurement_type'],
-    higher_is_better: item.higher_is_better,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-  })) || [];
-  
-  return typedData;
+  return data || [];
 }
 
 export async function saveUserCustomMetricSettings(
@@ -72,7 +57,7 @@ export async function saveUserCustomMetricSettings(
   // Supabase upsert with `onConflict: 'user_id, metric_identifier'` is ideal here.
   // This requires `user_id` and `metric_identifier` to be part of the unique constraint, which it is.
 
-  const { data, error } = await supabase
+  const { data, error }: PostgrestResponse<UserCustomMetricSetting> = await supabase
     .from(TABLE_NAME)
     .upsert(metricsToUpsert, { onConflict: 'user_id, metric_identifier', defaultToNull: false })
     .select();
@@ -82,19 +67,9 @@ export async function saveUserCustomMetricSettings(
     throw error;
   }
   
-  // Convert the returned data to ensure it matches our type
-  const typedReturnedData: UserCustomMetricSetting[] = data?.map(item => ({
-    id: item.id,
-    user_id: item.user_id,
-    metric_identifier: item.metric_identifier,
-    category: item.category,
-    label: item.label,
-    target_value: item.target_value,
-    measurement_type: item.measurement_type as UserCustomMetricSetting['measurement_type'],
-    higher_is_better: item.higher_is_better,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-  })) || [];
-  
-  return typedReturnedData;
+  // It's also good practice to delete any visitor profile metrics that were removed from the form
+  // This part is more complex and requires knowing which metrics existed before.
+  // For now, we'll just handle upserts. Deletion can be an enhancement.
+
+  return data || [];
 }
