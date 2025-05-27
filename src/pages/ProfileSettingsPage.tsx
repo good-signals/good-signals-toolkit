@@ -1,15 +1,40 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 import ProfileDetailsForm from '@/components/settings/ProfileDetailsForm';
 import AvatarUpload from '@/components/settings/AvatarUpload'; 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'; // Removed CardFooter
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button'; // Added Button
-import { Link } from 'react-router-dom'; // Added Link
-import { Briefcase } from 'lucide-react'; // Added Icon
-
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Briefcase } from 'lucide-react';
+import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService'; // Import service and type
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 const ProfileSettingsPage: React.FC = () => {
+  const { user, authLoading } = useAuth(); // Get user and authLoading
+  const [displayAccount, setDisplayAccount] = useState<Account | null>(null);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      setIsLoadingAccount(true);
+      fetchUserAccountsWithAdminRole(user.id)
+        .then(accounts => {
+          if (accounts && accounts.length > 0) {
+            setDisplayAccount(accounts[0]); // Display logo of the first account user is admin of
+          }
+        })
+        .catch(error => {
+          console.error("Failed to fetch user accounts for profile display:", error);
+          // Optionally, set an error state or toast
+        })
+        .finally(() => {
+          setIsLoadingAccount(false);
+        });
+    }
+  }, [user, authLoading]);
+
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-3xl">
       <div className="mb-8">
@@ -21,14 +46,27 @@ const ProfileSettingsPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your name, email address, and profile picture.</CardDescription>
+            <CardDescription>Update your name, email address, and (optionally) your personal profile picture. The image below may show your company logo.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <ProfileDetailsForm />
             <Separator />
             <div>
               <h3 className="text-lg font-medium mb-2">Profile Picture</h3>
-              <AvatarUpload />
+              {isLoadingAccount && !displayAccount ? (
+                <div className="flex items-center space-x-4">
+                  <Skeleton className="h-20 w-20 rounded-full border-2 border-muted" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                </div>
+              ) : (
+                <AvatarUpload 
+                  displayImageUrl={displayAccount?.logo_url} 
+                  displayName={displayAccount?.name} 
+                />
+              )}
             </div>
           </CardContent>
         </Card>
