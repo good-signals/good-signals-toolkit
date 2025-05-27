@@ -80,6 +80,53 @@ export type Database = {
         }
         Relationships: []
       }
+      assessment_metric_values: {
+        Row: {
+          assessment_id: string
+          category: string
+          created_at: string
+          entered_value: number
+          id: string
+          label: string
+          measurement_type: string | null
+          metric_identifier: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          assessment_id: string
+          category: string
+          created_at?: string
+          entered_value: number
+          id?: string
+          label: string
+          measurement_type?: string | null
+          metric_identifier: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string
+          category?: string
+          created_at?: string
+          entered_value?: number
+          id?: string
+          label?: string
+          measurement_type?: string | null
+          metric_identifier?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_metric_values_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "site_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_site_visit_ratings: {
         Row: {
           assessment_id: string

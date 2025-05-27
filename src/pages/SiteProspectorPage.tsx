@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { BarChart3, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NewAssessmentForm from '@/components/site-prospector/NewAssessmentForm';
-import SelectTargetMetricSetStep from '@/components/site-prospector/SelectTargetMetricSetStep'; // New import
+import SelectTargetMetricSetStep from '@/components/site-prospector/SelectTargetMetricSetStep';
+import InputMetricValuesStep from '@/components/site-prospector/InputMetricValuesStep'; // New import
 // import SiteAssessmentDetails from '@/components/site-prospector/SiteAssessmentDetails'; // Placeholder
 
-type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'assessmentDetails'; // Added 'selectMetrics'
+type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'assessmentDetails'; // Added 'inputMetrics'
 
 const SiteProspectorPage = () => {
   const [currentStep, setCurrentStep] = useState<AssessmentStep>('idle');
@@ -26,11 +27,16 @@ const SiteProspectorPage = () => {
   };
 
   const handleMetricSetSelected = (assessmentId: string, metricSetId: string) => {
-    setActiveAssessmentId(assessmentId); // Should already be set
+    setActiveAssessmentId(assessmentId); 
     setSelectedMetricSetId(metricSetId);
-    setCurrentStep('assessmentDetails'); // For now, goes to details. Later 'inputMetrics'
-    // TODO: Navigate to the next step (Input Metrics)
-    console.log("Assessment ID:", assessmentId, "Metric Set ID:", metricSetId, "selected. Next step: Input Metrics.");
+    setCurrentStep('inputMetrics'); // Navigate to new input metrics step
+  };
+
+  const handleMetricValuesSubmitted = (assessmentId: string) => {
+    setActiveAssessmentId(assessmentId); // Should already be set
+    // For now, goes to details. Later maybe a review step.
+    setCurrentStep('assessmentDetails'); 
+    console.log("Assessment ID:", assessmentId, "Metric values submitted. Next step: Assessment Details.");
   };
 
   const handleCancelAssessmentProcess = () => {
@@ -40,22 +46,31 @@ const SiteProspectorPage = () => {
   };
   
   const handleBackFromMetricSelection = () => {
-    // If desired, could allow editing address, or just cancel.
-    // For simplicity, going back from metric selection might mean restarting or just cancelling.
-    // Let's go back to the address form, assuming the assessmentId is still valid for potential updates.
-    // If assessment ID exists, it means address was already created.
     if (activeAssessmentId) {
-      setCurrentStep('newAddress'); // Could also be 'idle' if we want full restart
+      // Potentially clear selectedMetricSetId if going back to address makes sense
+      // For now, just go back to address form
+      setCurrentStep('newAddress'); 
     } else {
       setCurrentStep('idle');
     }
   };
 
+  const handleBackFromMetricInput = () => {
+    if (activeAssessmentId && selectedMetricSetId) {
+      setCurrentStep('selectMetrics'); // Go back to metric set selection
+    } else if (activeAssessmentId) {
+      setCurrentStep('newAddress'); // Fallback if metric set ID was lost
+    }
+    else {
+      setCurrentStep('idle');
+    }
+  };
+
+
   if (currentStep === 'newAddress') {
     return <NewAssessmentForm 
               onAssessmentCreated={handleAddressStepCompleted} 
               onCancel={handleCancelAssessmentProcess} 
-              // If editing, assessmentId could be passed here
             />;
   }
 
@@ -63,19 +78,29 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={handleBackFromMetricSelection} // Or handleCancelAssessmentProcess if direct cancel
+              onBack={handleBackFromMetricSelection}
+            />;
+  }
+
+  if (currentStep === 'inputMetrics' && activeAssessmentId && selectedMetricSetId) {
+    return <InputMetricValuesStep
+              assessmentId={activeAssessmentId}
+              targetMetricSetId={selectedMetricSetId}
+              onMetricsSubmitted={handleMetricValuesSubmitted}
+              onBack={handleBackFromMetricInput}
             />;
   }
 
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
-    // Placeholder for showing assessment details/next steps (Input Metrics)
+    // Placeholder for showing assessment details/next steps
     return (
       <div className="container mx-auto py-10">
-        <h2 className="text-2xl font-bold text-primary mb-4">Assessment: {activeAssessmentId}</h2>
+        <h2 className="text-2xl font-bold text-primary mb-4">Assessment Process Completed (ID: {activeAssessmentId})</h2>
         <p>Selected Metric Set: {selectedMetricSetId}</p>
-        <p>Next step: Inputting metric values for this assessment will appear here.</p>
-        <Button onClick={handleCancelAssessmentProcess} variant="outline" className="mt-4 mr-2">Back to Prospector Home</Button>
-        {/* <Button onClick={() => setCurrentStep('selectMetrics')} variant="outline" className="mt-4">Change Metric Set</Button> */}
+        <p>Metric values have been recorded.</p>
+        <p className="mt-4">Next: Displaying a summary of the assessment and potentially site visit ratings will appear here.</p>
+        <Button onClick={handleCancelAssessmentProcess} variant="outline" className="mt-6 mr-2">Back to Prospector Home</Button>
+        {/* <Button onClick={() => setCurrentStep('inputMetrics')} variant="outline" className="mt-6">Edit Metric Values</Button> */}
       </div>
     );
   }
@@ -111,4 +136,3 @@ const SiteProspectorPage = () => {
 };
 
 export default SiteProspectorPage;
-

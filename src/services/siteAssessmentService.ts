@@ -1,6 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { SiteAssessment, SiteAssessmentInsert, SiteAssessmentUpdate, AssessmentSiteVisitRatingInsert } from '@/types/siteAssessmentTypes';
+import { 
+  SiteAssessment, 
+  SiteAssessmentInsert, 
+  SiteAssessmentUpdate, 
+  AssessmentSiteVisitRatingInsert,
+  AssessmentMetricValue, // New import
+  AssessmentMetricValueInsert // New import
+} from '@/types/siteAssessmentTypes';
 import { Account, fetchUserAccountsWithAdminRole } from '@/services/accountService'; // Assuming Account type is exported
 
 export const createSiteAssessment = async (assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id'>, userId: string): Promise<SiteAssessment> => {
@@ -111,4 +117,38 @@ export const getSiteVisitRatings = async (assessmentId: string): Promise<Assessm
   return data || [];
 };
 
+// New functions for assessment metric values
+export const saveAssessmentMetricValues = async (
+  assessmentId: string,
+  metricValues: AssessmentMetricValueInsert[]
+): Promise<AssessmentMetricValue[]> => {
+  const valuesToSave = metricValues.map(mv => ({
+    ...mv,
+    assessment_id: assessmentId,
+  }));
 
+  // Upsert based on assessment_id and metric_identifier to allow updates
+  const { data, error } = await supabase
+    .from('assessment_metric_values')
+    .upsert(valuesToSave, { onConflict: 'assessment_id, metric_identifier' })
+    .select();
+
+  if (error) {
+    console.error('Error saving assessment metric values:', error);
+    throw error;
+  }
+  return data || [];
+};
+
+export const getAssessmentMetricValues = async (assessmentId: string): Promise<AssessmentMetricValue[]> => {
+  const { data, error } = await supabase
+    .from('assessment_metric_values')
+    .select('*')
+    .eq('assessment_id', assessmentId);
+
+  if (error) {
+    console.error('Error fetching assessment metric values:', error);
+    throw error;
+  }
+  return data || [];
+};

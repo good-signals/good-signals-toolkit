@@ -1,4 +1,3 @@
-
 import { Database } from "@/integrations/supabase/types";
 
 export type SiteAssessment = Database["public"]["Tables"]["site_assessments"]["Row"];
@@ -7,6 +6,11 @@ export type SiteAssessmentUpdate = Database["public"]["Tables"]["site_assessment
 
 export type AssessmentSiteVisitRating = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Row"];
 export type AssessmentSiteVisitRatingInsert = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Insert"];
+
+// New types for Assessment Metric Values
+export type AssessmentMetricValue = Database["public"]["Tables"]["assessment_metric_values"]["Row"];
+export type AssessmentMetricValueInsert = Database["public"]["Tables"]["assessment_metric_values"]["Insert"];
+export type AssessmentMetricValueUpdate = Database["public"]["Tables"]["assessment_metric_values"]["Update"];
 
 export type SiteVisitCriterionKey = Database["public"]["Enums"]["site_visit_criterion_key"];
 export type SiteVisitRatingGrade = Database["public"]["Enums"]["site_visit_rating_grade"];
@@ -133,4 +137,3 @@ export const siteVisitCriteria: { key: SiteVisitCriterionKey; label: string; des
     ],
   },
 ];
-
