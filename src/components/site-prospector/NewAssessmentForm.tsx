@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,10 +48,19 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
     setValue("state_province", addressDetails.stateProvince, { shouldValidate: true });
     setValue("postal_code", addressDetails.postalCode, { shouldValidate: true });
     setValue("country", addressDetails.country, { shouldValidate: true });
+    if (addressDetails.addressLine2) {
+      setValue("address_line2", addressDetails.addressLine2);
+    } else {
+      setValue("address_line2", ""); // Clear if not present
+    }
     if (addressDetails.latitude && addressDetails.longitude) {
       setValue("latitude", addressDetails.latitude);
       setValue("longitude", addressDetails.longitude);
       setCoordinates({ lat: addressDetails.latitude, lng: addressDetails.longitude });
+    } else {
+      setValue("latitude", undefined);
+      setValue("longitude", undefined);
+      setCoordinates({});
     }
     // Trigger validation for all fields after setting them
     trigger(["address_line1", "city", "state_province", "postal_code", "country"]);
@@ -111,51 +119,30 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
             onAddressSelect={handleAddressSelected}
             label="Search and Select Address"
             id="address_search"
-            error={errors.address_line1?.message}
+            error={errors.address_line1?.message} // Display error for address_line1 here as it's the primary address field
           />
-
-          {/* Hidden or read-only fields populated by autocomplete, shown for clarity */}
-          <div className="space-y-4 mt-4 p-4 border border-dashed rounded-md bg-muted/30">
-            <h3 className="text-sm font-medium text-muted-foreground">Selected Address Details (auto-filled)</h3>
-            <div>
-              <Label htmlFor="address_line1_display">Address Line 1</Label>
-              <Input id="address_line1_display" {...register("address_line1")} readOnly className="bg-muted/50" />
-              {errors.address_line1 && !errors.address_line1.message?.includes("Search") && <p className="text-sm text-destructive mt-1">{errors.address_line1.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
-              <Input id="address_line2" {...register("address_line2")} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="city_display">City</Label>
-                <Input id="city_display" {...register("city")} readOnly className="bg-muted/50" />
-                {errors.city && <p className="text-sm text-destructive mt-1">{errors.city.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="state_province_display">State/Province</Label>
-                <Input id="state_province_display" {...register("state_province")} readOnly className="bg-muted/50" />
-                {errors.state_province && <p className="text-sm text-destructive mt-1">{errors.state_province.message}</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="postal_code_display">Postal Code</Label>
-                <Input id="postal_code_display" {...register("postal_code")} readOnly className="bg-muted/50" />
-                {errors.postal_code && <p className="text-sm text-destructive mt-1">{errors.postal_code.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="country_display">Country</Label>
-                <Input id="country_display" {...register("country")} readOnly className="bg-muted/50" />
-                {errors.country && <p className="text-sm text-destructive mt-1">{errors.country.message}</p>}
-              </div>
-            </div>
-            {coordinates.lat && coordinates.lng && (
-              <p className="text-xs text-muted-foreground">
-                Lat: {coordinates.lat.toFixed(6)}, Lng: {coordinates.lng.toFixed(6)}
-              </p>
-            )}
+          
+          {/* Optional Address Line 2 - Kept as user might need it */}
+          <div>
+            <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
+            <Input 
+              id="address_line2" 
+              {...register("address_line2")} 
+              placeholder="Apartment, suite, unit, building, floor, etc."
+            />
           </div>
+
+          {/* Display validation errors for other address fields if they exist, typically after autocomplete fails or if manually cleared */}
+          {errors.city && <p className="text-sm text-destructive mt-1">City: {errors.city.message}</p>}
+          {errors.state_province && <p className="text-sm text-destructive mt-1">State/Province: {errors.state_province.message}</p>}
+          {errors.postal_code && <p className="text-sm text-destructive mt-1">Postal Code: {errors.postal_code.message}</p>}
+          {errors.country && <p className="text-sm text-destructive mt-1">Country: {errors.country.message}</p>}
+          
+          {coordinates.lat && coordinates.lng && (
+            <p className="text-xs text-muted-foreground">
+              Coordinates: Lat: {coordinates.lat.toFixed(6)}, Lng: {coordinates.lng.toFixed(6)}
+            </p>
+          )}
           
           <p className="text-sm text-muted-foreground pt-4">
             Note: Pin drop functionality will be added later. For now, please use the address search.
