@@ -1,28 +1,28 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye } from 'lucide-react';
+import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { getSiteAssessmentById, getAssessmentMetricValues, getSiteVisitRatings } from '@/services/siteAssessmentService';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { SiteAssessment, AssessmentMetricValue, AssessmentSiteVisitRatingInsert, siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
   metricSetId: string;
   onBack: () => void;
-  // onEdit: () => void; // Placeholder for future edit functionality
 }
 
 const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   assessmentId,
   metricSetId,
   onBack,
-  // onEdit,
 }) => {
   const { user } = useAuth();
 
@@ -55,6 +55,39 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     queryFn: () => getSiteVisitRatings(assessmentId),
     enabled: !!assessmentId,
   });
+
+  const metricsWithScores = useMemo(() => {
+    if (!metricSet?.user_custom_metrics_settings || !metricValues) return [];
+    
+    return metricSet.user_custom_metrics_settings.map(setting => {
+      const enteredMetricValue = metricValues.find(mv => mv.metric_identifier === setting.metric_identifier);
+      const score = calculateMetricSignalScore({
+        enteredValue: enteredMetricValue?.entered_value,
+        targetValue: setting.target_value,
+        higherIsBetter: setting.higher_is_better,
+      });
+      return {
+        ...setting, // Includes label, category, target_value, higher_is_better
+        entered_value: enteredMetricValue?.entered_value,
+        notes: enteredMetricValue?.notes,
+        image_url: enteredMetricValue?.image_url, // if you want to display it
+        metric_id_from_assessment: enteredMetricValue?.id, // if needed
+        score,
+      };
+    });
+  }, [metricSet, metricValues]);
+
+  const overallSiteSignalScore = useMemo(() => {
+    const scores = metricsWithScores.map(m => m.score);
+    return calculateOverallSiteSignalScore(scores);
+  }, [metricsWithScores]);
+
+  const completionPercentage = useMemo(() => {
+    if (!metricSet?.user_custom_metrics_settings) return 0;
+    const totalMetricsInSet = metricSet.user_custom_metrics_settings.length;
+    const metricsWithEnteredValues = metricsWithScores.filter(m => typeof m.entered_value === 'number').length;
+    return calculateCompletionPercentage(totalMetricsInSet, metricsWithEnteredValues);
+  }, [metricSet, metricsWithScores]);
 
   if (isLoadingAssessment || isLoadingMetricSet || isLoadingMetricValues || isLoadingSiteVisitRatings) {
     return (
@@ -101,20 +134,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     return parts.filter(Boolean).join(', ');
   };
 
-  // Group metric values by category
-  const metricsByCategory: Record<string, (AssessmentMetricValue & { target?: number, higher_is_better?: boolean })[]> = {};
-  metricValues?.forEach(mv => {
-    if (!metricsByCategory[mv.category]) {
-      metricsByCategory[mv.category] = [];
+  const metricsByCategory: Record<string, (UserCustomMetricSetting & { entered_value?: number | null; notes?: string | null; score?: number | null })[]> = {};
+  metricsWithScores.forEach(mws => {
+    if (!metricsByCategory[mws.category]) {
+      metricsByCategory[mws.category] = [];
     }
-    const originalMetric = metricSet?.user_custom_metrics_settings?.find(
-      m => m.metric_identifier === mv.metric_identifier
-    );
-    metricsByCategory[mv.category].push({
-        ...mv,
-        target: originalMetric?.target_value,
-        higher_is_better: originalMetric?.higher_is_better
-    });
+    metricsByCategory[mws.category].push(mws);
   });
 
   return (
@@ -137,11 +162,10 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
                 {getFullAddress(assessment)}
               </CardDescription>
             </div>
-            {/* <Button variant="outline" onClick={onEdit}><Edit3 className="mr-2 h-4 w-4" /> Edit</Button> */}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Assessment ID</h3>
               <p className="text-sm">{assessment.id}</p>
@@ -150,11 +174,46 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
               <h3 className="text-sm font-medium text-muted-foreground">Date Created</h3>
               <p className="text-sm">{new Date(assessment.created_at).toLocaleDateString()}</p>
             </div>
-             <div>
+            <div>
               <h3 className="text-sm font-medium text-muted-foreground">Target Metric Set</h3>
               <p className="text-sm text-primary font-semibold">{metricSet?.name || 'N/A'}</p>
             </div>
           </div>
+          
+          {/* Overall Scores Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t mt-6">
+            <div>
+              <h3 className="text-lg font-semibold text-primary flex items-center mb-2">
+                <TrendingUp className="h-5 w-5 mr-2" />
+                Overall Site Signal Score
+              </h3>
+              {overallSiteSignalScore !== null ? (
+                <div className="flex items-center">
+                  <Progress value={overallSiteSignalScore} className="w-3/4 mr-2 h-3" />
+                  <span className="text-xl font-bold">{overallSiteSignalScore}%</span>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Not enough data to calculate score.</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Stored Score: {assessment.site_signal_score !== null ? `${assessment.site_signal_score}%` : 'N/A (pending calculation)'}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-primary flex items-center mb-2">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Completion Percentage
+              </h3>
+              <div className="flex items-center">
+                <Progress value={completionPercentage} className="w-3/4 mr-2 h-3" />
+                <span className="text-xl font-bold">{completionPercentage}%</span>
+              </div>
+               <p className="text-xs text-muted-foreground mt-1">
+                Stored Percentage: {assessment.completion_percentage !== null ? `${assessment.completion_percentage}%` : 'N/A (pending calculation)'}
+              </p>
+            </div>
+          </div>
+
         </CardContent>
       </Card>
 
@@ -162,10 +221,10 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         <CardHeader>
           <CardTitle className="text-2xl font-semibold flex items-center">
             <ListChecks className="h-6 w-6 mr-2 text-primary" />
-            Metric Values
+            Metric Values & Scores
           </CardTitle>
           <CardDescription>
-            Detailed breakdown of the metric values recorded for this assessment.
+            Detailed breakdown of metric values and their calculated signal scores.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -177,27 +236,34 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[30%]">Metric</TableHead>
+                        <TableHead className="w-[25%]">Metric</TableHead>
                         <TableHead className="text-right w-[15%]">Entered Value</TableHead>
                         <TableHead className="text-right w-[15%]">Target Value</TableHead>
-                        <TableHead className="w-[40%]">Notes</TableHead>
+                        <TableHead className="text-right w-[15%]">Signal Score</TableHead>
+                        <TableHead className="w-[30%]">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {values.map((mv) => (
-                        <TableRow key={mv.id}>
-                          <TableCell className="font-medium">{mv.label}</TableCell>
-                          <TableCell className="text-right">{mv.entered_value}</TableCell>
+                      {values.map((metric) => (
+                        <TableRow key={metric.metric_identifier}>
+                          <TableCell className="font-medium">{metric.label}</TableCell>
                           <TableCell className="text-right">
-                            {mv.target !== undefined ? mv.target : 'N/A'}
-                            {mv.higher_is_better !== undefined && mv.target !== undefined && (
-                                <Badge variant={mv.higher_is_better ? (mv.entered_value >= mv.target ? "success" : "destructive") : (mv.entered_value <= mv.target ? "success" : "destructive")} className="ml-2 text-xs">
-                                    {mv.higher_is_better ? (mv.entered_value >= mv.target ? "Good" : "Below Target") : (mv.entered_value <= mv.target ? "Good" : "Above Target")}
-                                </Badge>
+                            {typeof metric.entered_value === 'number' ? metric.entered_value : <span className="text-xs text-muted-foreground">N/A</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {typeof metric.target_value === 'number' ? metric.target_value : <span className="text-xs text-muted-foreground">N/A</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {typeof metric.score === 'number' ? (
+                              <Badge variant={metric.score >= 75 ? "success" : metric.score >= 50 ? "warning" : "destructive"} className="text-sm">
+                                {metric.score}%
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">N/A</span>
                             )}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground italic">
-                            {mv.notes || 'No notes'}
+                            {metric.notes || 'No notes'}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -207,7 +273,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground">No metric values have been recorded for this assessment yet.</p>
+            <p className="text-muted-foreground">No metric values have been recorded for this assessment yet, or metric set not fully loaded.</p>
           )}
         </CardContent>
       </Card>

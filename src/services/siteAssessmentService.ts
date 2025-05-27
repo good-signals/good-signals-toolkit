@@ -4,10 +4,10 @@ import {
   SiteAssessmentInsert, 
   SiteAssessmentUpdate, 
   AssessmentSiteVisitRatingInsert,
-  AssessmentMetricValue, // New import
-  AssessmentMetricValueInsert // New import
+  AssessmentMetricValue,
+  AssessmentMetricValueInsert
 } from '@/types/siteAssessmentTypes';
-import { Account, fetchUserAccountsWithAdminRole } from '@/services/accountService'; // Assuming Account type is exported
+import { Account, fetchUserAccountsWithAdminRole } from '@/services/accountService'; 
 
 export const createSiteAssessment = async (assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id'>, userId: string): Promise<SiteAssessment> => {
   // Fetch user's first admin account
@@ -49,12 +49,12 @@ export const getSiteAssessmentById = async (assessmentId: string, userId: string
     .from('site_assessments')
     .select('*')
     .eq('id', assessmentId)
-    .eq('user_id', userId) // Ensure user owns this assessment
+    .eq('user_id', userId) 
     .single();
 
   if (error) {
-    if (error.code === 'PGRST116') { // PostgREST error for "exactly one row was expected"
-        return null; // Not found or not owned by user
+    if (error.code === 'PGRST116') { 
+        return null; 
     }
     console.error('Error fetching site assessment by ID:', error);
     throw error;
@@ -68,7 +68,7 @@ export const updateSiteAssessment = async (assessmentId: string, updates: SiteAs
     .update(updates)
     .eq('id', assessmentId)
     .eq('user_id', userId) // Ensure user owns this assessment
-    .select()
+    .select('*')
     .single();
 
   if (error) {
@@ -117,7 +117,6 @@ export const getSiteVisitRatings = async (assessmentId: string): Promise<Assessm
   return data || [];
 };
 
-// New functions for assessment metric values
 export const saveAssessmentMetricValues = async (
   assessmentId: string,
   metricValues: AssessmentMetricValueInsert[]
@@ -127,7 +126,6 @@ export const saveAssessmentMetricValues = async (
     assessment_id: assessmentId,
   }));
 
-  // Upsert based on assessment_id and metric_identifier to allow updates
   const { data, error } = await supabase
     .from('assessment_metric_values')
     .upsert(valuesToSave, { onConflict: 'assessment_id, metric_identifier' })

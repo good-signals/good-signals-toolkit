@@ -1,8 +1,18 @@
 import { Database } from "@/integrations/supabase/types";
 
-export type SiteAssessment = Database["public"]["Tables"]["site_assessments"]["Row"];
+export type SiteAssessment = Database["public"]["Tables"]["site_assessments"]["Row"] & {
+  site_signal_score?: number | null;
+  completion_percentage?: number | null;
+  executive_summary?: string | null;
+  last_summary_generated_at?: string | null;
+};
 export type SiteAssessmentInsert = Database["public"]["Tables"]["site_assessments"]["Insert"];
-export type SiteAssessmentUpdate = Database["public"]["Tables"]["site_assessments"]["Update"];
+export type SiteAssessmentUpdate = Database["public"]["Tables"]["site_assessments"]["Update"] & {
+  site_signal_score?: number | null;
+  completion_percentage?: number | null;
+  executive_summary?: string | null;
+  last_summary_generated_at?: string | null;
+};
 
 export type AssessmentSiteVisitRating = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Row"];
 export type AssessmentSiteVisitRatingInsert = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Insert"] & { image_url?: string | null };

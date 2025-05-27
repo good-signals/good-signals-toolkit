@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Save, TrendingUp, CheckCircle } from 'lucide-react'; // Added TrendingUp, CheckCircle
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -19,21 +19,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import NewAssessmentForm from '@/components/site-prospector/NewAssessmentForm';
 import SelectTargetMetricSetStep from '@/components/site-prospector/SelectTargetMetricSetStep';
 import InputMetricValuesStep from '@/components/site-prospector/InputMetricValuesStep';
-import InputSiteVisitRatingsStep from '@/components/site-prospector/InputSiteVisitRatingsStep';
 import SiteAssessmentDetailsView from '@/components/site-prospector/SiteAssessmentDetailsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/siteAssessmentService';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
+import { Badge } from '@/components/ui/badge'; // Added Badge for scores
 
 type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'inputSiteVisitRatings' | 'assessmentDetails';
-type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at';
+type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage'; // Added new sortable keys
 
 const SiteProspectorPage = () => {
   const [currentStep, setCurrentStep] = useState<AssessmentStep>('idle');
@@ -43,8 +42,8 @@ const SiteProspectorPage = () => {
   const queryClient = useQueryClient();
 
   const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
-  const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null); // For single delete confirmation
-  const [assessmentsToDeleteList, setAssessmentsToDeleteList] = useState<string[]>([]); // For multi-delete confirmation
+  const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null);
+  const [assessmentsToDeleteList, setAssessmentsToDeleteList] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys | null; direction: 'asc' | 'desc' }>({
@@ -53,7 +52,7 @@ const SiteProspectorPage = () => {
   });
 
   const { 
-    data: assessments = [], // Provide default empty array
+    data: assessments = [], 
     isLoading: isLoadingAssessments, 
     error: assessmentsError,
     refetch: refetchAssessments,
@@ -65,7 +64,7 @@ const SiteProspectorPage = () => {
     },
     enabled: !!user?.id && currentStep === 'idle',
   });
-
+  
   const deleteMutation = useMutation({
     mutationFn: (assessmentId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
@@ -109,10 +108,11 @@ const SiteProspectorPage = () => {
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
     setActiveAssessmentId(assessmentId);
-    setCurrentStep('assessmentDetails');
+    setCurrentStep('assessmentDetails'); // Go to details view after submitting metrics
     queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
     queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] });
-    queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] });
+    // queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] }); // This might not be needed here
+    queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId]}); // For details view
   };
 
   const handleCancelAssessmentProcess = () => {
@@ -123,15 +123,22 @@ const SiteProspectorPage = () => {
   };
   
   const handleBackFromMetricSelection = () => {
-    setCurrentStep(activeAssessmentId ? 'newAddress' : 'idle');
-    refetchAssessments();
+    // This was previously going to newAddress or idle. 
+    // It makes more sense to go back to the main list (idle) if cancelling from metric selection.
+    // For consistency, let's use handleCancelAssessmentProcess for full cancellation.
+    setCurrentStep('newAddress'); // Go back to editing the address/name of current assessment.
+    // If no activeAssessmentId, this would mean cancelling creation, so 'idle'
+    // If (activeAssessmentId) setCurrentStep('newAddress'); else setCurrentStep('idle');
+    // The SelectTargetMetricSetStep's onBack is currently mapped to handleCancelAssessmentProcess
+    // This specific handler is fine as is if it's only for a step back within the flow.
   };
 
   const handleBackFromMetricInput = () => {
     if (activeAssessmentId) {
       setCurrentStep('selectMetrics');
     } else {
-      setCurrentStep('idle');
+      // This case should ideally not happen if activeAssessmentId is required for inputMetrics step
+      setCurrentStep('idle'); 
     }
   };
 
@@ -153,12 +160,16 @@ const SiteProspectorPage = () => {
     setActiveAssessmentId(assessment.id);
     if (assessment.target_metric_set_id) {
       setSelectedMetricSetId(assessment.target_metric_set_id);
-      setCurrentStep('inputMetrics');
+      // If metric set exists, user might want to edit metric values or site visit ratings
+      // Taking them to 'inputMetrics' covers the metric values part.
+      setCurrentStep('inputMetrics'); 
     } else {
+      // If no metric set, they must select one first.
       setSelectedMetricSetId(null);
       setCurrentStep('selectMetrics');
     }
   };
+
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -188,20 +199,11 @@ const SiteProspectorPage = () => {
   const confirmDelete = async () => {
     const idsToDelete = assessmentToDelete ? [assessmentToDelete.id] : assessmentsToDeleteList;
     if (idsToDelete.length === 0) return;
-
-    try {
-      // Using Promise.all to run deletions in parallel for a slightly better UX
-      // The mutation itself will handle individual toast messages on error/success if needed,
-      // but the main success/error is handled by the mutation's onsuccess/onerror.
-      await Promise.all(idsToDelete.map(id => deleteMutation.mutateAsync(id)));
-      // Overall success is handled by the mutation's global onSuccess
-    } catch (error) {
-      // Overall error (e.g., if Promise.all rejects) can be handled here, 
-      // though individual errors are handled by the mutation's onError.
-      // console.error("One or more deletions failed:", error);
-      // toast({ title: "Error", description: "One or more deletions failed.", variant: "destructive" });
-    }
+    // The mutation will handle individual processing.
+    idsToDelete.forEach(id => deleteMutation.mutate(id));
+    // Optimistic update handled by invalidateQueries in onSuccess
   };
+
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -224,19 +226,15 @@ const SiteProspectorPage = () => {
         if (typeof valA === 'string' && typeof valB === 'string') {
           return valA.localeCompare(valB) * (sortConfig.direction === 'asc' ? 1 : -1);
         }
-        // Handle date sorting correctly by comparing Date objects or timestamps
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return (valA < valB ? -1 : valA > valB ? 1 : 0) * (sortConfig.direction === 'asc' ? 1 : -1);
+        }
         if (sortConfig.key === 'created_at') {
-            const dateA = new Date(valA).getTime();
-            const dateB = new Date(valB).getTime();
+            const dateA = new Date(valA as string).getTime(); // Cast as string if type is Date | string
+            const dateB = new Date(valB as string).getTime();
             return (dateA < dateB ? -1 : dateA > dateB ? 1 : 0) * (sortConfig.direction === 'asc' ? 1 : -1);
         }
-
-        if (valA < valB) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (valA > valB) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
+        // Fallback for other types if necessary, though current keys are covered.
         return 0;
       });
     }
@@ -255,7 +253,9 @@ const SiteProspectorPage = () => {
   if (currentStep === 'newAddress') {
     return <NewAssessmentForm 
               onAssessmentCreated={handleAddressStepCompleted} 
-              onCancel={handleCancelAssessmentProcess} 
+              onCancel={handleCancelAssessmentProcess}
+              // Pass activeAssessmentId if editing existing address details
+              existingAssessmentId={activeAssessmentId} 
             />;
   }
 
@@ -263,7 +263,7 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={handleCancelAssessmentProcess} // Corrected from handleBackFromMetricSelection for consistency
+              onBack={() => setCurrentStep('newAddress')} // Back to address/name editing
             />;
   }
 
@@ -272,16 +272,21 @@ const SiteProspectorPage = () => {
               assessmentId={activeAssessmentId}
               targetMetricSetId={selectedMetricSetId}
               onMetricsSubmitted={handleMetricValuesSubmitted}
-              onBack={handleBackFromMetricInput}
+              onBack={handleBackFromMetricInput} // Back to metric set selection
             />;
   }
+  
+  // SiteVisitRatingsStep is not currently in the main flow from here.
+  // If it were, it would be:
+  // if (currentStep === 'inputSiteVisitRatings' && activeAssessmentId) { ... }
+
 
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
     return (
       <SiteAssessmentDetailsView
         assessmentId={activeAssessmentId}
         metricSetId={selectedMetricSetId}
-        onBack={handleCancelAssessmentProcess}
+        onBack={handleCancelAssessmentProcess} // Back to the main list
       />
     );
   }
@@ -350,8 +355,18 @@ const SiteProspectorPage = () => {
                     <TableHead onClick={() => requestSort('assessment_name')} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center">Name {getSortIcon('assessment_name')}</div>
                     </TableHead>
-                    <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[200px]">
                       <div className="flex items-center">Address {getSortIcon('address_line1')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('site_signal_score')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
+                      <div className="flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 mr-1"/> Score {getSortIcon('site_signal_score')}
+                      </div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('completion_percentage')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
+                      <div className="flex items-center justify-center">
+                        <CheckCircle className="h-4 w-4 mr-1"/> Completion {getSortIcon('completion_percentage')}
+                      </div>
                     </TableHead>
                     <TableHead onClick={() => requestSort('created_at')} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center">Created {getSortIcon('created_at')}</div>
@@ -378,10 +393,22 @@ const SiteProspectorPage = () => {
                         {assessment.address_line1 || ''}
                         {assessment.address_line1 && assessment.city ? ', ' : ''}
                         {assessment.city || ''}
-                        {/* {(assessment.city || assessment.address_line1) && assessment.state_province ? ', ' : ''}
-                        {assessment.state_province || ''}
-                        {((assessment.city || assessment.address_line1) || assessment.state_province) && assessment.postal_code ? ' ' : ''}
-                        {assessment.postal_code || ''} */}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
+                           <Badge variant={assessment.site_signal_score >= 75 ? "success" : assessment.site_signal_score >= 50 ? "warning" : "destructive"}>
+                            {assessment.site_signal_score}%
+                           </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {assessment.completion_percentage !== null && assessment.completion_percentage !== undefined ? (
+                          <span>{assessment.completion_percentage}%</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">N/A</span>
+                        )}
                       </TableCell>
                       <TableCell>{new Date(assessment.created_at).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right space-x-1">
