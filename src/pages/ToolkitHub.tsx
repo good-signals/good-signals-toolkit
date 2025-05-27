@@ -14,18 +14,18 @@ const tools = [
     cta: 'Target Markets',
   },
   {
-    title: 'Site Prospector',
-    description: 'Guided assessment tool to evaluate a specific site using brand-specific criteria.',
-    icon: <BarChart3 size={32} className="text-gold" />,
-    link: '/toolkit/site-prospector',
-    cta: 'Prospect Sites',
-  },
-  {
     title: 'Site Treasure Map',
     description: 'Map viewer embedding Google My Map or ArcGIS views for market clusters or overlays.',
     icon: <MapPin size={32} className="text-gold" />,
     link: '/toolkit/site-treasure-map',
     cta: 'View Map',
+  },
+  {
+    title: 'Site Prospector',
+    description: 'Guided assessment tool to evaluate a specific site using brand-specific criteria.',
+    icon: <BarChart3 size={32} className="text-gold" />,
+    link: '/toolkit/site-prospector',
+    cta: 'Prospect Sites',
   },
 ];
 
