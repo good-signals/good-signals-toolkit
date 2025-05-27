@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { BarChart3, PlusCircle, Eye, Edit, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -10,27 +9,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import NewAssessmentForm from '@/components/site-prospector/NewAssessmentForm';
 import SelectTargetMetricSetStep from '@/components/site-prospector/SelectTargetMetricSetStep';
 import InputMetricValuesStep from '@/components/site-prospector/InputMetricValuesStep';
 import SiteAssessmentDetailsView from '@/components/site-prospector/SiteAssessmentDetailsView';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { getSiteAssessmentsForUser } from '@/services/siteAssessmentService';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/siteAssessmentService';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
 
-
 type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'assessmentDetails';
+type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at';
 
 const SiteProspectorPage = () => {
   const [currentStep, setCurrentStep] = useState<AssessmentStep>('idle');
   const [activeAssessmentId, setActiveAssessmentId] = useState<string | null>(null);
   const [selectedMetricSetId, setSelectedMetricSetId] = useState<string | null>(null);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
+  const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null); // For single delete confirmation
+  const [assessmentsToDeleteList, setAssessmentsToDeleteList] = useState<string[]>([]); // For multi-delete confirmation
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys | null; direction: 'asc' | 'desc' }>({
+    key: 'created_at',
+    direction: 'desc',
+  });
 
   const { 
-    data: assessments, 
+    data: assessments = [], // Provide default empty array
     isLoading: isLoadingAssessments, 
     error: assessmentsError,
     refetch: refetchAssessments,
@@ -43,6 +65,29 @@ const SiteProspectorPage = () => {
     enabled: !!user?.id && currentStep === 'idle',
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (assessmentId: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+      return deleteSiteAssessment(assessmentId, user.id);
+    },
+    onSuccess: () => {
+      toast({ title: "Assessment(s) deleted successfully." });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+      setSelectedAssessmentIds([]);
+      setShowDeleteDialog(false);
+      setAssessmentToDelete(null);
+      setAssessmentsToDeleteList([]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting assessment",
+        description: error.message,
+        variant: "destructive",
+      });
+      setShowDeleteDialog(false);
+    },
+  });
+
   const handleStartNewAssessment = () => {
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null);
@@ -52,7 +97,7 @@ const SiteProspectorPage = () => {
   const handleAddressStepCompleted = (assessmentId: string) => {
     setActiveAssessmentId(assessmentId);
     setCurrentStep('selectMetrics');
-    refetchAssessments(); // Refetch assessments list in case user cancels and returns to idle
+    refetchAssessments(); 
   };
 
   const handleMetricSetSelected = (assessmentId: string, metricSetId: string) => {
@@ -64,44 +109,31 @@ const SiteProspectorPage = () => {
   const handleMetricValuesSubmitted = (assessmentId: string) => {
     setActiveAssessmentId(assessmentId);
     setCurrentStep('assessmentDetails');
-    console.log("Assessment ID:", assessmentId, "Metric values submitted. Next step: Assessment Details.");
-    refetchAssessments(); // Refetch to update list with potentially new/updated assessment
+    refetchAssessments(); 
   };
 
   const handleCancelAssessmentProcess = () => {
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null);
     setCurrentStep('idle');
-    refetchAssessments(); // Ensure list is up-to-date when returning to idle
+    refetchAssessments(); 
   };
   
   const handleBackFromMetricSelection = () => {
-    if (activeAssessmentId) {
-      // Potentially find the assessment and decide if it was a new one or existing one
-      // For now, assume it goes back to address input or idle.
-      // If it was a new assessment flow, newAddress. If editing an existing one, could be idle.
-      // Let's simplify: if an activeAssessmentId exists, it implies we might be editing or continuing.
-      // Going back from metric selection could mean re-entering address if it's a new assessment
-      // or returning to the list if it was an edit flow from the list.
-      // This needs careful thought for full UX. For now, let's stick to existing logic.
-      setCurrentStep('newAddress'); // This was the original logic
-    } else {
-      setCurrentStep('idle');
-    }
-     refetchAssessments();
+    setCurrentStep(activeAssessmentId ? 'newAddress' : 'idle');
+    refetchAssessments();
   };
 
   const handleBackFromMetricInput = () => {
     if (activeAssessmentId && selectedMetricSetId) {
       setCurrentStep('selectMetrics');
     } else if (activeAssessmentId) {
-      // This case implies we came from an edit flow that started at selectMetrics (if metricSetId was null)
-      setCurrentStep('newAddress'); // Or selectMetrics if appropriate
+      setCurrentStep('newAddress');
     }
     else {
       setCurrentStep('idle');
     }
-     refetchAssessments();
+    refetchAssessments();
   };
 
   const handleViewAssessment = (assessment: SiteAssessment) => {
@@ -124,12 +156,91 @@ const SiteProspectorPage = () => {
       setSelectedMetricSetId(assessment.target_metric_set_id);
       setCurrentStep('inputMetrics');
     } else {
-      // If no metric set is associated, start by selecting one
       setSelectedMetricSetId(null);
       setCurrentStep('selectMetrics');
     }
   };
 
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedAssessmentIds(assessments.map(a => a.id));
+    } else {
+      setSelectedAssessmentIds([]);
+    }
+  };
+
+  const handleSelectRow = (assessmentId: string, checked: boolean) => {
+    setSelectedAssessmentIds(prev =>
+      checked ? [...prev, assessmentId] : prev.filter(id => id !== assessmentId)
+    );
+  };
+
+  const openDeleteDialog = (item: SiteAssessment | string[]) => {
+    if (Array.isArray(item)) {
+      setAssessmentsToDeleteList(item);
+      setAssessmentToDelete(null);
+    } else {
+      setAssessmentToDelete(item);
+      setAssessmentsToDeleteList([]);
+    }
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    const idsToDelete = assessmentToDelete ? [assessmentToDelete.id] : assessmentsToDeleteList;
+    if (idsToDelete.length === 0) return;
+
+    try {
+      for (const id of idsToDelete) {
+        await deleteMutation.mutateAsync(id);
+      }
+      // Success handled by mutation's onSuccess
+    } catch (error) {
+      // Error handled by mutation's onError
+    }
+  };
+
+  const requestSort = (key: SortableKeys) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedAssessments = useMemo(() => {
+    let sortableItems = [...assessments];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        const valA = a[sortConfig.key!];
+        const valB = b[sortConfig.key!];
+
+        if (valA === null || valA === undefined) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valB === null || valB === undefined) return sortConfig.direction === 'asc' ? 1 : -1;
+        
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return valA.localeCompare(valB) * (sortConfig.direction === 'asc' ? 1 : -1);
+        }
+        if (valA < valB) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (valA > valB) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [assessments, sortConfig]);
+
+  const getSortIcon = (columnKey: SortableKeys) => {
+    if (sortConfig.key !== columnKey) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ArrowUp className="ml-2 h-4 w-4" /> : 
+      <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   if (currentStep === 'newAddress') {
     return <NewAssessmentForm 
@@ -142,7 +253,7 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={handleCancelAssessmentProcess} // Changed to unified cancel/back to idle
+              onBack={handleCancelAssessmentProcess}
             />;
   }
 
@@ -184,7 +295,19 @@ const SiteProspectorPage = () => {
       </div>
       
       <div className="mt-10 p-6 border border-border rounded-lg bg-card">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">My Site Assessments</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-card-foreground">My Site Assessments</h2>
+          {selectedAssessmentIds.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => openDeleteDialog(selectedAssessmentIds)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Selected ({selectedAssessmentIds.length})
+            </Button>
+          )}
+        </div>
         {isLoadingAssessments && (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -195,20 +318,49 @@ const SiteProspectorPage = () => {
           <p className="text-destructive">Error loading assessments: {assessmentsError.message}</p>
         )}
         {!isLoadingAssessments && !assessmentsError && (
-          assessments && assessments.length > 0 ? (
+          sortedAssessments && sortedAssessments.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={
+                          selectedAssessmentIds.length === sortedAssessments.length && sortedAssessments.length > 0
+                            ? true
+                            : selectedAssessmentIds.length > 0
+                            ? "indeterminate"
+                            : false
+                        }
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all assessments"
+                      />
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('assessment_name')} className="cursor-pointer hover:bg-muted/50">
+                      <div className="flex items-center">Name {getSortIcon('assessment_name')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50">
+                      <div className="flex items-center">Address {getSortIcon('address_line1')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('created_at')} className="cursor-pointer hover:bg-muted/50">
+                      <div className="flex items-center">Created {getSortIcon('created_at')}</div>
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assessments.map((assessment) => (
-                    <TableRow key={assessment.id}>
+                  {sortedAssessments.map((assessment) => (
+                    <TableRow 
+                      key={assessment.id}
+                      data-state={selectedAssessmentIds.includes(assessment.id) ? "selected" : undefined}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedAssessmentIds.includes(assessment.id)}
+                          onCheckedChange={(checked) => handleSelectRow(assessment.id, !!checked)}
+                          aria-label={`Select assessment ${assessment.assessment_name || assessment.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{assessment.assessment_name || 'N/A'}</TableCell>
                       <TableCell>
                         {assessment.address_line1 || ''}
@@ -216,10 +368,10 @@ const SiteProspectorPage = () => {
                         {assessment.city || ''}
                       </TableCell>
                       <TableCell>{new Date(assessment.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className="text-right space-x-1">
                         <Button 
                           variant="outline" 
-                          size="sm" 
+                          size="icon" 
                           onClick={() => handleViewAssessment(assessment)}
                           disabled={!assessment.target_metric_set_id}
                           title={!assessment.target_metric_set_id ? "Select a metric set to view details" : "View Details"}
@@ -228,11 +380,19 @@ const SiteProspectorPage = () => {
                         </Button>
                         <Button 
                           variant="outline" 
-                          size="sm" 
+                          size="icon" 
                           onClick={() => handleEditAssessment(assessment)}
                           title="Edit Assessment"
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive-outline"
+                          size="icon"
+                          onClick={() => openDeleteDialog(assessment)}
+                          title="Delete Assessment"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -247,6 +407,31 @@ const SiteProspectorPage = () => {
           )
         )}
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {assessmentToDelete
+                ? `This will permanently delete the assessment "${assessmentToDelete.assessment_name || assessmentToDelete.id}".`
+                : `This will permanently delete ${assessmentsToDeleteList.length} selected assessment(s).`}
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
