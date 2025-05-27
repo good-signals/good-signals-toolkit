@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
-import { LogIn, Settings, LogOut, Briefcase, Compass, ListChecks } from 'lucide-react'; // Updated lucide-react import
+import { LogIn, Settings, LogOut, Briefcase, ListChecks } from 'lucide-react'; // Removed Compass
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/components/auth/UserAvatar';
 import {
@@ -66,7 +67,8 @@ const Header = () => {
     <header className="bg-primary text-primary-foreground shadow-md">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
         <Link to={isLoggedIn ? "/toolkit-hub" : "/"} className="flex items-center space-x-2">
-          <Compass size={36} className="text-gold" />
+          {/* Replace Compass icon with the uploaded image */}
+          <img src="/lovable-uploads/8de401d0-f357-4b00-8015-dd18c55c0f1d.png" alt="Good Signals Logo" className="h-9 w-auto" /> 
           <h1 className="text-3xl font-bold text-gold">
             Good Signals
           </h1>
@@ -81,7 +83,6 @@ const Header = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full hover:bg-primary/80 focus-visible:ring-gold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
-                  {/* UserAvatar will show initials from nameForAvatarInitials if avatarUrlToDisplay is null */}
                   <UserAvatar avatarUrl={avatarUrlToDisplay} fullName={nameForAvatarInitials} size={8} />
                   <span className="hidden md:inline text-sm font-medium">{nameForDisplayText}</span>
                 </Button>
@@ -104,7 +105,6 @@ const Header = () => {
                   <Briefcase className="mr-2 h-4 w-4" />
                   <span>Account Management</span>
                 </DropdownMenuItem>
-                {/* New DropdownMenuItem for Target Metrics */}
                 <DropdownMenuItem onClick={() => navigate('/target-metric-sets')} className="cursor-pointer">
                   <ListChecks className="mr-2 h-4 w-4" />
                   <span>Target Metrics</span>
