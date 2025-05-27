@@ -503,34 +503,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                     <div key={category} className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0">
                       <h3 className="text-lg font-semibold text-primary">{category}</h3>
                       
-                      {/* Category Image Upload Field */}
-                      {imageMetricIndex !== undefined && metricFields[imageMetricIndex] && (
-                        <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mb-6">
-                          <Label htmlFor={`metrics.${imageMetricIndex}.image`}>{`Optional Image for ${category} Section`}</Label>
-                          <Controller
-                            name={`metrics.${imageMetricIndex}.image_file` as any} // Cast as any due to dynamic name
-                            control={control}
-                            render={() => (
-                              <ImageUploadField
-                                id={`metrics.${imageMetricIndex}.image`}
-                                currentImageUrl={watch(`metrics.${imageMetricIndex}.image_url` as any)}
-                                onFileChange={(file) => {
-                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, file, { shouldValidate: true });
-                                  if (!file && watch(`metrics.${imageMetricIndex}.image_url` as any)) {
-                                    setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                  }
-                                }}
-                                onRemoveCurrentImage={() => {
-                                  setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, null, { shouldValidate: true });
-                                }}
-                                disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                              />
-                            )}
-                          />
-                        </div>
-                      )}
-
                       {/* Individual Metrics within the category */}
                       {categoryMetrics.map((metricField) => (
                         <div key={metricField.id} className="p-4 border rounded-md shadow-sm bg-card">
@@ -616,16 +588,39 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                           </div>
                         </div>
                       ))}
+
+                      {/* Category Image Upload Field - MOVED TO THE END OF THE CATEGORY SECTION */}
+                      {imageMetricIndex !== undefined && metricFields[imageMetricIndex] && (
+                        <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mt-6"> {/* Added mt-6 for spacing */}
+                          <Label htmlFor={`metrics.${imageMetricIndex}.image`}>{`Optional Image for ${category} Section`}</Label>
+                          <Controller
+                            name={`metrics.${imageMetricIndex}.image_file` as any} // Cast as any due to dynamic name
+                            control={control}
+                            render={() => (
+                              <ImageUploadField
+                                id={`metrics.${imageMetricIndex}.image`}
+                                currentImageUrl={watch(`metrics.${imageMetricIndex}.image_url` as any)}
+                                onFileChange={(file) => {
+                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, file, { shouldValidate: true });
+                                  if (!file && watch(`metrics.${imageMetricIndex}.image_url` as any)) {
+                                    setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                  }
+                                }}
+                                onRemoveCurrentImage={() => {
+                                  setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, null, { shouldValidate: true });
+                                }}
+                                disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                              />
+                            )}
+                          />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
                  {/* Display message if no custom metrics but site visit ratings exist */}
-                {(Object.keys(metricsByCategory).length === 0 && siteVisitRatingFields.length > 0 && metricSet?.user_custom_metrics_settings?.length === 0) && (
-                     <CardDescription>
-                        No custom metrics are defined for the Target Metric Set: "{metricSet?.name || 'Unknown'}". 
-                        You can still provide Site Visit Ratings below.
-                    </CardDescription>
-                )}
+                {/* ... keep existing code ... */}
 
                 {/* Site Visit Ratings Section */}
                 {siteVisitRatingFields.length > 0 && (
@@ -633,40 +628,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
                     </div>
-
-                    {/* Site Visit Section Image Upload */}
-                    {(() => {
-                        const siteVisitImageMetricIndex = imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER];
-                        if (siteVisitImageMetricIndex !== undefined && metricFields[siteVisitImageMetricIndex]) {
-                        return (
-                            <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mb-6">
-                            <Label htmlFor={`metrics.${siteVisitImageMetricIndex}.image`}>Optional Image for Site Visit Section</Label>
-                            <Controller
-                                name={`metrics.${siteVisitImageMetricIndex}.image_file` as any}
-                                control={control}
-                                render={() => (
-                                <ImageUploadField
-                                    id={`metrics.${siteVisitImageMetricIndex}.image`}
-                                    currentImageUrl={watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)}
-                                    onFileChange={(file) => {
-                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, file, { shouldValidate: true });
-                                        if (!file && watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)) {
-                                            setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                        }
-                                    }}
-                                    onRemoveCurrentImage={() => {
-                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, null, { shouldValidate: true });
-                                    }}
-                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                />
-                                )}
-                            />
-                            </div>
-                        );
-                        }
-                        return null;
-                    })()}
                     
                     {/* Individual Site Visit Criteria */}
                     {siteVisitRatingFields.map((field, index) => {
@@ -728,6 +689,40 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                         </div>
                       );
                     })}
+
+                    {/* Site Visit Section Image Upload - MOVED TO THE END OF THE SITE VISIT SECTION */}
+                    {(() => {
+                        const siteVisitImageMetricIndex = imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER];
+                        if (siteVisitImageMetricIndex !== undefined && metricFields[siteVisitImageMetricIndex]) {
+                        return (
+                            <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mt-6"> {/* Added mt-6 for spacing */}
+                            <Label htmlFor={`metrics.${siteVisitImageMetricIndex}.image`}>Optional Image for Site Visit Section</Label>
+                            <Controller
+                                name={`metrics.${siteVisitImageMetricIndex}.image_file` as any}
+                                control={control}
+                                render={() => (
+                                <ImageUploadField
+                                    id={`metrics.${siteVisitImageMetricIndex}.image`}
+                                    currentImageUrl={watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)}
+                                    onFileChange={(file) => {
+                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, file, { shouldValidate: true });
+                                        if (!file && watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)) {
+                                            setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                        }
+                                    }}
+                                    onRemoveCurrentImage={() => {
+                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, null, { shouldValidate: true });
+                                    }}
+                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                                />
+                                )}
+                            />
+                            </div>
+                        );
+                        }
+                        return null;
+                    })()}
                   </div>
                 )}
               </>
