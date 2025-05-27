@@ -28,12 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger
-} from "@/components/ui/tabs";
 
 const metricValueSchema = z.object({
   metric_identifier: z.string(),
@@ -160,18 +154,12 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       replaceMetrics([]);
     }
 
-    // Initialize site visit ratings fields regardless of metrics
-    // existingSiteVisitRatings might be loading, so wait for it if it's relevant.
-    // If existingSiteVisitRatings is undefined (still loading), this map might run with it as null.
-    // The `enabled` flag on the query should prevent this from running with undefined `existingSiteVisitRatings` too early.
-    // However, this effect depends on `metricSet` as well.
-    // Let's ensure existingSiteVisitRatings is checked for existence.
-    if (siteVisitCriteria) { // siteVisitCriteria is always available
+    if (siteVisitCriteria) { 
         const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
             const existingRating = existingSiteVisitRatings?.find(r => r.criterion_key === criterion.key);
             return {
                 criterion_key: criterion.key,
-                grade: existingRating?.rating_grade || '',
+                grade: existingRating?.rating_grade || '', // Keeps '' for "No Grade" in form state
                 notes: existingRating?.notes || '',
             };
         });
@@ -185,7 +173,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         if (!user?.id) throw new Error('User not authenticated');
         return saveAssessmentMetricValues(assessmentId, data);
     },
-    // onSuccess removed, will be handled in onSubmitMetrics
     onError: (error: Error) => {
       toast({ title: "Error Saving Metrics", description: `Failed to save metric values: ${error.message}`, variant: "destructive" });
     },
@@ -196,7 +183,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     onSuccess: () => {
       toast({ title: 'Success', description: 'Site visit ratings saved successfully.' });
       queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] });
-      onMetricsSubmitted(assessmentId); // Proceed to the final step
+      onMetricsSubmitted(assessmentId); 
     },
     onError: (error: Error) => {
       toast({ title: 'Error Saving Site Visit Ratings', description: `Failed to save ratings: ${error.message}`, variant: 'destructive' });
@@ -204,12 +191,13 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   });
 
   const onSubmitCombinedData: SubmitHandler<MetricValuesFormData> = async (data) => {
+    console.log("Form data submitted:", data);
     const metricsToSave: AssessmentMetricValueInsert[] = data.metrics.map(m => ({
       assessment_id: assessmentId,
       metric_identifier: m.metric_identifier,
-      label: m.label, // `label` comes from the metric definition, not directly from form input for label itself
-      category: m.category, // same for category
-      entered_value: m.entered_value, // This is the core value from the form
+      label: m.label, 
+      category: m.category, 
+      entered_value: m.entered_value, 
       measurement_type: m.measurement_type,
       notes: m.notes,
     }));
@@ -217,9 +205,11 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     const ratingsToSave: AssessmentSiteVisitRatingInsert[] = data.siteVisitRatings
       .map(svr => {
         const criterion = siteVisitCriteria.find(c => c.key === svr.criterion_key);
-        if (!criterion) return null; // Should not happen if form is based on siteVisitCriteria
+        if (!criterion) return null; 
         
-        if (svr.grade && svr.grade !== '') { // Only save if a grade is selected
+        // If svr.grade is '' (after being converted from 'none' by onValueChange), it means "No Grade" was selected.
+        // So, we only save if a grade is selected (i.e., svr.grade is not an empty string).
+        if (svr.grade && svr.grade !== '') { 
           const gradeDetail = criterion.grades.find(g => g.grade === svr.grade);
           return {
             assessment_id: assessmentId,
@@ -233,38 +223,40 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       })
       .filter(Boolean) as AssessmentSiteVisitRatingInsert[];
 
+    console.log("Metrics to save:", metricsToSave);
+    console.log("Ratings to save:", ratingsToSave);
+
     let metricsStepSuccess = false;
-    if (metricsToSave.length > 0) {
+    if (metricsToSave.length > 0 || metricFields.length > 0) { // Check if there are metric fields, even if none are to be saved
       try {
-        await metricsMutation.mutateAsync(metricsToSave);
-        toast({ title: "Metrics Saved", description: "Metric values have been successfully saved." });
+        if (metricsToSave.length > 0) {
+          await metricsMutation.mutateAsync(metricsToSave);
+          toast({ title: "Metrics Saved", description: "Metric values have been successfully saved." });
+        } else {
+          toast({ title: "Metrics", description: "No new metric values to save." });
+        }
         queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId] });
         metricsStepSuccess = true;
       } catch (error) {
         // Error already toasted by mutation's onError.
-        // Do not proceed if metrics fail.
         return;
       }
-    } else if (metricFields.length === 0) {
-      // No metrics configured, so this step is definitionally successful.
-      metricsStepSuccess = true;
     } else {
-      // Metrics configured but nothing to save (e.g. all optional and left blank)
-      // Or Zod validation passed empty/default values that don't need DB write.
-      toast({ title: "Metrics", description: "No new metric values to save." });
+      // No metrics configured at all.
       metricsStepSuccess = true;
     }
 
     if (metricsStepSuccess) {
-      if (ratingsToSave.length > 0) {
-        // siteVisitRatingsMutation.onSuccess will call onMetricsSubmitted
-        siteVisitRatingsMutation.mutate(ratingsToSave);
+      if (ratingsToSave.length > 0 || siteVisitRatingFields.length > 0) { // Check if there are site visit fields
+        if (ratingsToSave.length > 0) {
+          siteVisitRatingsMutation.mutate(ratingsToSave);
+        } else {
+          // No ratings to save, but fields exist. Proceed to next step directly.
+          toast({ title: 'Site Visit Ratings', description: 'No new site visit ratings to save.' });
+          onMetricsSubmitted(assessmentId);
+        }
       } else {
-        toast({ title: 'Site Visit Ratings Skipped', description: 'No site visit ratings were entered. Proceeding.' });
-        // If there are existing ratings, and user submits empty, should they be cleared?
-        // Current `saveSiteVisitRatings` with an empty array might do nothing or clear, depending on its impl.
-        // For now, assume submitting empty means "no changes" or "clear".
-        // To be safe, if we want to ensure `onMetricsSubmitted` is called:
+        // No site visit ratings configured at all.
         onMetricsSubmitted(assessmentId);
       }
     }
@@ -312,160 +304,172 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         
         <form onSubmit={handleSubmit(onSubmitCombinedData)}>
           <CardContent className="space-y-8 pt-4">
-            {metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0 ? (
-              Object.entries(metricsByCategory).map(([category, categoryMetrics]) => (
-                <div key={category} className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0">
-                  <h3 className="text-lg font-semibold text-primary">{category}</h3>
-                  {categoryMetrics.map((metricField) => (
-                    <div key={metricField.id} className="p-4 border rounded-md shadow-sm bg-card">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        <div>
-                          <Label htmlFor={`metrics.${metricField.originalIndex}.entered_value`} className="flex items-center">
-                            {metricField.label}
-                            <Tooltip delayDuration={100}>
-                              <TooltipTrigger asChild>
-                                <Info className="h-3 w-3 ml-1.5 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs">
-                                <p>Target: {metricField.target_value ?? 'N/A'} ({metricField.higher_is_better ? "Higher is better" : "Lower is better"})</p>
-                                {metricField.measurement_type && <p>Type: {metricField.measurement_type}</p>}
-                              </TooltipContent>
-                            </Tooltip>
-                          </Label>
-                          
-                          {specificDropdownMetrics.includes(metricField.metric_identifier) ? (
-                            <Controller
-                              name={`metrics.${metricField.originalIndex}.entered_value`}
-                              control={control}
-                              render={({ field: controllerField }) => (
-                                <Select
-                                  value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
-                                  onValueChange={(value) => controllerField.onChange(parseFloat(value))}
-                                >
-                                  <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
-                                    <SelectValue placeholder={`Select value for ${metricField.label}`} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {metricDropdownOptions[metricField.metric_identifier].map(option => (
-                                      <SelectItem key={option.value} value={String(option.value)}>
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                            />
-                          ) : (
-                            <Controller
-                              name={`metrics.${metricField.originalIndex}.entered_value`}
-                              control={control}
-                              render={({ field: controllerField }) => (
-                                <Input
-                                  {...controllerField}
-                                  id={`metrics.${metricField.originalIndex}.entered_value`}
-                                  type="number"
-                                  step="any"
-                                  placeholder={`Enter value for ${metricField.label}`}
-                                  className="mt-1"
-                                  value={controllerField.value === null || controllerField.value === undefined ? '' : String(controllerField.value)}
-                                  onChange={e => controllerField.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+            {(metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) || siteVisitRatingFields.length > 0 ? (
+              <>
+                {metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0 ? (
+                  Object.entries(metricsByCategory).map(([category, categoryMetrics]) => (
+                    <div key={category} className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0">
+                      <h3 className="text-lg font-semibold text-primary">{category}</h3>
+                      {categoryMetrics.map((metricField) => (
+                        <div key={metricField.id} className="p-4 border rounded-md shadow-sm bg-card">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div>
+                              <Label htmlFor={`metrics.${metricField.originalIndex}.entered_value`} className="flex items-center">
+                                {metricField.label}
+                                <Tooltip delayDuration={100}>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-3 w-3 ml-1.5 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p>Target: {metricField.target_value ?? 'N/A'} ({metricField.higher_is_better ? "Higher is better" : "Lower is better"})</p>
+                                    {metricField.measurement_type && <p>Type: {metricField.measurement_type}</p>}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </Label>
+                              
+                              {specificDropdownMetrics.includes(metricField.metric_identifier) ? (
+                                <Controller
+                                  name={`metrics.${metricField.originalIndex}.entered_value`}
+                                  control={control}
+                                  render={({ field: controllerField }) => (
+                                    <Select
+                                      value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
+                                      onValueChange={(value) => controllerField.onChange(parseFloat(value))}
+                                    >
+                                      <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
+                                        <SelectValue placeholder={`Select value for ${metricField.label}`} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {metricDropdownOptions[metricField.metric_identifier].map(option => (
+                                          <SelectItem key={option.value} value={String(option.value)}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                />
+                              ) : (
+                                <Controller
+                                  name={`metrics.${metricField.originalIndex}.entered_value`}
+                                  control={control}
+                                  render={({ field: controllerField }) => (
+                                    <Input
+                                      {...controllerField}
+                                      id={`metrics.${metricField.originalIndex}.entered_value`}
+                                      type="number"
+                                      step="any"
+                                      placeholder={`Enter value for ${metricField.label}`}
+                                      className="mt-1"
+                                      value={controllerField.value === null || controllerField.value === undefined ? '' : String(controllerField.value)}
+                                      onChange={e => controllerField.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                                    />
+                                  )}
                                 />
                               )}
-                            />
-                          )}
-                          {errors.metrics?.[metricField.originalIndex]?.entered_value && (
-                            <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message}</p>
-                          )}
-                        </div>
-                        <div>
-                          <Label htmlFor={`metrics.${metricField.originalIndex}.notes`}>Notes (Optional)</Label>
-                          <Controller
-                            name={`metrics.${metricField.originalIndex}.notes`}
-                            control={control}
-                            render={({ field: controllerField }) => (
-                              <Textarea
-                                {...controllerField}
-                                id={`metrics.${metricField.originalIndex}.notes`}
-                                placeholder="Any specific observations or context..."
-                                className="mt-1"
-                                value={controllerField.value ?? ''}
-                                onChange={e => controllerField.onChange(e.target.value)}
+                              {errors.metrics?.[metricField.originalIndex]?.entered_value && (
+                                <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message}</p>
+                              )}
+                            </div>
+                            <div>
+                              <Label htmlFor={`metrics.${metricField.originalIndex}.notes`}>Notes (Optional)</Label>
+                              <Controller
+                                name={`metrics.${metricField.originalIndex}.notes`}
+                                control={control}
+                                render={({ field: controllerField }) => (
+                                  <Textarea
+                                    {...controllerField}
+                                    id={`metrics.${metricField.originalIndex}.notes`}
+                                    placeholder="Any specific observations or context..."
+                                    className="mt-1"
+                                    value={controllerField.value ?? ''}
+                                    onChange={e => controllerField.onChange(e.target.value)}
+                                  />
+                                )}
                               />
-                            )}
-                          />
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ))
+                  ))
+                ): (
+                  metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length === 0 && siteVisitRatingFields.length > 0 && (
+                     <CardDescription>
+                        No custom metrics are defined for the Target Metric Set: "{metricSet?.name || 'Unknown'}". 
+                        You can still provide Site Visit Ratings below.
+                    </CardDescription>
+                  )
+                )}
+
+                {/* Site Visit Ratings Section */}
+                {siteVisitRatingFields.length > 0 && (
+                  <div className="space-y-6 border-t pt-6 mt-8">
+                    <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
+                    {siteVisitRatingFields.map((field, index) => {
+                      const criterionDetails = getCriterionDetails(field.criterion_key as SiteVisitCriterionKey);
+                      if (!criterionDetails) return null; 
+
+                      return (
+                        <div key={field.id} className="p-4 border rounded-md shadow-sm bg-card">
+                          <h4 className="text-md font-semibold mb-1">{criterionDetails.label}</h4>
+                          <p className="text-sm text-muted-foreground mb-3">{criterionDetails.description}</p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                            <div className="md:col-span-1">
+                              <Label htmlFor={`siteVisitRatings.${index}.grade`}>Grade</Label>
+                              <Controller
+                                name={`siteVisitRatings.${index}.grade`}
+                                control={control}
+                                render={({ field: controllerField }) => (
+                                  <Select
+                                    value={controllerField.value || ''} // Uses '' for "No Grade" or if unselected
+                                    onValueChange={(value) => controllerField.onChange(value === 'none' ? '' : value)} // Store '' if "none" is selected
+                                  >
+                                    <SelectTrigger id={`siteVisitRatings.${index}.grade`} className="mt-1">
+                                      <SelectValue placeholder="Select grade" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none"><em>No Grade</em></SelectItem>
+                                      {criterionDetails.grades.map(grade => (
+                                        <SelectItem key={grade.grade} value={grade.grade}>
+                                          {grade.grade} - {grade.description}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label htmlFor={`siteVisitRatings.${index}.notes`}>Notes (Optional)</Label>
+                              <Controller
+                                name={`siteVisitRatings.${index}.notes`}
+                                control={control}
+                                render={({ field: controllerField }) => (
+                                  <Textarea
+                                    {...controllerField}
+                                    id={`siteVisitRatings.${index}.notes`}
+                                    placeholder="Optional notes..."
+                                    rows={2}
+                                    className="mt-1"
+                                    value={controllerField.value ?? ''}
+                                  />
+                                )}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               <CardDescription>
-                No custom metrics are defined for the Target Metric Set: "{metricSet?.name || 'Unknown'}". 
-                You can still provide Site Visit Ratings below.
+                Neither custom metrics nor site visit criteria are available for this assessment. 
+                Please configure a Target Metric Set or check system settings.
               </CardDescription>
             )}
-
-            {/* Site Visit Ratings Section */}
-            <div className="space-y-6 border-t pt-6 mt-8">
-              <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
-              {siteVisitRatingFields.map((field, index) => {
-                const criterionDetails = getCriterionDetails(field.criterion_key as SiteVisitCriterionKey);
-                if (!criterionDetails) return null; // Should not happen
-
-                return (
-                  <div key={field.id} className="p-4 border rounded-md shadow-sm bg-card">
-                    <h4 className="text-md font-semibold mb-1">{criterionDetails.label}</h4>
-                    <p className="text-sm text-muted-foreground mb-3">{criterionDetails.description}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                      <div className="md:col-span-1">
-                        <Label htmlFor={`siteVisitRatings.${index}.grade`}>Grade</Label>
-                        <Controller
-                          name={`siteVisitRatings.${index}.grade`}
-                          control={control}
-                          render={({ field: controllerField }) => (
-                            <Select
-                              value={controllerField.value || ''}
-                              onValueChange={(value) => controllerField.onChange(value)}
-                            >
-                              <SelectTrigger id={`siteVisitRatings.${index}.grade`} className="mt-1">
-                                <SelectValue placeholder="Select grade" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value=""><em>No Grade</em></SelectItem>
-                                {criterionDetails.grades.map(grade => (
-                                  <SelectItem key={grade.grade} value={grade.grade}>
-                                    {grade.grade} - {grade.description}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                        {/* No direct error display for grade unless made required by schema */}
-                      </div>
-                      <div className="md:col-span-2">
-                        <Label htmlFor={`siteVisitRatings.${index}.notes`}>Notes (Optional)</Label>
-                        <Controller
-                          name={`siteVisitRatings.${index}.notes`}
-                          control={control}
-                          render={({ field: controllerField }) => (
-                            <Textarea
-                              {...controllerField}
-                              id={`siteVisitRatings.${index}.notes`}
-                              placeholder="Optional notes..."
-                              rows={2}
-                              className="mt-1"
-                              value={controllerField.value ?? ''}
-                            />
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </CardContent>
           <CardFooter className="flex justify-between bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-4 border-t sticky bottom-0">
             <Button 
