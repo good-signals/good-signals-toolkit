@@ -11,6 +11,8 @@ export interface Account {
   logo_url?: string | null;
   created_at?: string;
   updated_at?: string;
+  signal_good_threshold: number; // Added
+  signal_bad_threshold: number;  // Added
 }
 
 export interface AccountMembership {
@@ -44,7 +46,7 @@ export const fetchUserAccountsWithAdminRole = async (userId: string): Promise<Ac
 
     const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('*')
+      .select('*') // This will now include the new threshold columns
       .in('id', accountIds);
 
     if (accountsError) {
@@ -60,11 +62,24 @@ export const fetchUserAccountsWithAdminRole = async (userId: string): Promise<Ac
   }
 };
 
-export const updateAccountDetailsService = async (accountId: string, updates: Partial<Pick<Account, 'name' | 'category' | 'subcategory' | 'address' | 'logo_url'>>): Promise<Account | null> => {
+// Updated to include new threshold fields in updates
+export const updateAccountDetailsService = async (
+  accountId: string, 
+  updates: Partial<Pick<Account, 'name' | 'category' | 'subcategory' | 'address' | 'logo_url' | 'signal_good_threshold' | 'signal_bad_threshold'>>
+): Promise<Account | null> => {
   try {
+    // Ensure numeric values are correctly formatted if they come from form inputs as strings
+    const processedUpdates = { ...updates };
+    if (processedUpdates.signal_good_threshold !== undefined) {
+      processedUpdates.signal_good_threshold = Number(processedUpdates.signal_good_threshold);
+    }
+    if (processedUpdates.signal_bad_threshold !== undefined) {
+      processedUpdates.signal_bad_threshold = Number(processedUpdates.signal_bad_threshold);
+    }
+
     const { data, error } = await supabase
       .from('accounts')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...processedUpdates, updated_at: new Date().toISOString() })
       .eq('id', accountId)
       .select()
       .maybeSingle();
@@ -74,20 +89,12 @@ export const updateAccountDetailsService = async (accountId: string, updates: Pa
       toast.error(`Failed to update account: ${error.message}`);
       return null;
     }
-    // If data is null here, it means the row wasn't found or accessible after update.
-    // The original error was about this select returning no rows.
-    // With maybeSingle, data will be null instead of an error,
-    // which should be handled by the calling component if specific feedback is needed.
-    // For now, if no error, we assume success if data is returned.
+    
     if (data) {
         toast.success('Account details updated successfully!');
     } else if (!error) {
-        // This case implies the update might have gone through, but the select failed to return the row.
-        // This could happen if RLS prevents seeing the row, or the ID was wrong.
-        // Given the RLS policies we just added, this should be less likely for valid admin updates.
         console.warn('Account update was attempted, but no data returned. Account ID:', accountId);
-        toast.info('Account details updated, but confirmation failed. Please refresh.'); // Changed from toast.warn
-        // We still return the (empty) data, which is null.
+        toast.info('Account details updated, but confirmation failed. Please refresh.');
     }
     return data;
   } catch (error: any) {

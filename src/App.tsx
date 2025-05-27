@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
 import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
+import SignalThresholdSettingsPage from "./pages/SignalThresholdSettingsPage"; // Import the new page
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -89,6 +90,11 @@ const AppContent = () => {
           <Route 
             path="target-metric-sets" 
             element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
+          />
+          {/* Add new route for Signal Threshold Settings */}
+          <Route 
+            path="signal-threshold-settings"
+            element={<ProtectedRoute><SignalThresholdSettingsPage /></ProtectedRoute>}
           />
         </Route>
         <Route path="*" element={<NotFound />} />

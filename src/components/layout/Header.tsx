@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
-import { LogIn, Settings, LogOut, Briefcase, ListChecks } from 'lucide-react'; // Removed Compass
+import { LogIn, Settings, LogOut, Briefcase, ListChecks, BarChart3 } from 'lucide-react'; // Added BarChart3
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/components/auth/UserAvatar';
 import {
@@ -67,7 +66,6 @@ const Header = () => {
     <header className="bg-primary text-primary-foreground shadow-md">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
         <Link to={isLoggedIn ? "/toolkit-hub" : "/"} className="flex items-center space-x-2">
-          {/* Replace Compass icon with the uploaded image */}
           <img src="/lovable-uploads/8de401d0-f357-4b00-8015-dd18c55c0f1d.png" alt="Good Signals Logo" className="h-9 w-auto" /> 
           <h1 className="text-3xl font-bold text-gold">
             Good Signals
@@ -108,6 +106,10 @@ const Header = () => {
                 <DropdownMenuItem onClick={() => navigate('/target-metric-sets')} className="cursor-pointer">
                   <ListChecks className="mr-2 h-4 w-4" />
                   <span>Target Metrics</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/signal-threshold-settings')} className="cursor-pointer">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  <span>Signal Thresholds</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive hover:!text-destructive hover:!bg-destructive/10 focus:text-destructive focus:bg-destructive/10">

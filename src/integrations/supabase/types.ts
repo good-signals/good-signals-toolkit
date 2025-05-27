@@ -49,6 +49,8 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          signal_bad_threshold: number
+          signal_good_threshold: number
           subcategory: string | null
           updated_at: string | null
         }
@@ -59,6 +61,8 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          signal_bad_threshold?: number
+          signal_good_threshold?: number
           subcategory?: string | null
           updated_at?: string | null
         }
@@ -69,6 +73,8 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          signal_bad_threshold?: number
+          signal_good_threshold?: number
           subcategory?: string | null
           updated_at?: string | null
         }
