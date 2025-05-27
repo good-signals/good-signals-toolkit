@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -24,6 +24,7 @@ import {
 import NewAssessmentForm from '@/components/site-prospector/NewAssessmentForm';
 import SelectTargetMetricSetStep from '@/components/site-prospector/SelectTargetMetricSetStep';
 import InputMetricValuesStep from '@/components/site-prospector/InputMetricValuesStep';
+import InputSiteVisitRatingsStep from '@/components/site-prospector/InputSiteVisitRatingsStep';
 import SiteAssessmentDetailsView from '@/components/site-prospector/SiteAssessmentDetailsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,7 +32,7 @@ import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/site
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
 
-type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'assessmentDetails';
+type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'inputSiteVisitRatings' | 'assessmentDetails';
 type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at';
 
 const SiteProspectorPage = () => {
@@ -108,8 +109,16 @@ const SiteProspectorPage = () => {
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
     setActiveAssessmentId(assessmentId);
+    setCurrentStep('inputSiteVisitRatings'); 
+    // queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // Potentially refetch if list view needs update
+  };
+
+  const handleSiteVisitRatingsSubmitted = (assessmentId: string) => {
+    setActiveAssessmentId(assessmentId);
     setCurrentStep('assessmentDetails');
-    refetchAssessments(); 
+    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // Refetch to update table if needed
+    queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] }); // Refetch details for the view
+    queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] }); // Refetch ratings for the view
   };
 
   const handleCancelAssessmentProcess = () => {
@@ -126,14 +135,24 @@ const SiteProspectorPage = () => {
 
   const handleBackFromMetricInput = () => {
     if (activeAssessmentId && selectedMetricSetId) {
-      setCurrentStep('selectMetrics');
+      setCurrentStep('inputMetrics'); // Go back to inputting metric values
     } else if (activeAssessmentId) {
-      setCurrentStep('newAddress');
-    }
-    else {
+      setCurrentStep('selectMetrics'); // Fallback, though should have metricSetId
+    } else {
       setCurrentStep('idle');
     }
-    refetchAssessments();
+    // No immediate refetch needed here, just changing step
+  };
+
+  const handleBackFromSiteVisitRatingsInput = () => {
+    if (activeAssessmentId && selectedMetricSetId) {
+      setCurrentStep('inputMetrics'); // Go back to inputting metric values
+    } else if (activeAssessmentId) {
+      setCurrentStep('selectMetrics'); // Fallback, though should have metricSetId
+    } else {
+      setCurrentStep('idle');
+    }
+    // No immediate refetch needed here, just changing step
   };
 
   const handleViewAssessment = (assessment: SiteAssessment) => {
@@ -252,7 +271,7 @@ const SiteProspectorPage = () => {
       <ArrowUp className="ml-2 h-4 w-4" /> : 
       <ArrowDown className="ml-2 h-4 w-4" />;
   };
-
+  
   if (currentStep === 'newAddress') {
     return <NewAssessmentForm 
               onAssessmentCreated={handleAddressStepCompleted} 
@@ -274,6 +293,14 @@ const SiteProspectorPage = () => {
               targetMetricSetId={selectedMetricSetId}
               onMetricsSubmitted={handleMetricValuesSubmitted}
               onBack={handleBackFromMetricInput}
+            />;
+  }
+
+  if (currentStep === 'inputSiteVisitRatings' && activeAssessmentId && selectedMetricSetId) {
+    return <InputSiteVisitRatingsStep
+              assessmentId={activeAssessmentId}
+              onSiteVisitRatingsSubmitted={handleSiteVisitRatingsSubmitted}
+              onBack={handleBackFromSiteVisitRatingsInput}
             />;
   }
 
