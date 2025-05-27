@@ -191,12 +191,16 @@ const SiteProspectorPage = () => {
     if (idsToDelete.length === 0) return;
 
     try {
-      for (const id of idsToDelete) {
-        await deleteMutation.mutateAsync(id);
-      }
-      // Success handled by mutation's onSuccess
+      // Using Promise.all to run deletions in parallel for a slightly better UX
+      // The mutation itself will handle individual toast messages on error/success if needed,
+      // but the main success/error is handled by the mutation's onsuccess/onerror.
+      await Promise.all(idsToDelete.map(id => deleteMutation.mutateAsync(id)));
+      // Overall success is handled by the mutation's global onSuccess
     } catch (error) {
-      // Error handled by mutation's onError
+      // Overall error (e.g., if Promise.all rejects) can be handled here, 
+      // though individual errors are handled by the mutation's onError.
+      // console.error("One or more deletions failed:", error);
+      // toast({ title: "Error", description: "One or more deletions failed.", variant: "destructive" });
     }
   };
 
@@ -221,6 +225,13 @@ const SiteProspectorPage = () => {
         if (typeof valA === 'string' && typeof valB === 'string') {
           return valA.localeCompare(valB) * (sortConfig.direction === 'asc' ? 1 : -1);
         }
+        // Handle date sorting correctly by comparing Date objects or timestamps
+        if (sortConfig.key === 'created_at') {
+            const dateA = new Date(valA).getTime();
+            const dateB = new Date(valB).getTime();
+            return (dateA < dateB ? -1 : dateA > dateB ? 1 : 0) * (sortConfig.direction === 'asc' ? 1 : -1);
+        }
+
         if (valA < valB) {
           return sortConfig.direction === 'asc' ? -1 : 1;
         }
@@ -232,7 +243,7 @@ const SiteProspectorPage = () => {
     }
     return sortableItems;
   }, [assessments, sortConfig]);
-
+  
   const getSortIcon = (columnKey: SortableKeys) => {
     if (sortConfig.key !== columnKey) {
       return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
@@ -253,7 +264,7 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={handleCancelAssessmentProcess}
+              onBack={handleCancelAssessmentProcess} // Corrected from handleBackFromMetricSelection for consistency
             />;
   }
 
@@ -302,8 +313,9 @@ const SiteProspectorPage = () => {
               variant="destructive"
               size="sm"
               onClick={() => openDeleteDialog(selectedAssessmentIds)}
+              disabled={deleteMutation.isPending}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              {deleteMutation.isPending && assessmentsToDeleteList.length > 0 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
               Delete Selected ({selectedAssessmentIds.length})
             </Button>
           )}
@@ -336,13 +348,13 @@ const SiteProspectorPage = () => {
                         aria-label="Select all assessments"
                       />
                     </TableHead>
-                    <TableHead onClick={() => requestSort('assessment_name')} className="cursor-pointer hover:bg-muted/50">
+                    <TableHead onClick={() => requestSort('assessment_name')} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center">Name {getSortIcon('assessment_name')}</div>
                     </TableHead>
-                    <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50">
+                    <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center">Address {getSortIcon('address_line1')}</div>
                     </TableHead>
-                    <TableHead onClick={() => requestSort('created_at')} className="cursor-pointer hover:bg-muted/50">
+                    <TableHead onClick={() => requestSort('created_at')} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center">Created {getSortIcon('created_at')}</div>
                     </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -353,6 +365,7 @@ const SiteProspectorPage = () => {
                     <TableRow 
                       key={assessment.id}
                       data-state={selectedAssessmentIds.includes(assessment.id) ? "selected" : undefined}
+                      className={selectedAssessmentIds.includes(assessment.id) ? "bg-muted/50" : ""}
                     >
                       <TableCell>
                         <Checkbox
@@ -366,6 +379,10 @@ const SiteProspectorPage = () => {
                         {assessment.address_line1 || ''}
                         {assessment.address_line1 && assessment.city ? ', ' : ''}
                         {assessment.city || ''}
+                        {/* {(assessment.city || assessment.address_line1) && assessment.state_province ? ', ' : ''}
+                        {assessment.state_province || ''}
+                        {((assessment.city || assessment.address_line1) || assessment.state_province) && assessment.postal_code ? ' ' : ''}
+                        {assessment.postal_code || ''} */}
                       </TableCell>
                       <TableCell>{new Date(assessment.created_at).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right space-x-1">
@@ -373,7 +390,7 @@ const SiteProspectorPage = () => {
                           variant="outline" 
                           size="icon" 
                           onClick={() => handleViewAssessment(assessment)}
-                          disabled={!assessment.target_metric_set_id}
+                          disabled={!assessment.target_metric_set_id || deleteMutation.isPending}
                           title={!assessment.target_metric_set_id ? "Select a metric set to view details" : "View Details"}
                         >
                           <Eye className="h-4 w-4" />
@@ -383,16 +400,19 @@ const SiteProspectorPage = () => {
                           size="icon" 
                           onClick={() => handleEditAssessment(assessment)}
                           title="Edit Assessment"
+                          disabled={deleteMutation.isPending}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="destructive-outline"
+                          variant="outline"
                           size="icon"
+                          className="text-destructive border-destructive hover:bg-destructive/90 hover:text-destructive-foreground"
                           onClick={() => openDeleteDialog(assessment)}
                           title="Delete Assessment"
+                          disabled={deleteMutation.isPending && assessmentToDelete?.id === assessment.id}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {deleteMutation.isPending && assessmentToDelete?.id === assessment.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -420,11 +440,11 @@ const SiteProspectorPage = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setShowDeleteDialog(false); setAssessmentToDelete(null); setAssessmentsToDeleteList([]); }}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleteMutation.isPending}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Delete
