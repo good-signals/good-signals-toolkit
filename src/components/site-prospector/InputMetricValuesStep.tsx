@@ -159,7 +159,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             const existingRating = existingSiteVisitRatings?.find(r => r.criterion_key === criterion.key);
             return {
                 criterion_key: criterion.key,
-                grade: existingRating?.rating_grade || '', // Keeps '' for "No Grade" in form state
+                // Ensure form state for grade is '' if no grade or "none" was stored.
+                grade: (existingRating?.rating_grade && existingRating.rating_grade !== 'none') ? existingRating.rating_grade : '', 
                 notes: existingRating?.notes || '',
             };
         });
@@ -207,8 +208,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         const criterion = siteVisitCriteria.find(c => c.key === svr.criterion_key);
         if (!criterion) return null; 
         
-        // If svr.grade is '' (after being converted from 'none' by onValueChange), it means "No Grade" was selected.
-        // So, we only save if a grade is selected (i.e., svr.grade is not an empty string).
+        // svr.grade will be '' if "No Grade" was selected (due to onValueChange logic)
+        // or if it was initialized as such.
         if (svr.grade && svr.grade !== '') { 
           const gradeDetail = criterion.grades.find(g => g.grade === svr.grade);
           return {
@@ -227,7 +228,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     console.log("Ratings to save:", ratingsToSave);
 
     let metricsStepSuccess = false;
-    if (metricsToSave.length > 0 || metricFields.length > 0) { // Check if there are metric fields, even if none are to be saved
+    if (metricsToSave.length > 0 || metricFields.length > 0) { 
       try {
         if (metricsToSave.length > 0) {
           await metricsMutation.mutateAsync(metricsToSave);
@@ -247,7 +248,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     }
 
     if (metricsStepSuccess) {
-      if (ratingsToSave.length > 0 || siteVisitRatingFields.length > 0) { // Check if there are site visit fields
+      if (ratingsToSave.length > 0 || siteVisitRatingFields.length > 0) { 
         if (ratingsToSave.length > 0) {
           siteVisitRatingsMutation.mutate(ratingsToSave);
         } else {
@@ -422,13 +423,20 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                 control={control}
                                 render={({ field: controllerField }) => (
                                   <Select
-                                    value={controllerField.value || ''} // Uses '' for "No Grade" or if unselected
-                                    onValueChange={(value) => controllerField.onChange(value === 'none' ? '' : value)} // Store '' if "none" is selected
+                                    // controllerField.value is '' for "No Grade" or unselected.
+                                    // This makes Select show placeholder if controllerField.value is ''.
+                                    value={controllerField.value || ''} 
+                                    onValueChange={(value) => {
+                                      // If 'none' is selected from dropdown, set form state to ''.
+                                      // Otherwise, set to the selected grade value.
+                                      controllerField.onChange(value === 'none' ? '' : value);
+                                    }}
                                   >
                                     <SelectTrigger id={`siteVisitRatings.${index}.grade`} className="mt-1">
                                       <SelectValue placeholder="Select grade" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                      {/* Ensure "No Grade" item has a non-empty value */}
                                       <SelectItem value="none"><em>No Grade</em></SelectItem>
                                       {criterionDetails.grades.map(grade => (
                                         <SelectItem key={grade.grade} value={grade.grade}>
