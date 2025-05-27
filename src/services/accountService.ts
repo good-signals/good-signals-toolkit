@@ -86,7 +86,7 @@ export const updateAccountDetailsService = async (accountId: string, updates: Pa
         // This could happen if RLS prevents seeing the row, or the ID was wrong.
         // Given the RLS policies we just added, this should be less likely for valid admin updates.
         console.warn('Account update was attempted, but no data returned. Account ID:', accountId);
-        toast.warn('Account details updated, but confirmation failed. Please refresh.');
+        toast.info('Account details updated, but confirmation failed. Please refresh.'); // Changed from toast.warn
         // We still return the (empty) data, which is null.
     }
     return data;
