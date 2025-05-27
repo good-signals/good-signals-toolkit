@@ -24,12 +24,12 @@ export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 // Schema for a single custom metric setting from the database
 export const UserCustomMetricSettingSchema = z.object({
   id: z.string().uuid().optional(),
-  user_id: z.string().uuid(), // CHANGED: Made non-optional
+  user_id: z.string().uuid(), 
   metric_identifier: z.string().min(1),
   category: z.string().min(1),
   label: z.string().min(1),
   target_value: z.number(),
-  measurement_type: z.enum(MEASUREMENT_TYPES).nullable().optional(),
+  measurement_type: z.enum(MEASUREMENT_TYPES).nullable(), // CHANGED: Removed .optional()
   higher_is_better: z.boolean(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
