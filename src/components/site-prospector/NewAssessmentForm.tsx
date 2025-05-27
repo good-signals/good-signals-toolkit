@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,11 +13,13 @@ import { SiteAssessmentInsert } from '@/types/siteAssessmentTypes';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import AddressAutocompleteInput, { AddressComponents } from './AddressAutocompleteInput';
+import AddressMapDisplay from './AddressMapDisplay'; // New import for the map
 
+// Removed address_line2 from the schema
 const addressSchema = z.object({
   assessment_name: z.string().min(1, "Assessment name is required"),
   address_line1: z.string().min(1, "Address is required"),
-  address_line2: z.string().optional(),
+  // address_line2: z.string().optional(), // Removed
   city: z.string().min(1, "City is required"),
   state_province: z.string().min(1, "State/Province is required"),
   postal_code: z.string().min(1, "Postal Code is required"),
@@ -48,11 +51,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
     setValue("state_province", addressDetails.stateProvince, { shouldValidate: true });
     setValue("postal_code", addressDetails.postalCode, { shouldValidate: true });
     setValue("country", addressDetails.country, { shouldValidate: true });
-    if (addressDetails.addressLine2) {
-      setValue("address_line2", addressDetails.addressLine2);
-    } else {
-      setValue("address_line2", ""); // Clear if not present
-    }
+    // No longer setting address_line2
     if (addressDetails.latitude && addressDetails.longitude) {
       setValue("latitude", addressDetails.latitude);
       setValue("longitude", addressDetails.longitude);
@@ -62,7 +61,6 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       setValue("longitude", undefined);
       setCoordinates({});
     }
-    // Trigger validation for all fields after setting them
     trigger(["address_line1", "city", "state_province", "postal_code", "country"]);
   };
 
@@ -76,7 +74,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       const assessmentPayload: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'> = {
         assessment_name: data.assessment_name,
         address_line1: data.address_line1,
-        address_line2: data.address_line2,
+        // address_line2: data.address_line2, // Removed
         city: data.city,
         state_province: data.state_province,
         postal_code: data.postal_code,
@@ -114,39 +112,32 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
             {errors.assessment_name && <p className="text-sm text-destructive mt-1">{errors.assessment_name.message}</p>}
           </div>
           
-          {/* Address Autocomplete */}
           <AddressAutocompleteInput
             onAddressSelect={handleAddressSelected}
             label="Search and Select Address"
             id="address_search"
-            error={errors.address_line1?.message} // Display error for address_line1 here as it's the primary address field
+            error={errors.address_line1?.message}
           />
           
-          {/* Optional Address Line 2 - Kept as user might need it */}
-          <div>
-            <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
-            <Input 
-              id="address_line2" 
-              {...register("address_line2")} 
-              placeholder="Apartment, suite, unit, building, floor, etc."
-            />
-          </div>
+          {/* Address Line 2 field removed */}
 
-          {/* Display validation errors for other address fields if they exist, typically after autocomplete fails or if manually cleared */}
+          {/* Display validation errors for other address fields if they exist */}
           {errors.city && <p className="text-sm text-destructive mt-1">City: {errors.city.message}</p>}
           {errors.state_province && <p className="text-sm text-destructive mt-1">State/Province: {errors.state_province.message}</p>}
           {errors.postal_code && <p className="text-sm text-destructive mt-1">Postal Code: {errors.postal_code.message}</p>}
           {errors.country && <p className="text-sm text-destructive mt-1">Country: {errors.country.message}</p>}
           
           {coordinates.lat && coordinates.lng && (
-            <p className="text-xs text-muted-foreground">
-              Coordinates: Lat: {coordinates.lat.toFixed(6)}, Lng: {coordinates.lng.toFixed(6)}
-            </p>
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground mb-2">
+                Coordinates: Lat: {coordinates.lat.toFixed(6)}, Lng: {coordinates.lng.toFixed(6)}
+              </p>
+              <AddressMapDisplay latitude={coordinates.lat} longitude={coordinates.lng} />
+            </div>
           )}
           
           <p className="text-sm text-muted-foreground pt-4">
-            Note: Pin drop functionality will be added later. For now, please use the address search.
-            Step 2 (Select Target Metric Type) and Step 3 (Input fields) will appear after this step.
+            Step 2 (Select Target Metric Set) and Step 3 (Input fields) will appear after this step.
           </p>
         </CardContent>
         <CardFooter className="flex justify-end space-x-2">
