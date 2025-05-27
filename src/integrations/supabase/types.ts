@@ -95,6 +95,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_custom_metrics_settings: {
+        Row: {
+          category: string
+          created_at: string
+          higher_is_better: boolean
+          id: string
+          label: string
+          measurement_type: string | null
+          metric_identifier: string
+          target_value: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          higher_is_better: boolean
+          id?: string
+          label: string
+          measurement_type?: string | null
+          metric_identifier: string
+          target_value: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          higher_is_better?: boolean
+          id?: string
+          label?: string
+          measurement_type?: string | null
+          metric_identifier?: string
+          target_value?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_global_roles: {
         Row: {
           created_at: string | null
