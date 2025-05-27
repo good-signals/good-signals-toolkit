@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
-import { LogIn, Settings, LogOut, Briefcase, Compass } from 'lucide-react'; // Removed UserCircle, Upload as they are less relevant now
+import { LogIn, Settings, LogOut, Briefcase, Compass, ListChecks } from 'lucide-react'; // Updated lucide-react import
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/components/auth/UserAvatar';
 import {
@@ -104,6 +103,11 @@ const Header = () => {
                 <DropdownMenuItem onClick={() => navigate('/account-management')} className="cursor-pointer">
                   <Briefcase className="mr-2 h-4 w-4" />
                   <span>Account Management</span>
+                </DropdownMenuItem>
+                {/* New DropdownMenuItem for Target Metrics */}
+                <DropdownMenuItem onClick={() => navigate('/target-metric-sets')} className="cursor-pointer">
+                  <ListChecks className="mr-2 h-4 w-4" />
+                  <span>Target Metrics</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive hover:!text-destructive hover:!bg-destructive/10 focus:text-destructive focus:bg-destructive/10">
