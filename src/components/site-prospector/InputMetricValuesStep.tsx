@@ -9,12 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, ArrowRight, ArrowLeft, Info, Save, Trash2 } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Info, Save } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { saveAssessmentMetricValues, getAssessmentMetricValues, getSiteVisitRatings, saveSiteVisitRatings } from '@/services/siteAssessmentService';
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
-import { AssessmentMetricValueInsert, siteVisitCriteria, SiteVisitCriterionKey, SiteVisitRatingGrade, AssessmentSiteVisitRatingInsert } from '@/types/siteAssessmentTypes';
+import { AssessmentMetricValueInsert, siteVisitCriteria, SiteVisitCriterionKey, SiteVisitRatingGrade, AssessmentSiteVisitRatingInsert, AssessmentMetricValue } from '@/types/siteAssessmentTypes';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Tooltip,
   TooltipContent,
@@ -30,26 +31,46 @@ import {
 } from "@/components/ui/select";
 import ImageUploadField from './ImageUploadField';
 
+// Constants for special image metric identifiers
+const SITE_VISIT_SECTION_IMAGE_IDENTIFIER = 'site_visit_section_image_overall';
+const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall`;
+
+// Define a type for the image-only metric objects we'll manage in the form state
+type ImageOnlyFormMetric = {
+  id: string; // React Hook Form field ID
+  metric_identifier: string;
+  label: string;
+  category: string; // Can be the original category or a special one
+  image_url: string | null;
+  image_file: File | null;
+  // Add other fields from metricValueSchema with placeholder/dummy values if necessary
+  entered_value: number; // Dummy, as schema requires it
+  measurement_type: string | null;
+  notes: string | null;
+};
+
 const metricValueSchema = z.object({
   metric_identifier: z.string(),
   label: z.string(),
   category: z.string(),
+  // For regular metrics, entered_value is required. For image placeholders, it'll be a dummy.
   entered_value: z.preprocess(
     (val) => (val === "" || val === null || val === undefined ? null : parseFloat(String(val))),
-    z.number({ required_error: "Value is required" }).min(-Infinity).max(Infinity)
+    z.number({invalid_type_error: "Value must be a number"}).nullable() // Allow null for image placeholders
   ),
   measurement_type: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   image_url: z.string().optional().nullable(),
-  image_file: z.instanceof(File).optional().nullable(), // For handling new file uploads
+  image_file: z.instanceof(File).optional().nullable(),
 });
 
 const siteVisitRatingItemSchema = z.object({
   criterion_key: z.string(),
-  grade: z.string().optional(),
+  grade: z.string().optional().nullable(), // Allow null
   notes: z.string().optional().nullable(),
-  image_url: z.string().optional().nullable(),
-  image_file: z.instanceof(File).optional().nullable(), // For handling new file uploads
+  // Individual site visit ratings will no longer have their own images
+  // image_url: z.string().optional().nullable(),
+  // image_file: z.instanceof(File).optional().nullable(),
 });
 
 const formSchema = z.object({
@@ -105,13 +126,13 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     enabled: !!user?.id && !!targetMetricSetId,
   });
 
-  const { data: existingMetricValues, isLoading: isLoadingExistingValues } = useQuery({
+  const { data: existingMetricValuesData, isLoading: isLoadingExistingValues } = useQuery<AssessmentMetricValue[], Error>({
     queryKey: ['assessmentMetricValues', assessmentId],
     queryFn: () => getAssessmentMetricValues(assessmentId),
     enabled: !!assessmentId,
   });
   
-  const { data: existingSiteVisitRatings, isLoading: isLoadingSiteVisitRatings } = useQuery({
+  const { data: existingSiteVisitRatingsData, isLoading: isLoadingSiteVisitRatings } = useQuery<AssessmentSiteVisitRatingInsert[], Error>({
     queryKey: ['siteVisitRatings', assessmentId],
     queryFn: () => getSiteVisitRatings(assessmentId),
     enabled: !!assessmentId,
@@ -122,7 +143,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     defaultValues: { metrics: [], siteVisitRatings: [] },
   });
 
-  const { fields: metricFields, replace: replaceMetrics } = useFieldArray({
+  const { fields: metricFields, replace: replaceMetrics, append: appendMetric, remove: removeMetric } = useFieldArray({
     control,
     name: "metrics",
   });
@@ -131,56 +152,108 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     control,
     name: "siteVisitRatings",
   });
+  
+  // State to manage the indices of image-only metrics within the metrics array
+  const [imageOnlyMetricIndices, setImageOnlyMetricIndices] = useState<Record<string, number>>({});
+
 
   // Initialize form data
   useEffect(() => {
+    const allMetricsToSet: any[] = [];
+    const currentImageOnlyIndices: Record<string, number> = {};
+
+    // 1. Process regular metrics from metricSet
     if (metricSet?.user_custom_metrics_settings) {
-      const initialMetrics = metricSet.user_custom_metrics_settings.map(metric => {
-        const existingValue = existingMetricValues?.find(ev => ev.metric_identifier === metric.metric_identifier);
-        let defaultValue: number;
+      metricSet.user_custom_metrics_settings.forEach(metric => {
+        const existingValue = existingMetricValuesData?.find(ev => ev.metric_identifier === metric.metric_identifier);
+        let defaultValue: number | null;
         if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
           defaultValue = existingValue.entered_value;
         } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
-          defaultValue = 50; 
+          defaultValue = 50;
         } else {
           defaultValue = metric.measurement_type === 'Index' ? 50 : 0;
         }
-        return {
+        allMetricsToSet.push({
           metric_identifier: metric.metric_identifier,
           label: metric.label,
           category: metric.category,
           entered_value: defaultValue,
           measurement_type: metric.measurement_type,
           notes: existingValue?.notes ?? '',
-          image_url: existingValue?.image_url ?? null,
+          image_url: null, // Individual metrics no longer have images
           image_file: null,
+        });
+      });
+    }
+
+    // 2. Process category-specific images
+    const categories = metricSet?.user_custom_metrics_settings
+      ? [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))]
+      : [];
+
+    categories.forEach(category => {
+      const identifier = getCategorySpecificImageIdentifier(category);
+      const existingImageMetric = existingMetricValuesData?.find(ev => ev.metric_identifier === identifier);
+      currentImageOnlyIndices[identifier] = allMetricsToSet.length;
+      allMetricsToSet.push({
+        metric_identifier: identifier,
+        label: `${category} Section Image`,
+        category: category, // Keep original category for grouping, or use a special one
+        entered_value: null, // Dummy value
+        measurement_type: 'image_placeholder_category',
+        notes: null,
+        image_url: existingImageMetric?.image_url ?? null,
+        image_file: null,
+      });
+    });
+
+    // 3. Process Site Visit section image
+    const siteVisitImageIdentifier = SITE_VISIT_SECTION_IMAGE_IDENTIFIER;
+    const existingSiteVisitSectionImage = existingMetricValuesData?.find(ev => ev.metric_identifier === siteVisitImageIdentifier);
+    currentImageOnlyIndices[siteVisitImageIdentifier] = allMetricsToSet.length;
+    allMetricsToSet.push({
+      metric_identifier: siteVisitImageIdentifier,
+      label: 'Site Visit Section Image',
+      category: 'SiteVisitSectionImages', // Special category for this
+      entered_value: null, // Dummy value
+      measurement_type: 'image_placeholder_section',
+      notes: null,
+      image_url: existingSiteVisitSectionImage?.image_url ?? null,
+      image_file: null,
+    });
+    
+    replaceMetrics(allMetricsToSet);
+    setImageOnlyMetricIndices(currentImageOnlyIndices);
+
+    // Initialize site visit ratings (no individual images anymore)
+    if (siteVisitCriteria) {
+      const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
+        const existingRating = existingSiteVisitRatingsData?.find(r => r.criterion_key === criterion.key);
+        return {
+          criterion_key: criterion.key,
+          grade: existingRating?.rating_grade || '',
+          notes: existingRating?.notes || '',
+          // image_url: null, // Removed
+          // image_file: null, // Removed
         };
       });
-      replaceMetrics(initialMetrics);
-    } else if (metricSet && metricSet.user_custom_metrics_settings?.length === 0) {
-      replaceMetrics([]);
+      replaceSiteVisitRatings(initialSiteVisitRatingsData);
     }
 
-    if (siteVisitCriteria) { 
-        const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
-            const existingRating = existingSiteVisitRatings?.find(r => r.criterion_key === criterion.key);
-            return {
-                criterion_key: criterion.key,
-                grade: existingRating?.rating_grade || '', 
-                notes: existingRating?.notes || '',
-                image_url: existingRating?.image_url ?? null,
-                image_file: null,
-            };
-        });
-        replaceSiteVisitRatings(initialSiteVisitRatingsData);
-    }
-
-  }, [metricSet, existingMetricValues, existingSiteVisitRatings, replaceMetrics, replaceSiteVisitRatings]);
+  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings]);
 
   const metricsMutation = useMutation({
     mutationFn: (data: AssessmentMetricValueInsert[]) => {
         if (!user?.id) throw new Error('User not authenticated');
-        return saveAssessmentMetricValues(assessmentId, data);
+        // Filter out any metrics with null entered_value if they are not image placeholders
+        const validData = data.filter(d => 
+            d.entered_value !== null || 
+            d.metric_identifier.includes('_image_overall') || 
+            d.metric_identifier === SITE_VISIT_SECTION_IMAGE_IDENTIFIER
+        );
+        if (validData.length === 0) return Promise.resolve([]); // No valid data to save
+        return saveAssessmentMetricValues(assessmentId, validData);
     },
     onError: (error: Error) => {
       toast({ title: "Error Saving Metrics", description: `Failed to save metric values: ${error.message}`, variant: "destructive" });
@@ -223,7 +296,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const deleteImage = async (imageUrl: string | null | undefined): Promise<void> => {
     if (!imageUrl) return;
     try {
-        // Extract the file path from the full URL
         const urlParts = imageUrl.split('/assessment_images/');
         if (urlParts.length < 2) {
             console.warn("Could not parse file path from image URL for deletion:", imageUrl);
@@ -238,8 +310,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         if (error) {
             console.error("Error deleting image from storage:", error);
             toast({ title: "Image Deletion Failed", description: error.message, variant: "destructive"});
-        } else {
-            // console.log("Image deleted successfully from storage:", filePath);
         }
     } catch (e) {
         console.error("Exception while deleting image:", e);
@@ -248,127 +318,151 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   const onSubmitCombinedData: SubmitHandler<MetricValuesFormData> = async (formData) => {
     console.log("Form data submitted:", formData);
+    const metricsToSave: AssessmentMetricValueInsert[] = [];
 
-    // Process metrics
-    const metricsToSave: AssessmentMetricValueInsert[] = await Promise.all(formData.metrics.map(async (m, index) => {
-      let newImageUrl = m.image_url;
-      const existingMetricData = existingMetricValues?.find(ev => ev.metric_identifier === m.metric_identifier);
-      const oldImageUrl = existingMetricData?.image_url;
+    // Process regular metrics and section/category images
+    for (const m of formData.metrics) {
+      const isCategoryOrSectionImageMetric = m.metric_identifier.includes('_image_overall');
+      
+      if (isCategoryOrSectionImageMetric) {
+        // This is a category/section image placeholder metric
+        let newImageUrl = m.image_url; // Existing URL
+        const existingMetricData = existingMetricValuesData?.find(ev => ev.metric_identifier === m.metric_identifier);
+        const oldImageUrl = existingMetricData?.image_url;
 
-      if (m.image_file) { // New file uploaded
-        if (oldImageUrl) await deleteImage(oldImageUrl); // Delete old image if replacing
-        newImageUrl = await uploadImage(m.image_file, assessmentId, `metric-${m.metric_identifier}`);
-      } else if (m.image_url === null && oldImageUrl) { // Image explicitly removed (image_url became null, and there was an old one)
-        await deleteImage(oldImageUrl);
-        newImageUrl = null;
+        if (m.image_file) { // New file uploaded
+          if (oldImageUrl) await deleteImage(oldImageUrl);
+          newImageUrl = await uploadImage(m.image_file, assessmentId, m.metric_identifier);
+        } else if (m.image_url === null && oldImageUrl) { // Image explicitly removed
+          await deleteImage(oldImageUrl);
+          newImageUrl = null;
+        }
+        
+        // Only save if there's an image_url or it's a new upload (image_file implies newImageUrl will be set)
+        if (newImageUrl || m.image_file) {
+          metricsToSave.push({
+            assessment_id: assessmentId,
+            metric_identifier: m.metric_identifier,
+            label: m.label,
+            category: m.category,
+            entered_value: null, // Image placeholders don't have a numeric value
+            measurement_type: m.measurement_type, // e.g., 'image_placeholder_category'
+            notes: null,
+            image_url: newImageUrl,
+          });
+        } else if (oldImageUrl && !newImageUrl) { // Image was removed, and we need to record its absence
+           metricsToSave.push({ // This will effectively delete the image by saving null URL
+            assessment_id: assessmentId,
+            metric_identifier: m.metric_identifier,
+            label: m.label,
+            category: m.category,
+            entered_value: null,
+            measurement_type: m.measurement_type,
+            notes: null,
+            image_url: null, // Explicitly null
+          });
+        }
+
+
+      } else {
+        // This is a regular metric
+        if (m.entered_value === null || m.entered_value === undefined) {
+          // Skip saving if entered_value is null/undefined for a regular metric,
+          // unless you intend to explicitly save nulls. For now, we skip.
+          // This check might need refinement based on whether a metric with notes/image but no value is valid.
+          // Since individual metrics no longer have images, this path is simpler.
+          console.warn(`Skipping metric ${m.metric_identifier} due to null/undefined entered_value.`);
+          continue;
+        }
+        metricsToSave.push({
+          assessment_id: assessmentId,
+          metric_identifier: m.metric_identifier,
+          label: m.label,
+          category: m.category,
+          entered_value: m.entered_value, // Already preprocessed to number or null
+          measurement_type: m.measurement_type,
+          notes: m.notes,
+          image_url: null, // No individual image for regular metrics
+        });
       }
-      // If m.image_url is a string, it means no new file, and existing image (if any) is kept.
-      // If m.image_url is null and there was no oldImageUrl, it stays null.
+    }
+    
+    // Process site visit ratings (no individual images anymore)
+    const ratingsToSave: AssessmentSiteVisitRatingInsert[] = formData.siteVisitRatings.map(svr => {
+      const criterion = siteVisitCriteria.find(c => c.key === svr.criterion_key);
+      if (!criterion || !svr.grade || svr.grade === '') return null; // Don't save if no grade
 
+      const gradeDetail = criterion.grades.find(g => g.grade === svr.grade);
       return {
         assessment_id: assessmentId,
-        metric_identifier: m.metric_identifier,
-        label: m.label, 
-        category: m.category, 
-        entered_value: m.entered_value, 
-        measurement_type: m.measurement_type,
-        notes: m.notes,
-        image_url: newImageUrl,
+        criterion_key: svr.criterion_key as SiteVisitCriterionKey,
+        rating_grade: svr.grade as SiteVisitRatingGrade,
+        rating_description: gradeDetail?.description || '',
+        notes: svr.notes || null,
+        // image_url: null, // No individual image for ratings
       };
-    }));
-
-    // Process site visit ratings
-    const ratingsToSave: AssessmentSiteVisitRatingInsert[] = (await Promise.all(formData.siteVisitRatings.map(async (svr, index) => {
-      const criterion = siteVisitCriteria.find(c => c.key === svr.criterion_key);
-      if (!criterion) return null;
-
-      let newImageUrl = svr.image_url;
-      const existingRatingData = existingSiteVisitRatings?.find(er => er.criterion_key === svr.criterion_key);
-      const oldImageUrl = existingRatingData?.image_url;
-
-
-      if (svr.image_file) { // New file uploaded
-        if (oldImageUrl) await deleteImage(oldImageUrl); // Delete old image if replacing
-        newImageUrl = await uploadImage(svr.image_file, assessmentId, `rating-${svr.criterion_key}`);
-      } else if (svr.image_url === null && oldImageUrl) { // Image explicitly removed
-        await deleteImage(oldImageUrl);
-        newImageUrl = null;
-      }
-      
-      if (svr.grade && svr.grade !== '') { 
-        const gradeDetail = criterion.grades.find(g => g.grade === svr.grade);
-        return {
-          assessment_id: assessmentId,
-          criterion_key: svr.criterion_key as SiteVisitCriterionKey,
-          rating_grade: svr.grade as SiteVisitRatingGrade,
-          rating_description: gradeDetail?.description || '',
-          notes: svr.notes || null,
-          image_url: newImageUrl,
-        };
-      }
-      // If no grade, but there's an image or notes, we might still want to save that.
-      // However, current schema might require rating_grade. For now, only save if grade exists.
-      // If an image was uploaded for an item without a grade, it won't be saved by current logic.
-      // This could be adjusted if needed.
-      return null; 
-    }))).filter(Boolean) as AssessmentSiteVisitRatingInsert[];
+    }).filter(Boolean) as AssessmentSiteVisitRatingInsert[];
 
     console.log("Metrics to save:", metricsToSave);
     console.log("Ratings to save:", ratingsToSave);
 
     let metricsStepSuccess = false;
-    if (metricsToSave.length > 0 || metricFields.length > 0) { 
+    if (metricsToSave.length > 0) {
       try {
-        if (metricsToSave.length > 0) {
-          await metricsMutation.mutateAsync(metricsToSave);
-          toast({ title: "Metrics Saved", description: "Metric values have been successfully saved." });
-        } else {
-          toast({ title: "Metrics", description: "No new metric values to save." });
-        }
+        await metricsMutation.mutateAsync(metricsToSave);
+        toast({ title: "Data Saved", description: "Metric values and section images have been successfully saved." });
         queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId] });
         metricsStepSuccess = true;
       } catch (error) {
-        // Error already toasted by mutation's onError.
+        // Error already toasted
         return;
       }
     } else {
-      // No metrics configured at all.
-      metricsStepSuccess = true;
+      toast({ title: "Data", description: "No new metric values or section images to save." });
+      metricsStepSuccess = true; // Proceed if no metrics were there to be saved
     }
 
     if (metricsStepSuccess) {
-      if (ratingsToSave.length > 0 || siteVisitRatingFields.length > 0) { 
-        if (ratingsToSave.length > 0) {
-          siteVisitRatingsMutation.mutate(ratingsToSave);
-        } else {
-          // No ratings to save, but fields exist. Proceed to next step directly.
-          toast({ title: 'Site Visit Ratings', description: 'No new site visit ratings to save.' });
-          onMetricsSubmitted(assessmentId);
-        }
+      if (ratingsToSave.length > 0) {
+        siteVisitRatingsMutation.mutate(ratingsToSave);
       } else {
-        // No site visit ratings configured at all.
-        onMetricsSubmitted(assessmentId);
+        toast({ title: 'Site Visit Ratings', description: 'No new site visit ratings to save.' });
+        onMetricsSubmitted(assessmentId); // If no ratings, submit directly
       }
     }
   };
   
   const metricsByCategory = metricFields.reduce((acc, field, index) => {
-    const typedField = field as unknown as UserCustomMetricSetting & { id: string; entered_value: number; notes?: string | null; image_url?: string | null }; // Cast for target_value etc.
-    // Find the original metric definition to get target_value, higher_is_better
-    const originalMetricDef = metricSet?.user_custom_metrics_settings.find(m => m.metric_identifier === typedField.metric_identifier);
+    // Cast field to include 'id' and other properties
+    const typedField = field as unknown as { 
+        id: string; 
+        metric_identifier: string; 
+        label: string; 
+        category: string; 
+        entered_value: number | null; 
+        notes?: string | null; 
+        image_url?: string | null;
+        measurement_type?: string | null; // Added for image placeholders
+    };
 
+    // Skip image placeholder metrics from regular display
+    if (typedField.metric_identifier.includes('_image_overall')) {
+      return acc;
+    }
+
+    const originalMetricDef = metricSet?.user_custom_metrics_settings.find(m => m.metric_identifier === typedField.metric_identifier);
     const category = typedField.category || 'Uncategorized';
     if (!acc[category]) {
       acc[category] = [];
     }
     acc[category].push({ 
         ...typedField, 
-        originalIndex: index,
+        originalIndex: index, // This index refers to its position in the `metricFields` array from useFieldArray
         target_value: originalMetricDef?.target_value,
         higher_is_better: originalMetricDef?.higher_is_better
     });
     return acc;
-  }, {} as Record<string, Array<UserCustomMetricSetting & { id: string; originalIndex: number; entered_value: number; notes?: string | null; image_url?: string | null }>>);
+  }, {} as Record<string, Array<{ id: string; originalIndex: number; metric_identifier: string; label: string; category: string; entered_value: number | null; notes?: string | null; image_url?: string | null; target_value?: number; higher_is_better?: boolean; measurement_type?: string | null }>>);
 
   const getCriterionDetails = (key: SiteVisitCriterionKey) => {
     return siteVisitCriteria.find(c => c.key === key);
@@ -382,13 +476,17 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     return <p className="text-destructive text-center p-4">Error loading metric set: {metricSetError.message}</p>;
   }
   
+  const uniqueCategories = metricSet?.user_custom_metrics_settings
+    ? [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))]
+    : [];
+
   return (
     <TooltipProvider>
       <Card className="w-full max-w-3xl mx-auto">
         <CardHeader>
           <CardTitle>Step 3: Input Data for "{metricSet?.name || 'Assessment'}"</CardTitle>
           <CardDescription>
-            Enter metric values and site visit ratings for your assessment. Assessment ID: {assessmentId}
+            Enter metric values and site visit ratings. Upload one image per section if needed. Assessment ID: {assessmentId}
           </CardDescription>
         </CardHeader>
         
@@ -396,10 +494,44 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           <CardContent className="space-y-8 pt-4">
             {(metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) || siteVisitRatingFields.length > 0 ? (
               <>
-                {metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0 ? (
-                  Object.entries(metricsByCategory).map(([category, categoryMetrics]) => (
+                {/* Metric Sections with Category Image Upload */}
+                {Object.entries(metricsByCategory).map(([category, categoryMetrics]) => {
+                  const categoryImageIdentifier = getCategorySpecificImageIdentifier(category);
+                  const imageMetricIndex = imageOnlyMetricIndices[categoryImageIdentifier];
+                  
+                  return (
                     <div key={category} className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0">
                       <h3 className="text-lg font-semibold text-primary">{category}</h3>
+                      
+                      {/* Category Image Upload Field */}
+                      {imageMetricIndex !== undefined && metricFields[imageMetricIndex] && (
+                        <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mb-6">
+                          <Label htmlFor={`metrics.${imageMetricIndex}.image`}>{`Optional Image for ${category} Section`}</Label>
+                          <Controller
+                            name={`metrics.${imageMetricIndex}.image_file` as any} // Cast as any due to dynamic name
+                            control={control}
+                            render={() => (
+                              <ImageUploadField
+                                id={`metrics.${imageMetricIndex}.image`}
+                                currentImageUrl={watch(`metrics.${imageMetricIndex}.image_url` as any)}
+                                onFileChange={(file) => {
+                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, file, { shouldValidate: true });
+                                  if (!file && watch(`metrics.${imageMetricIndex}.image_url` as any)) {
+                                    setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                  }
+                                }}
+                                onRemoveCurrentImage={() => {
+                                  setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, null, { shouldValidate: true });
+                                }}
+                                disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                              />
+                            )}
+                          />
+                        </div>
+                      )}
+
+                      {/* Individual Metrics within the category */}
                       {categoryMetrics.map((metricField) => (
                         <div key={metricField.id} className="p-4 border rounded-md shadow-sm bg-card">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -460,7 +592,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                 />
                               )}
                               {errors.metrics?.[metricField.originalIndex]?.entered_value && (
-                                <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message}</p>
+                                <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message as string}</p>
                               )}
                             </div>
                             <div>
@@ -482,50 +614,61 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                               />
                             </div>
                           </div>
-                          <div className="mt-4">
-                            <Label htmlFor={`metrics.${metricField.originalIndex}.image`}>Image (Optional)</Label>
-                            <Controller
-                              name={`metrics.${metricField.originalIndex}.image_file`}
-                              control={control}
-                              render={({ field: controllerField }) => (
-                                <ImageUploadField
-                                  id={`metrics.${metricField.originalIndex}.image`}
-                                  currentImageUrl={watch(`metrics.${metricField.originalIndex}.image_url`)}
-                                  onFileChange={(file) => {
-                                    setValue(`metrics.${metricField.originalIndex}.image_file`, file, { shouldValidate: true });
-                                    if (!file) { // If file is removed by ImageUploadField internal logic
-                                       // If there was an existing URL, and user clears the file input, mark for removal.
-                                       if(watch(`metrics.${metricField.originalIndex}.image_url`)) {
-                                         setValue(`metrics.${metricField.originalIndex}.image_url`, null, { shouldValidate: true });
-                                       }
-                                    }
-                                  }}
-                                  onRemoveCurrentImage={() => {
-                                    setValue(`metrics.${metricField.originalIndex}.image_url`, null, { shouldValidate: true });
-                                    setValue(`metrics.${metricField.originalIndex}.image_file`, null, { shouldValidate: true });
-                                  }}
-                                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                />
-                              )}
-                            />
-                          </div>
                         </div>
                       ))}
                     </div>
-                  ))
-                ): (
-                  metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length === 0 && siteVisitRatingFields.length > 0 && (
+                  )
+                })}
+                 {/* Display message if no custom metrics but site visit ratings exist */}
+                {(Object.keys(metricsByCategory).length === 0 && siteVisitRatingFields.length > 0 && metricSet?.user_custom_metrics_settings?.length === 0) && (
                      <CardDescription>
                         No custom metrics are defined for the Target Metric Set: "{metricSet?.name || 'Unknown'}". 
                         You can still provide Site Visit Ratings below.
                     </CardDescription>
-                  )
                 )}
 
                 {/* Site Visit Ratings Section */}
                 {siteVisitRatingFields.length > 0 && (
                   <div className="space-y-6 border-t pt-6 mt-8">
-                    <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
+                    </div>
+
+                    {/* Site Visit Section Image Upload */}
+                    {(() => {
+                        const siteVisitImageMetricIndex = imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER];
+                        if (siteVisitImageMetricIndex !== undefined && metricFields[siteVisitImageMetricIndex]) {
+                        return (
+                            <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mb-6">
+                            <Label htmlFor={`metrics.${siteVisitImageMetricIndex}.image`}>Optional Image for Site Visit Section</Label>
+                            <Controller
+                                name={`metrics.${siteVisitImageMetricIndex}.image_file` as any}
+                                control={control}
+                                render={() => (
+                                <ImageUploadField
+                                    id={`metrics.${siteVisitImageMetricIndex}.image`}
+                                    currentImageUrl={watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)}
+                                    onFileChange={(file) => {
+                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, file, { shouldValidate: true });
+                                        if (!file && watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)) {
+                                            setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                        }
+                                    }}
+                                    onRemoveCurrentImage={() => {
+                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, null, { shouldValidate: true });
+                                    }}
+                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                                />
+                                )}
+                            />
+                            </div>
+                        );
+                        }
+                        return null;
+                    })()}
+                    
+                    {/* Individual Site Visit Criteria */}
                     {siteVisitRatingFields.map((field, index) => {
                       const criterionDetails = getCriterionDetails(field.criterion_key as SiteVisitCriterionKey);
                       if (!criterionDetails) return null; 
@@ -581,32 +724,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                 )}
                               />
                             </div>
-                          </div>
-                          <div className="mt-4">
-                            <Label htmlFor={`siteVisitRatings.${index}.image`}>Image (Optional)</Label>
-                             <Controller
-                              name={`siteVisitRatings.${index}.image_file`}
-                              control={control}
-                              render={() => ( // field not directly used here, rely on setValue/watch
-                                <ImageUploadField
-                                  id={`siteVisitRatings.${index}.image`}
-                                  currentImageUrl={watch(`siteVisitRatings.${index}.image_url`)}
-                                  onFileChange={(file) => {
-                                    setValue(`siteVisitRatings.${index}.image_file`, file, { shouldValidate: true });
-                                     if (!file) {
-                                       if(watch(`siteVisitRatings.${index}.image_url`)) {
-                                         setValue(`siteVisitRatings.${index}.image_url`, null, { shouldValidate: true });
-                                       }
-                                    }
-                                  }}
-                                  onRemoveCurrentImage={() => {
-                                    setValue(`siteVisitRatings.${index}.image_url`, null, { shouldValidate: true });
-                                    setValue(`siteVisitRatings.${index}.image_file`, null, { shouldValidate: true });
-                                  }}
-                                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                />
-                              )}
-                            />
                           </div>
                         </div>
                       );
