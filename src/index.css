@@ -5,79 +5,83 @@
 
 @layer base {
   :root {
-    --background: 40 50% 98%; /* Light Parchment */
-    --foreground: 40 10% 10%; /* Dark Brown/Black for text */
+    /* Light Theme Monochrome Palette */
+    --background: 0 0% 100%; /* White */
+    --foreground: 0 0% 0%;   /* Black */
 
-    --card: 40 50% 100%; /* Slightly whiter parchment for cards */
-    --card-foreground: 40 10% 10%;
+    --card: 0 0% 100%;       /* White */
+    --card-foreground: 0 0% 0%; /* Black */
 
-    --popover: 40 50% 100%;
-    --popover-foreground: 40 10% 10%;
+    --popover: 0 0% 100%;    /* White */
+    --popover-foreground: 0 0% 0%; /* Black */
 
-    --primary: 220 70% 40%; /* Deep Blue */
-    --primary-foreground: 0 0% 100%; /* White text on Deep Blue */
+    --primary: 0 0% 0%;      /* Black */
+    --primary-foreground: 0 0% 100%; /* White */
 
-    --gold: 45 80% 55%; /* Rich Gold */
-    --gold-foreground: 40 10% 10%; /* Dark text on Gold */
+    --gold: 0 0% 0%;         /* Black (was Rich Gold) */
+    --gold-foreground: 0 0% 100%; /* White (text on Gold) */
     
-    --secondary: 40 30% 92%; /* Lighter Parchment for secondary elements */
-    --secondary-foreground: 220 30% 30%; /* Darker Blue text */
+    --secondary: 0 0% 95%;   /* Very Light Gray (for secondary BGs) */
+    --secondary-foreground: 0 0% 20%; /* Dark Gray (text on secondary) */
 
-    --muted: 40 30% 88%;
-    --muted-foreground: 40 10% 35%;
+    --muted: 0 0% 90%;       /* Light Gray (for muted elements/BGs) */
+    --muted-foreground: 0 0% 40%; /* Medium-Dark Gray (muted text) */
 
-    --accent: 40 70% 60%; /* A brighter, slightly desaturated gold for accents */
-    --accent-foreground: 40 10% 10%;
+    --accent: 0 0% 25%;      /* Dark Gray (for accents) */
+    --accent-foreground: 0 0% 95%; /* Off-White (text on accent) */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 0% 0%;  /* Black (for destructive actions) */
+    --destructive-foreground: 0 0% 100%; /* White (text on destructive) */
 
-    --border: 40 20% 80%; /* Soft brown border */
-    --input: 40 20% 90%;
-    --ring: 45 80% 55%; /* Gold for focus rings */
+    --border: 0 0% 85%;      /* Light Gray (general borders) */
+    --input: 0 0% 60%;       /* Medium Gray (input border color) */
+    --ring: 0 0% 0%;         /* Black (focus rings) */
 
     --radius: 0.5rem;
 
-    /* Keep sidebar variables if needed, or adapt them */
-    --sidebar-background: 220 15% 20%; /* Dark blue for sidebar */
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 45 80% 60%; /* Gold for active sidebar items */
-    --sidebar-primary-foreground: 220 15% 10%;
-    --sidebar-accent: 220 15% 25%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 220 15% 15%;
-    --sidebar-ring: 45 80% 55%;
+    /* Sidebar Monochrome Palette */
+    --sidebar-background: 0 0% 10%;      /* Very Dark Gray/Almost Black */
+    --sidebar-foreground: 0 0% 95%;      /* Off-White */
+    --sidebar-primary: 0 0% 100%;        /* White (active sidebar items) */
+    --sidebar-primary-foreground: 0 0% 0%;/* Black (text on active items) */
+    --sidebar-accent: 0 0% 20%;          /* Dark Gray */
+    --sidebar-accent-foreground: 0 0% 95%;/* Off-White */
+    --sidebar-border: 0 0% 15%;          /* Darker Gray */
+    --sidebar-ring: 0 0% 100%;           /* White */
   }
 
   .dark {
-    /* TODO: Define dark theme variables if requested later */
-    --background: 220 20% 12%; /* Dark Navy */
-    --foreground: 40 30% 90%; /* Light Parchment text */
+    /* Dark Theme Monochrome Palette */
+    --background: 0 0% 0%;   /* Black */
+    --foreground: 0 0% 100%; /* White */
 
-    --card: 220 20% 15%;
-    --card-foreground: 40 30% 90%;
+    --card: 0 0% 5%;         /* Near Black */
+    --card-foreground: 0 0% 100%; /* White */
 
-    --popover: 220 20% 15%;
-    --popover-foreground: 40 30% 90%;
+    --popover: 0 0% 5%;      /* Near Black */
+    --popover-foreground: 0 0% 100%; /* White */
 
-    --primary: 45 70% 60%; /* Gold as primary in dark mode */
-    --primary-foreground: 220 20% 10%; /* Dark text on Gold */
+    --primary: 0 0% 100%;    /* White */
+    --primary-foreground: 0 0% 0%; /* Black */
 
-    --gold: 45 70% 60%;
-    --gold-foreground: 220 20% 10%;
+    --gold: 0 0% 100%;       /* White (was Gold) */
+    --gold-foreground: 0 0% 0%; /* Black (text on Gold) */
     
-    --secondary: 220 15% 25%; /* Slightly lighter navy */
-    --secondary-foreground: 40 30% 85%;
+    --secondary: 0 0% 15%;   /* Dark Gray (for secondary BGs) */
+    --secondary-foreground: 0 0% 90%; /* Light Gray (text on secondary) */
 
-    --muted: 220 15% 22%;
-    --muted-foreground: 40 20% 65%;
+    --muted: 0 0% 10%;       /* Very Dark Gray (for muted elements/BGs) */
+    --muted-foreground: 0 0% 60%; /* Medium-Light Gray (muted text) */
 
-    --accent: 45 80% 65%; /* Brighter Gold */
-    --accent-foreground: 220 20% 10%;
+    --accent: 0 0% 75%;      /* Light Gray (for accents) */
+    --accent-foreground: 0 0% 5%; /* Near Black (text on accent) */
 
-    --border: 220 15% 30%;
-    --input: 220 15% 30%;
-    --ring: 45 70% 60%;
+    --destructive: 0 0% 100%;/* White (for destructive actions) */
+    --destructive-foreground: 0 0% 0%; /* Black (text on destructive) */
+
+    --border: 0 0% 25%;      /* Dark Gray (general borders) */
+    --input: 0 0% 40%;       /* Medium-Dark Gray (input border color) */
+    --ring: 0 0% 100%;       /* White (focus rings) */
   }
 }
 
@@ -94,3 +98,4 @@
     @apply font-serif;
   }
 }
+
