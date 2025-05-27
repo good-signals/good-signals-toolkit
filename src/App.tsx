@@ -1,3 +1,4 @@
+
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -13,6 +14,7 @@ import TerritoryTargeterPage from "./pages/TerritoryTargeterPage";
 import SiteTreasureMapPage from "./pages/SiteTreasureMapPage";
 import AuthPage from "./pages/AuthPage"; 
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
+import AccountManagementPage from "./pages/AccountManagementPage"; // Import the new page
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -83,6 +85,14 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <ProfileSettingsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="account-management"  // Add this new route
+            element={
+              <ProtectedRoute>
+                <AccountManagementPage />
               </ProtectedRoute>
             } 
           />
