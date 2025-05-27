@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react'; // Added useState, useEffect
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
-import { LogIn, Settings, UserCircle, LogOut, Briefcase, Compass, Upload } from 'lucide-react'; 
+import { LogIn, Settings, LogOut, Briefcase, Compass } from 'lucide-react'; // Removed UserCircle, Upload as they are less relevant now
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/components/auth/UserAvatar';
 import {
@@ -13,8 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService'; // Import service and type
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Header = () => {
   const { user, profile, signOut, authLoading } = useAuth(); 
@@ -32,7 +32,7 @@ const Header = () => {
           if (accounts && accounts.length > 0) {
             setDisplayAccount(accounts[0]); 
           } else {
-            setDisplayAccount(null); // Explicitly set to null if no admin accounts
+            setDisplayAccount(null);
           }
         })
         .catch(error => {
@@ -43,7 +43,6 @@ const Header = () => {
           setIsLoadingAccountInfo(false);
         });
     } else if (!authLoading) {
-      // User is not logged in or auth state is clear
       setDisplayAccount(null);
       setIsLoadingAccountInfo(false);
     }
@@ -54,11 +53,13 @@ const Header = () => {
     navigate('/'); 
   };
 
-  const avatarUrlToDisplay = displayAccount?.logo_url || profile?.avatar_url;
-  // For avatar initials, user's name is often preferred even if company logo is shown.
-  // But for display text, company name can be primary.
+  // Prioritize company logo. UserAvatar will show initials if logo_url is null/undefined.
+  const avatarUrlToDisplay = displayAccount?.logo_url; 
+  // Initials should still be based on the user's name, even if showing company logo or company name.
   const nameForAvatarInitials = profile?.full_name || user?.email; 
+  // Display text prioritizes company name, then user's full name, then email.
   const nameForDisplayText = displayAccount?.name || profile?.full_name || user?.email;
+  // Name in dropdown prioritizes company name.
   const nameInDropdown = displayAccount?.name || profile?.full_name || "User";
 
 
@@ -81,6 +82,7 @@ const Header = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full hover:bg-primary/80 focus-visible:ring-gold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
+                  {/* UserAvatar will show initials from nameForAvatarInitials if avatarUrlToDisplay is null */}
                   <UserAvatar avatarUrl={avatarUrlToDisplay} fullName={nameForAvatarInitials} size={8} />
                   <span className="hidden md:inline text-sm font-medium">{nameForDisplayText}</span>
                 </Button>
@@ -125,4 +127,3 @@ const Header = () => {
 };
 
 export default Header;
-
