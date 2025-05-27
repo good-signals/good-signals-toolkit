@@ -33,17 +33,16 @@ const SiteProspectorPage = () => {
     return <NewAssessmentForm onAssessmentCreated={handleAssessmentCreated} onCancel={handleCancelNewAssessment} />;
   }
 
-  // if (currentAssessmentId) {
-  //   // Placeholder for showing assessment details/next steps
-  //   // return <SiteAssessmentDetails assessmentId={currentAssessmentId} />;
-  //   return (
-  //       <div className="container mx-auto py-10">
-  //         <h2 className="text-2xl font-bold text-primary mb-4">Assessment: {currentAssessmentId}</h2>
-  //         <p>Next steps for this assessment will appear here.</p>
-  //         <Button onClick={() => setCurrentAssessmentId(null)} variant="outline" className="mt-4">Back to Prospector Home</Button>
-  //       </div>
-  //   );
-  // }
+  if (currentAssessmentId) {
+    // Placeholder for showing assessment details/next steps
+    return (
+      <div className="container mx-auto py-10">
+        <h2 className="text-2xl font-bold text-primary mb-4">Assessment: {currentAssessmentId}</h2>
+        <p>Next steps for this assessment will appear here.</p>
+        <Button onClick={() => setCurrentAssessmentId(null)} variant="outline" className="mt-4">Back to Prospector Home</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -74,4 +73,3 @@ const SiteProspectorPage = () => {
 };
 
 export default SiteProspectorPage;
-
