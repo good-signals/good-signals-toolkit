@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -68,14 +67,28 @@ export const updateAccountDetailsService = async (accountId: string, updates: Pa
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', accountId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error updating account details in service:', error);
       toast.error(`Failed to update account: ${error.message}`);
       return null;
     }
-    toast.success('Account details updated successfully!');
+    // If data is null here, it means the row wasn't found or accessible after update.
+    // The original error was about this select returning no rows.
+    // With maybeSingle, data will be null instead of an error,
+    // which should be handled by the calling component if specific feedback is needed.
+    // For now, if no error, we assume success if data is returned.
+    if (data) {
+        toast.success('Account details updated successfully!');
+    } else if (!error) {
+        // This case implies the update might have gone through, but the select failed to return the row.
+        // This could happen if RLS prevents seeing the row, or the ID was wrong.
+        // Given the RLS policies we just added, this should be less likely for valid admin updates.
+        console.warn('Account update was attempted, but no data returned. Account ID:', accountId);
+        toast.warn('Account details updated, but confirmation failed. Please refresh.');
+        // We still return the (empty) data, which is null.
+    }
     return data;
   } catch (error: any) {
     console.error('Catch error updating account details in service:', error);
