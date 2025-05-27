@@ -24,7 +24,7 @@ export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 // Schema for a single custom metric setting from the database
 export const UserCustomMetricSettingSchema = z.object({
   id: z.string().uuid().optional(),
-  user_id: z.string().uuid().optional(), // Will be set on the backend or service layer
+  user_id: z.string().uuid(), // CHANGED: Made non-optional
   metric_identifier: z.string().min(1),
   category: z.string().min(1),
   label: z.string().min(1),
@@ -61,3 +61,4 @@ export const TargetMetricsFormSchema = z.object({
   visitor_profile_metrics: z.array(VisitorProfileMetricFormSchema),
 });
 export type TargetMetricsFormData = z.infer<typeof TargetMetricsFormSchema>;
+
