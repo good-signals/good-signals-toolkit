@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft } from 'lucide-react';
@@ -17,8 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
   metricSetId: string;
-  onBack: ()
- => void;
+  onBack: () => void;
   // onEdit: () => void; // Placeholder for future edit functionality
 }
 
@@ -117,6 +115,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   return (
     <div className="container mx-auto py-10 px-4 space-y-8">
+      <div className="flex justify-start mb-6">
+        <Button onClick={onBack} variant="outline" size="lg">
+          <ArrowLeft className="mr-2 h-5 w-5" /> Back to Prospector Home
+        </Button>
+      </div>
+
       <Card className="shadow-lg">
         <CardHeader>
           <div className="flex justify-between items-start">
@@ -215,15 +219,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </CardContent>
       </Card>
       */}
-
-      <div className="mt-8 flex justify-start">
-        <Button onClick={onBack} variant="outline" size="lg">
-          <ArrowLeft className="mr-2 h-5 w-5" /> Back to Prospector Home
-        </Button>
-      </div>
     </div>
   );
 };
 
 export default SiteAssessmentDetailsView;
-
