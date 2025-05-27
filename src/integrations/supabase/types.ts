@@ -80,6 +80,47 @@ export type Database = {
         }
         Relationships: []
       }
+      assessment_site_visit_ratings: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          criterion_key: Database["public"]["Enums"]["site_visit_criterion_key"]
+          id: string
+          notes: string | null
+          rating_description: string | null
+          rating_grade: Database["public"]["Enums"]["site_visit_rating_grade"]
+          updated_at: string
+        }
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          criterion_key: Database["public"]["Enums"]["site_visit_criterion_key"]
+          id?: string
+          notes?: string | null
+          rating_description?: string | null
+          rating_grade: Database["public"]["Enums"]["site_visit_rating_grade"]
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          criterion_key?: Database["public"]["Enums"]["site_visit_criterion_key"]
+          id?: string
+          notes?: string | null
+          rating_description?: string | null
+          rating_grade?: Database["public"]["Enums"]["site_visit_rating_grade"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_site_visit_ratings_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "site_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -100,6 +141,75 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      site_assessments: {
+        Row: {
+          account_id: string
+          address_line1: string | null
+          address_line2: string | null
+          assessment_name: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          postal_code: string | null
+          state_province: string | null
+          target_metric_set_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          address_line1?: string | null
+          address_line2?: string | null
+          assessment_name?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          postal_code?: string | null
+          state_province?: string | null
+          target_metric_set_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          address_line1?: string | null
+          address_line2?: string | null
+          assessment_name?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          postal_code?: string | null
+          state_province?: string | null
+          target_metric_set_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_assessments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_assessments_target_metric_set_id_fkey"
+            columns: ["target_metric_set_id"]
+            isOneToOne: false
+            referencedRelation: "target_metric_sets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       target_metric_sets: {
         Row: {
@@ -212,6 +322,18 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "account_admin" | "account_user"
+      site_visit_criterion_key:
+        | "visibility"
+        | "signage"
+        | "accessibility"
+        | "parking"
+        | "loading"
+        | "safety"
+        | "aesthetics"
+        | "storefront_traffic"
+        | "layout_size_of_space"
+        | "delivery_condition"
+      site_visit_rating_grade: "A" | "B" | "C" | "D" | "F"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -328,6 +450,19 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "account_admin", "account_user"],
+      site_visit_criterion_key: [
+        "visibility",
+        "signage",
+        "accessibility",
+        "parking",
+        "loading",
+        "safety",
+        "aesthetics",
+        "storefront_traffic",
+        "layout_size_of_space",
+        "delivery_condition",
+      ],
+      site_visit_rating_grade: ["A", "B", "C", "D", "F"],
     },
   },
 } as const
