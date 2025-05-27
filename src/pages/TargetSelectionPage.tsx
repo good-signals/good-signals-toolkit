@@ -2,73 +2,104 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { SlidersHorizontal, Target as TargetIcon, ArrowRight } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckSquare, Edit3, ListChecks } from 'lucide-react'; // Added ListChecks
 import { useAuth } from '@/contexts/AuthContext';
-import { saveUserStandardMetricsPreference } from '@/services/targetMetricsService';
-import { toast } from 'sonner';
+import { saveUserStandardMetricsPreference, hasUserSetAnyMetrics } from '@/services/targetMetricsService'; // Corrected import
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast as sonnerToast } from 'sonner';
 
 const TargetSelectionPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const handleUseStandardTargets = async () => {
-    if (!user) {
-      toast.error("You need to be logged in to set target preferences");
-      return;
-    }
-
-    try {
-      await saveUserStandardMetricsPreference(user.id);
-      toast.success("Standard targets selected successfully!");
+  const { data: hasMetrics, isLoading: isLoadingHasMetrics } = useQuery({
+    queryKey: ['hasUserSetAnyMetrics', user?.id],
+    queryFn: () => user ? hasUserSetAnyMetrics(user.id) : false,
+    enabled: !!user,
+  });
+  
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!user) throw new Error("User not authenticated.");
+      return saveUserStandardMetricsPreference(user.id);
+    },
+    onSuccess: () => {
+      sonnerToast.success("Standard metrics preference saved. Redirecting to Toolkit Hub...");
+      queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] });
       navigate('/toolkit-hub');
-    } catch (error) {
-      console.error("Error saving standard metrics preference:", error);
-      toast.error("Failed to select standard targets. Please try again.");
+    },
+    onError: (error: Error) => {
+      sonnerToast.error(`Error: ${error.message}`);
     }
+  });
+
+  const handleUseStandardMetrics = () => {
+    mutation.mutate();
   };
 
   return (
-    <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+    <div className="container mx-auto flex flex-col items-center justify-center min-h-[calc(100vh-80px)] py-12 px-4">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-primary mb-3">Choose Your Target Approach</h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Select how you'd like to define targets for your market analysis. You can use standard, pre-defined targets or create your own.
+        <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl text-primary">
+          Define Your Target Metrics
+        </h1>
+        <p className="mt-4 text-xl text-muted-foreground max-w-2xl mx-auto">
+          Choose how you want to set up your target metrics. You can use our predefined standard metrics
+          or create your own custom sets.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
         <Card className="flex flex-col">
-          <CardHeader className="items-center text-center">
-            <SlidersHorizontal size={48} className="text-primary mb-4" />
-            <CardTitle className="text-2xl">Use Standard Targets</CardTitle>
+          <CardHeader>
+            <CheckSquare className="h-12 w-12 text-green-500 mb-4" />
+            <CardTitle className="text-2xl">Use Standard Metrics</CardTitle>
             <CardDescription>
-              Get started quickly with pre-defined targets. These are typically set by an administrator for general use.
+              Get started quickly with a comprehensive set of predefined industry-standard metrics.
+              Ideal for a general overview and quick setup.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-grow" />
-          <CardFooter className="flex justify-center">
-            <Button size="lg" className="w-full md:w-auto" onClick={handleUseStandardTargets}>
-              Proceed with Standard Targets <ArrowRight className="ml-2 h-5 w-5" />
+          <CardContent className="flex-grow">
+            {/* Additional details about standard metrics can go here */}
+          </CardContent>
+          <CardFooter>
+            <Button 
+              className="w-full" 
+              onClick={handleUseStandardMetrics}
+              disabled={mutation.isPending || isLoadingHasMetrics}
+            >
+              {mutation.isPending ? "Saving..." : "Use Standard Metrics"}
             </Button>
           </CardFooter>
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader className="items-center text-center">
-            <TargetIcon size={48} className="text-primary mb-4" />
-            <CardTitle className="text-2xl">Set Custom Targets</CardTitle>
+          <CardHeader>
+            <Edit3 className="h-12 w-12 text-blue-500 mb-4" />
+            <CardTitle className="text-2xl">Create Custom Metric Set</CardTitle>
             <CardDescription>
-              Tailor your analysis by building your own specific target metrics. This allows for more granular control.
+              Tailor your analysis by defining specific metrics and target values that matter most to your business.
+              Build one or more sets for different scenarios.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-grow" />
-          <CardFooter className="flex justify-center">
-            <Button asChild size="lg" variant="outline" className="w-full md:w-auto">
+          <CardContent className="flex-grow">
+             {/* Additional details about custom metrics can go here */}
+          </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row gap-2">
+            <Button className="w-full sm:w-auto flex-1" asChild>
               <Link to="/target-metrics-builder">
-                Build Custom Targets <ArrowRight className="ml-2 h-5 w-5" />
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Set
               </Link>
             </Button>
+            {hasMetrics && (
+              <Button variant="outline" className="w-full sm:w-auto flex-1" asChild>
+                <Link to="/target-metric-sets">
+                  <ListChecks className="mr-2 h-4 w-4" /> View My Sets
+                </Link>
+              </Button>
+            )}
           </CardFooter>
         </Card>
       </div>

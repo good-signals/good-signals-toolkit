@@ -13,10 +13,11 @@ import TerritoryTargeterPage from "./pages/TerritoryTargeterPage";
 import SiteTreasureMapPage from "./pages/SiteTreasureMapPage";
 import AuthPage from "./pages/AuthPage"; 
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
-import AccountManagementPage from "./pages/AccountManagementPage"; // Import the new page
+import AccountManagementPage from "./pages/AccountManagementPage";
 import NotFound from "./pages/NotFound";
-import TargetSelectionPage from "./pages/TargetSelectionPage"; // Added
-import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage"; // Added
+import TargetSelectionPage from "./pages/TargetSelectionPage";
+import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
+import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -51,69 +52,44 @@ const AppContent = () => {
           <Route index element={<LandingPage />} />
           <Route 
             path="toolkit-hub" 
-            element={
-              <ProtectedRoute>
-                <ToolkitHub />
-              </ProtectedRoute>
-            } 
+            element={<ProtectedRoute><ToolkitHub /></ProtectedRoute>} 
           />
           <Route 
             path="toolkit/site-prospector" 
-            element={
-              <ProtectedRoute>
-                <SiteProspectorPage />
-              </ProtectedRoute>
-            } 
+            element={<ProtectedRoute><SiteProspectorPage /></ProtectedRoute>} 
           />
           <Route 
             path="toolkit/territory-targeter" 
-            element={
-              <ProtectedRoute>
-                <TerritoryTargeterPage />
-              </ProtectedRoute>
-            } 
+            element={<ProtectedRoute><TerritoryTargeterPage /></ProtectedRoute>} 
           />
           <Route 
             path="toolkit/site-treasure-map" 
-            element={
-              <ProtectedRoute>
-                <SiteTreasureMapPage />
-              </ProtectedRoute>
-            } 
+            element={<ProtectedRoute><SiteTreasureMapPage /></ProtectedRoute>} 
           />
           <Route 
             path="profile-settings" 
-            element={
-              <ProtectedRoute>
-                <ProfileSettingsPage />
-              </ProtectedRoute>
-            } 
+            element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} 
           />
           <Route 
-            path="account-management" // Add this new route
-            element={
-              <ProtectedRoute>
-                <AccountManagementPage />
-              </ProtectedRoute>
-            } 
+            path="account-management"
+            element={<ProtectedRoute><AccountManagementPage /></ProtectedRoute>} 
           />
           <Route 
-            path="target-selection" // Added route
-            element={
-              <ProtectedRoute>
-                <TargetSelectionPage />
-              </ProtectedRoute>
-            } 
+            path="target-selection" 
+            element={<ProtectedRoute><TargetSelectionPage /></ProtectedRoute>} 
           />
           <Route 
-            path="target-metrics-builder" // Added route
-            element={
-              <ProtectedRoute>
-                <TargetMetricsBuilderPage />
-              </ProtectedRoute>
-            } 
+            path="target-metrics-builder" 
+            element={<ProtectedRoute><TargetMetricsBuilderPage /></ProtectedRoute>} 
           />
-          {/* ADD ALL CUSTOM ROUTES INSIDE THIS AppRoutes Route for MainLayout */}
+          <Route 
+            path="target-metrics-builder/:metricSetId" 
+            element={<ProtectedRoute><TargetMetricsBuilderPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="target-metric-sets" 
+            element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
+          />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -124,10 +100,10 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider> {/* AuthProvider now wraps AppContent */}
+      <AuthProvider>
         <Toaster />
         <Sonner />
-        <AppContent /> {/* AppContent contains BrowserRouter and Routes */}
+        <AppContent />
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

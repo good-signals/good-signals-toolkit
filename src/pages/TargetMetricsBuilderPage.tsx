@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Target as TargetIcon, PlusCircle, Trash2, Save } from 'lucide-react';
+import { Target as TargetIcon, PlusCircle, Trash2, Save, Edit3, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,34 +17,32 @@ import {
   saveUserCustomMetricSettings,
   createTargetMetricSet,
   updateTargetMetricSetName,
-  getTargetMetricSetById, // To load existing set name
+  getTargetMetricSetById,
 } from '@/services/targetMetricsService';
-import { toast as sonnerToast } from 'sonner'; // Using sonner for consistency
+import { toast as sonnerToast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-
-// Placeholder for where metricSetId might come from (e.g., route, state management)
-// For now, we'll assume it could be passed or managed internally for new vs edit
-// This component would typically get metricSetId via props or route if editing a specific set.
-// const DUMMY_EDIT_METRIC_SET_ID = "uuid-of-set-to-edit"; // Example
 
 const TargetMetricsBuilderPage: React.FC = () => {
   const { user, authLoading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   
-  // This would come from React Router if using path like /target-metrics-builder/:metricSetId
-  // const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
-  // For now, managing a local state for it, default to undefined (new set)
-  const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(undefined); 
-  // TODO: This state should be initialized based on route params or navigation state
+  const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
+  // The currentMetricSetId for logic, derived from route or after creating a new set.
+  const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
+
+  // Update currentMetricSetId if routeMetricSetId changes (e.g. navigation)
+  useEffect(() => {
+    setCurrentMetricSetId(routeMetricSetId);
+  }, [routeMetricSetId]);
 
   const form = useForm<TargetMetricsFormData>({
     resolver: zodResolver(TargetMetricsFormSchema),
     defaultValues: {
-      metric_set_id: undefined, // Will be set if editing
-      metric_set_name: "", // New field for the set name
-      predefined_metrics: predefinedMetricsConfig.map(config => ({ // Default population
+      metric_set_id: routeMetricSetId, 
+      metric_set_name: "", 
+      predefined_metrics: predefinedMetricsConfig.map(config => ({
         metric_identifier: config.metric_identifier,
         label: config.label,
         category: config.category,
@@ -60,7 +58,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
     name: "visitor_profile_metrics",
   });
 
-  // Fetch data for an existing metric set if currentMetricSetId is defined
   const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
     queryKey: ['targetMetricSet', currentMetricSetId, user?.id],
     queryFn: async () => {
@@ -73,16 +70,14 @@ const TargetMetricsBuilderPage: React.FC = () => {
   const { data: existingMetrics, isLoading: isLoadingMetrics, error: fetchError } = useQuery({
     queryKey: ['userCustomMetricSettings', currentMetricSetId, user?.id],
     queryFn: () => {
-      if (!user?.id || !currentMetricSetId) return []; // Return empty if no set ID (new set)
+      if (!user?.id || !currentMetricSetId) return [];
       return getUserCustomMetricSettings(currentMetricSetId);
     },
-    enabled: !!user && !!currentMetricSetId && !authLoading, // Only fetch if metricSetId is known
+    enabled: !!user && !!currentMetricSetId && !authLoading,
   });
 
 
   useEffect(() => {
-    // This effect now depends on whether we are editing an existing set
-    // If currentMetricSetId is set and existingMetricSet and existingMetrics are loaded
     if (currentMetricSetId && existingMetricSet && existingMetrics) {
       const predefinedMetricsData = predefinedMetricsConfig.map(config => {
         const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier);
@@ -91,7 +86,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
           label: config.label,
           category: config.category,
           target_value: existing?.target_value ?? 0,
-          higher_is_better: config.higher_is_better,
+          higher_is_better: existing?.higher_is_better ?? config.higher_is_better, // Fallback to config
         };
       });
 
@@ -100,7 +95,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
         .map(s => ({
           metric_identifier: s.metric_identifier,
           label: s.label,
-          category: VISITOR_PROFILE_CATEGORY,
+          category: VISITOR_PROFILE_CATEGORY, // Ensure this is set
           target_value: s.target_value,
           measurement_type: s.measurement_type as typeof MEASUREMENT_TYPES[number] | undefined,
           higher_is_better: s.higher_is_better,
@@ -113,8 +108,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
         visitor_profile_metrics: visitorProfileMetricsData,
       });
     } else if (!currentMetricSetId && !isLoadingMetricSet && !isLoadingMetrics && !authLoading && user) {
-      // This is for a new set, reset with defaults (already handled by defaultValues)
-      // but ensure metric_set_name is clear if user navigates back and forth
       form.reset({
         metric_set_id: undefined,
         metric_set_name: "",
@@ -135,36 +128,39 @@ const TargetMetricsBuilderPage: React.FC = () => {
     mutationFn: async (formData: TargetMetricsFormData) => {
       if (!user?.id) throw new Error('User not authenticated');
       
-      let operatingMetricSetId = formData.metric_set_id || currentMetricSetId; // Use ID from form (if editing) or state
+      let operatingMetricSetId = formData.metric_set_id || currentMetricSetId;
 
       if (!formData.metric_set_name || formData.metric_set_name.trim() === "") {
         throw new Error("Metric set name is required.");
       }
 
-      // 1. Create or Update the TargetMetricSet itself
-      if (operatingMetricSetId) { // Editing existing set
+      if (operatingMetricSetId) {
         await updateTargetMetricSetName(operatingMetricSetId, user.id, formData.metric_set_name);
-      } else { // Creating new set
+      } else {
         const newSet = await createTargetMetricSet(user.id, formData.metric_set_name);
         operatingMetricSetId = newSet.id;
-        setCurrentMetricSetId(newSet.id); // Update state if new set created
-        form.setValue('metric_set_id', newSet.id); // Update form as well
+        setCurrentMetricSetId(newSet.id); 
+        form.setValue('metric_set_id', newSet.id); 
+        // After creating a new set, navigate to its edit page to avoid confusion
+        // and allow further metric additions without creating duplicates on form resubmit.
+        // Or, simply stay on the page, and the form state reflects the new set.
+        // For now, let's update the URL to reflect the new set ID
+        navigate(`/target-metrics-builder/${newSet.id}`, { replace: true });
       }
 
       if (!operatingMetricSetId) {
         throw new Error("Failed to get or create metric set ID.");
       }
 
-      // 2. Save the metrics for this set
       return saveUserCustomMetricSettings(user.id, operatingMetricSetId, formData);
     },
-    onSuccess: (data, variables) => { // data is UserCustomMetricSetting[], variables is TargetMetricsFormData
+    onSuccess: (data, variables) => { 
       sonnerToast.success("Target metrics saved successfully!");
-      queryClient.invalidateQueries({ queryKey: ['userCustomMetricSettings', variables.metric_set_id || currentMetricSetId, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['targetMetricSet', variables.metric_set_id || currentMetricSetId, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id] }); // Invalidate list of sets too
-      // Potentially navigate to a list of sets or back to hub
-      // navigate('/target-selection'); // Or a new page showing all sets
+      const finalMetricSetId = variables.metric_set_id || currentMetricSetId;
+      queryClient.invalidateQueries({ queryKey: ['userCustomMetricSettings', finalMetricSetId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['targetMetricSet', finalMetricSetId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id] });
+      // navigate('/target-metric-sets'); // Navigate to list page after save
     },
     onError: (error) => {
       sonnerToast.error(`Failed to save metrics: ${error.message}`);
@@ -197,7 +193,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      {/* ... keep existing code (header and back button) ... */}
        <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
           <TargetIcon size={48} className="text-primary mr-4" />
@@ -209,8 +204,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
           </div>
         </div>
         <Button asChild variant="outline">
-          {/* TODO: This link should go to a page listing metric sets if they exist, or target-selection if no sets yet */}
-          <Link to="/target-selection">Back to Target Selection</Link>
+          <Link to="/target-metric-sets"><List className="mr-2"/> View All Sets</Link>
         </Button>
       </div>
 
@@ -251,7 +245,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
 
                   return (
                     <FormField
-                      key={`${metric.metric_identifier}-${index}`} // Ensure key is unique if identifiers could repeat (though they shouldn't here)
+                      key={`${metric.metric_identifier}-${index}-predefined`}
                       control={form.control}
                       name={`predefined_metrics.${index}.target_value`}
                       render={({ field }) => (
@@ -260,7 +254,8 @@ const TargetMetricsBuilderPage: React.FC = () => {
                             <FormLabel className="text-base">{metric.label}</FormLabel>
                             {config?.description && <FormDescription>{config.description}</FormDescription>}
                             <FormDescription>
-                              {metric.higher_is_better ? "(Higher is better)" : "(Lower is better)"}
+                              {/* Ensure higher_is_better comes from the form values, falling back to config */}
+                              {(form.getValues().predefined_metrics[index]?.higher_is_better ?? config?.higher_is_better) ? "(Higher is better)" : "(Lower is better)"}
                             </FormDescription>
                           </div>
                           <div className="sm:w-2/5">
@@ -348,6 +343,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
                         </FormItem>
                       )}
                     />
+                    {/* Hidden fields for metric_identifier and category */}
                     <Controller
                         name={`visitor_profile_metrics.${index}.metric_identifier`}
                         control={form.control}
@@ -356,7 +352,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
                      <Controller
                         name={`visitor_profile_metrics.${index}.category`}
                         control={form.control}
-                        defaultValue={VISITOR_PROFILE_CATEGORY}
+                        defaultValue={VISITOR_PROFILE_CATEGORY} // Already there
                         render={({ field }) => <input type="hidden" {...field} />}
                     />
                   </div>
@@ -380,7 +376,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
           <div className="flex justify-end space-x-4">
             <Button type="button" variant="ghost" asChild>
                {/* TODO: This link should go to a page listing metric sets if they exist, or target-selection if no sets yet */}
-              <Link to="/target-selection">Cancel</Link>
+              <Link to="/target-metric-sets">Cancel</Link>
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               <Save className="mr-2 h-4 w-4" />
