@@ -1,16 +1,14 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft } from 'lucide-react';
+import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { getSiteAssessmentById } from '@/services/siteAssessmentService';
+import { getSiteAssessmentById, getAssessmentMetricValues, getSiteVisitRatings } from '@/services/siteAssessmentService';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
-import { getAssessmentMetricValues } from '@/services/siteAssessmentService';
-import { SiteAssessment } from '@/types/siteAssessmentTypes';
+import { SiteAssessment, AssessmentMetricValue, AssessmentSiteVisitRatingInsert, siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
-import { AssessmentMetricValue } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SiteAssessmentDetailsViewProps {
@@ -52,7 +50,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     enabled: !!assessmentId,
   });
 
-  if (isLoadingAssessment || isLoadingMetricSet || isLoadingMetricValues) {
+  const { data: siteVisitRatings, isLoading: isLoadingSiteVisitRatings, error: siteVisitRatingsError } = useQuery<AssessmentSiteVisitRatingInsert[], Error>({
+    queryKey: ['siteVisitRatings', assessmentId],
+    queryFn: () => getSiteVisitRatings(assessmentId),
+    enabled: !!assessmentId,
+  });
+
+  if (isLoadingAssessment || isLoadingMetricSet || isLoadingMetricValues || isLoadingSiteVisitRatings) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -61,11 +65,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     );
   }
 
-  if (assessmentError || metricSetError || metricValuesError) {
+  if (assessmentError || metricSetError || metricValuesError || siteVisitRatingsError) {
     return (
       <div className="container mx-auto py-10 px-4 text-center">
         <p className="text-destructive text-xl">
-          Error loading assessment details: {assessmentError?.message || metricSetError?.message || metricValuesError?.message}
+          Error loading assessment details: {assessmentError?.message || metricSetError?.message || metricValuesError?.message || siteVisitRatingsError?.message}
         </p>
         <Button onClick={onBack} variant="outline" className="mt-6">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
@@ -208,17 +212,60 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </CardContent>
       </Card>
       
-      {/* Placeholder for Site Visit Ratings - can be a new Card */}
-      {/* 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl font-semibold">Site Visit Ratings</CardTitle>
+          <CardTitle className="text-2xl font-semibold flex items-center">
+            <Eye className="h-6 w-6 mr-2 text-primary" />
+            Site Visit Ratings
+          </CardTitle>
+          <CardDescription>
+            Subjective ratings based on on-site observations.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Site visit ratings will be displayed here. (Coming Soon)</p>
+          {siteVisitRatings && siteVisitRatings.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[20%]">Criterion</TableHead>
+                    <TableHead className="text-center w-[10%]">Grade</TableHead>
+                    <TableHead className="w-[40%]">Description</TableHead>
+                    <TableHead className="w-[30%]">Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {siteVisitCriteria.map((criterion) => {
+                    const savedRating = siteVisitRatings.find(r => r.criterion_key === criterion.key);
+                    const gradeDetail = savedRating ? criterion.grades.find(g => g.grade === savedRating.rating_grade) : null;
+                    
+                    return (
+                      <TableRow key={criterion.key}>
+                        <TableCell className="font-medium">{criterion.label}</TableCell>
+                        <TableCell className="text-center">
+                          {savedRating ? (
+                            <Badge variant="secondary" className="text-sm">{savedRating.rating_grade}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {gradeDetail ? gradeDetail.description : (savedRating ? savedRating.rating_description || 'N/A' : <span className="text-muted-foreground text-xs">Not Rated</span>)}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground italic">
+                          {savedRating?.notes || (savedRating ? 'No notes' : '')}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No site visit ratings have been recorded for this assessment yet.</p>
+          )}
         </CardContent>
       </Card>
-      */}
     </div>
   );
 };
