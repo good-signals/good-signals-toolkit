@@ -159,8 +159,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             const existingRating = existingSiteVisitRatings?.find(r => r.criterion_key === criterion.key);
             return {
                 criterion_key: criterion.key,
-                // Ensure form state for grade is '' if no grade or "none" was stored.
-                grade: (existingRating?.rating_grade && existingRating.rating_grade !== 'none') ? existingRating.rating_grade : '', 
+                // If rating_grade from DB is null (no grade saved), use '' for form state.
+                // Otherwise, use the saved grade ('A', 'B', etc.).
+                grade: existingRating?.rating_grade || '', 
                 notes: existingRating?.notes || '',
             };
         });
