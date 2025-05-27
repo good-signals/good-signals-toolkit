@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTargetMetricSets, deleteTargetMetricSet, TargetMetricSet } from '@/services/targetMetricsService';
+import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetricsService';
+import { TargetMetricSet } from '@/types/targetMetrics'; // Corrected import
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { PlusCircle, Edit3, Trash2, ListChecks } from 'lucide-react';

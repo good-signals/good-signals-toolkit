@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckSquare, Edit3, ListChecks } from 'lucide-react'; // Added ListChecks
+import { CheckSquare, Edit3, ListChecks, PlusCircle } from 'lucide-react'; // Added PlusCircle
 import { useAuth } from '@/contexts/AuthContext';
-import { saveUserStandardMetricsPreference, hasUserSetAnyMetrics } from '@/services/targetMetricsService'; // Corrected import
+import { saveUserStandardMetricsPreference, hasUserSetAnyMetrics } from '@/services/targetMetricsService';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast as sonnerToast } from 'sonner';
 
