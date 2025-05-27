@@ -87,6 +87,7 @@ export type Database = {
           created_at: string
           entered_value: number
           id: string
+          image_url: string | null
           label: string
           measurement_type: string | null
           metric_identifier: string
@@ -99,6 +100,7 @@ export type Database = {
           created_at?: string
           entered_value: number
           id?: string
+          image_url?: string | null
           label: string
           measurement_type?: string | null
           metric_identifier: string
@@ -111,6 +113,7 @@ export type Database = {
           created_at?: string
           entered_value?: number
           id?: string
+          image_url?: string | null
           label?: string
           measurement_type?: string | null
           metric_identifier?: string
@@ -133,6 +136,7 @@ export type Database = {
           created_at: string
           criterion_key: Database["public"]["Enums"]["site_visit_criterion_key"]
           id: string
+          image_url: string | null
           notes: string | null
           rating_description: string | null
           rating_grade: Database["public"]["Enums"]["site_visit_rating_grade"]
@@ -143,6 +147,7 @@ export type Database = {
           created_at?: string
           criterion_key: Database["public"]["Enums"]["site_visit_criterion_key"]
           id?: string
+          image_url?: string | null
           notes?: string | null
           rating_description?: string | null
           rating_grade: Database["public"]["Enums"]["site_visit_rating_grade"]
@@ -153,6 +158,7 @@ export type Database = {
           created_at?: string
           criterion_key?: Database["public"]["Enums"]["site_visit_criterion_key"]
           id?: string
+          image_url?: string | null
           notes?: string | null
           rating_description?: string | null
           rating_grade?: Database["public"]["Enums"]["site_visit_rating_grade"]

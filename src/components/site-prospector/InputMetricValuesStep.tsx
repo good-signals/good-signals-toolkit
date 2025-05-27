@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, ArrowRight, ArrowLeft, Info, Save } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Info, Save, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { saveAssessmentMetricValues, getAssessmentMetricValues, getSiteVisitRatings, saveSiteVisitRatings } from '@/services/siteAssessmentService';
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import ImageUploadField from './ImageUploadField';
 
 const metricValueSchema = z.object({
   metric_identifier: z.string(),
@@ -39,12 +40,16 @@ const metricValueSchema = z.object({
   ),
   measurement_type: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  image_url: z.string().optional().nullable(),
+  image_file: z.instanceof(File).optional().nullable(), // For handling new file uploads
 });
 
 const siteVisitRatingItemSchema = z.object({
-  criterion_key: z.string(), // Using z.string() for simplicity, matching SiteVisitCriterionKey type
-  grade: z.string().optional(), // Empty string means "No Grade"
+  criterion_key: z.string(),
+  grade: z.string().optional(),
   notes: z.string().optional().nullable(),
+  image_url: z.string().optional().nullable(),
+  image_file: z.instanceof(File).optional().nullable(), // For handling new file uploads
 });
 
 const formSchema = z.object({
@@ -112,7 +117,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     enabled: !!assessmentId,
   });
   
-  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<MetricValuesFormData>({
+  const { control, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = useForm<MetricValuesFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: { metrics: [], siteVisitRatings: [] },
   });
@@ -147,6 +152,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           entered_value: defaultValue,
           measurement_type: metric.measurement_type,
           notes: existingValue?.notes ?? '',
+          image_url: existingValue?.image_url ?? null,
+          image_file: null,
         };
       });
       replaceMetrics(initialMetrics);
@@ -159,10 +166,10 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             const existingRating = existingSiteVisitRatings?.find(r => r.criterion_key === criterion.key);
             return {
                 criterion_key: criterion.key,
-                // If rating_grade from DB is null (no grade saved), use '' for form state.
-                // Otherwise, use the saved grade ('A', 'B', etc.).
                 grade: existingRating?.rating_grade || '', 
                 notes: existingRating?.notes || '',
+                image_url: existingRating?.image_url ?? null,
+                image_file: null,
             };
         });
         replaceSiteVisitRatings(initialSiteVisitRatingsData);
@@ -192,38 +199,119 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     },
   });
 
-  const onSubmitCombinedData: SubmitHandler<MetricValuesFormData> = async (data) => {
-    console.log("Form data submitted:", data);
-    const metricsToSave: AssessmentMetricValueInsert[] = data.metrics.map(m => ({
-      assessment_id: assessmentId,
-      metric_identifier: m.metric_identifier,
-      label: m.label, 
-      category: m.category, 
-      entered_value: m.entered_value, 
-      measurement_type: m.measurement_type,
-      notes: m.notes,
+  const uploadImage = async (file: File, assessmentId: string, identifier: string): Promise<string | null> => {
+    if (!user?.id) throw new Error("User not authenticated for image upload.");
+    const filePath = `public/${user.id}/${assessmentId}/${identifier}-${Date.now()}-${file.name}`;
+    
+    const { data, error } = await supabase.storage
+      .from('assessment_images')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true, 
+      });
+
+    if (error) {
+      console.error('Error uploading image:', error);
+      toast({ title: "Image Upload Failed", description: error.message, variant: "destructive" });
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('assessment_images').getPublicUrl(filePath);
+    return publicUrl;
+  };
+
+  const deleteImage = async (imageUrl: string | null | undefined): Promise<void> => {
+    if (!imageUrl) return;
+    try {
+        // Extract the file path from the full URL
+        const urlParts = imageUrl.split('/assessment_images/');
+        if (urlParts.length < 2) {
+            console.warn("Could not parse file path from image URL for deletion:", imageUrl);
+            return;
+        }
+        const filePath = urlParts[1];
+        
+        const { error } = await supabase.storage
+            .from('assessment_images')
+            .remove([filePath]);
+        
+        if (error) {
+            console.error("Error deleting image from storage:", error);
+            toast({ title: "Image Deletion Failed", description: error.message, variant: "destructive"});
+        } else {
+            // console.log("Image deleted successfully from storage:", filePath);
+        }
+    } catch (e) {
+        console.error("Exception while deleting image:", e);
+    }
+};
+
+  const onSubmitCombinedData: SubmitHandler<MetricValuesFormData> = async (formData) => {
+    console.log("Form data submitted:", formData);
+
+    // Process metrics
+    const metricsToSave: AssessmentMetricValueInsert[] = await Promise.all(formData.metrics.map(async (m, index) => {
+      let newImageUrl = m.image_url;
+      const existingMetricData = existingMetricValues?.find(ev => ev.metric_identifier === m.metric_identifier);
+      const oldImageUrl = existingMetricData?.image_url;
+
+      if (m.image_file) { // New file uploaded
+        if (oldImageUrl) await deleteImage(oldImageUrl); // Delete old image if replacing
+        newImageUrl = await uploadImage(m.image_file, assessmentId, `metric-${m.metric_identifier}`);
+      } else if (m.image_url === null && oldImageUrl) { // Image explicitly removed (image_url became null, and there was an old one)
+        await deleteImage(oldImageUrl);
+        newImageUrl = null;
+      }
+      // If m.image_url is a string, it means no new file, and existing image (if any) is kept.
+      // If m.image_url is null and there was no oldImageUrl, it stays null.
+
+      return {
+        assessment_id: assessmentId,
+        metric_identifier: m.metric_identifier,
+        label: m.label, 
+        category: m.category, 
+        entered_value: m.entered_value, 
+        measurement_type: m.measurement_type,
+        notes: m.notes,
+        image_url: newImageUrl,
+      };
     }));
 
-    const ratingsToSave: AssessmentSiteVisitRatingInsert[] = data.siteVisitRatings
-      .map(svr => {
-        const criterion = siteVisitCriteria.find(c => c.key === svr.criterion_key);
-        if (!criterion) return null; 
-        
-        // svr.grade will be '' if "No Grade" was selected (due to onValueChange logic)
-        // or if it was initialized as such.
-        if (svr.grade && svr.grade !== '') { 
-          const gradeDetail = criterion.grades.find(g => g.grade === svr.grade);
-          return {
-            assessment_id: assessmentId,
-            criterion_key: svr.criterion_key as SiteVisitCriterionKey,
-            rating_grade: svr.grade as SiteVisitRatingGrade,
-            rating_description: gradeDetail?.description || '',
-            notes: svr.notes || null,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean) as AssessmentSiteVisitRatingInsert[];
+    // Process site visit ratings
+    const ratingsToSave: AssessmentSiteVisitRatingInsert[] = (await Promise.all(formData.siteVisitRatings.map(async (svr, index) => {
+      const criterion = siteVisitCriteria.find(c => c.key === svr.criterion_key);
+      if (!criterion) return null;
+
+      let newImageUrl = svr.image_url;
+      const existingRatingData = existingSiteVisitRatings?.find(er => er.criterion_key === svr.criterion_key);
+      const oldImageUrl = existingRatingData?.image_url;
+
+
+      if (svr.image_file) { // New file uploaded
+        if (oldImageUrl) await deleteImage(oldImageUrl); // Delete old image if replacing
+        newImageUrl = await uploadImage(svr.image_file, assessmentId, `rating-${svr.criterion_key}`);
+      } else if (svr.image_url === null && oldImageUrl) { // Image explicitly removed
+        await deleteImage(oldImageUrl);
+        newImageUrl = null;
+      }
+      
+      if (svr.grade && svr.grade !== '') { 
+        const gradeDetail = criterion.grades.find(g => g.grade === svr.grade);
+        return {
+          assessment_id: assessmentId,
+          criterion_key: svr.criterion_key as SiteVisitCriterionKey,
+          rating_grade: svr.grade as SiteVisitRatingGrade,
+          rating_description: gradeDetail?.description || '',
+          notes: svr.notes || null,
+          image_url: newImageUrl,
+        };
+      }
+      // If no grade, but there's an image or notes, we might still want to save that.
+      // However, current schema might require rating_grade. For now, only save if grade exists.
+      // If an image was uploaded for an item without a grade, it won't be saved by current logic.
+      // This could be adjusted if needed.
+      return null; 
+    }))).filter(Boolean) as AssessmentSiteVisitRatingInsert[];
 
     console.log("Metrics to save:", metricsToSave);
     console.log("Ratings to save:", ratingsToSave);
@@ -265,7 +353,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   };
   
   const metricsByCategory = metricFields.reduce((acc, field, index) => {
-    const typedField = field as unknown as UserCustomMetricSetting & { id: string; entered_value: number; notes?: string | null }; // Cast for target_value etc.
+    const typedField = field as unknown as UserCustomMetricSetting & { id: string; entered_value: number; notes?: string | null; image_url?: string | null }; // Cast for target_value etc.
     // Find the original metric definition to get target_value, higher_is_better
     const originalMetricDef = metricSet?.user_custom_metrics_settings.find(m => m.metric_identifier === typedField.metric_identifier);
 
@@ -280,7 +368,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         higher_is_better: originalMetricDef?.higher_is_better
     });
     return acc;
-  }, {} as Record<string, Array<UserCustomMetricSetting & { id: string; originalIndex: number; entered_value: number; notes?: string | null }>>);
+  }, {} as Record<string, Array<UserCustomMetricSetting & { id: string; originalIndex: number; entered_value: number; notes?: string | null; image_url?: string | null }>>);
 
   const getCriterionDetails = (key: SiteVisitCriterionKey) => {
     return siteVisitCriteria.find(c => c.key === key);
@@ -337,6 +425,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                     <Select
                                       value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
                                       onValueChange={(value) => controllerField.onChange(parseFloat(value))}
+                                      disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                                     >
                                       <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
                                         <SelectValue placeholder={`Select value for ${metricField.label}`} />
@@ -365,6 +454,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                       className="mt-1"
                                       value={controllerField.value === null || controllerField.value === undefined ? '' : String(controllerField.value)}
                                       onChange={e => controllerField.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                                      disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                                     />
                                   )}
                                 />
@@ -386,10 +476,38 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                     className="mt-1"
                                     value={controllerField.value ?? ''}
                                     onChange={e => controllerField.onChange(e.target.value)}
+                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                                   />
                                 )}
                               />
                             </div>
+                          </div>
+                          <div className="mt-4">
+                            <Label htmlFor={`metrics.${metricField.originalIndex}.image`}>Image (Optional)</Label>
+                            <Controller
+                              name={`metrics.${metricField.originalIndex}.image_file`}
+                              control={control}
+                              render={({ field: controllerField }) => (
+                                <ImageUploadField
+                                  id={`metrics.${metricField.originalIndex}.image`}
+                                  currentImageUrl={watch(`metrics.${metricField.originalIndex}.image_url`)}
+                                  onFileChange={(file) => {
+                                    setValue(`metrics.${metricField.originalIndex}.image_file`, file, { shouldValidate: true });
+                                    if (!file) { // If file is removed by ImageUploadField internal logic
+                                       // If there was an existing URL, and user clears the file input, mark for removal.
+                                       if(watch(`metrics.${metricField.originalIndex}.image_url`)) {
+                                         setValue(`metrics.${metricField.originalIndex}.image_url`, null, { shouldValidate: true });
+                                       }
+                                    }
+                                  }}
+                                  onRemoveCurrentImage={() => {
+                                    setValue(`metrics.${metricField.originalIndex}.image_url`, null, { shouldValidate: true });
+                                    setValue(`metrics.${metricField.originalIndex}.image_file`, null, { shouldValidate: true });
+                                  }}
+                                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                                />
+                              )}
+                            />
                           </div>
                         </div>
                       ))}
@@ -424,20 +542,16 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                 control={control}
                                 render={({ field: controllerField }) => (
                                   <Select
-                                    // controllerField.value is '' for "No Grade" or unselected.
-                                    // This makes Select show placeholder if controllerField.value is ''.
                                     value={controllerField.value || ''} 
                                     onValueChange={(value) => {
-                                      // If 'none' is selected from dropdown, set form state to ''.
-                                      // Otherwise, set to the selected grade value.
                                       controllerField.onChange(value === 'none' ? '' : value);
                                     }}
+                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                                   >
                                     <SelectTrigger id={`siteVisitRatings.${index}.grade`} className="mt-1">
                                       <SelectValue placeholder="Select grade" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {/* Ensure "No Grade" item has a non-empty value */}
                                       <SelectItem value="none"><em>No Grade</em></SelectItem>
                                       {criterionDetails.grades.map(grade => (
                                         <SelectItem key={grade.grade} value={grade.grade}>
@@ -462,10 +576,37 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                                     rows={2}
                                     className="mt-1"
                                     value={controllerField.value ?? ''}
+                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                                   />
                                 )}
                               />
                             </div>
+                          </div>
+                          <div className="mt-4">
+                            <Label htmlFor={`siteVisitRatings.${index}.image`}>Image (Optional)</Label>
+                             <Controller
+                              name={`siteVisitRatings.${index}.image_file`}
+                              control={control}
+                              render={() => ( // field not directly used here, rely on setValue/watch
+                                <ImageUploadField
+                                  id={`siteVisitRatings.${index}.image`}
+                                  currentImageUrl={watch(`siteVisitRatings.${index}.image_url`)}
+                                  onFileChange={(file) => {
+                                    setValue(`siteVisitRatings.${index}.image_file`, file, { shouldValidate: true });
+                                     if (!file) {
+                                       if(watch(`siteVisitRatings.${index}.image_url`)) {
+                                         setValue(`siteVisitRatings.${index}.image_url`, null, { shouldValidate: true });
+                                       }
+                                    }
+                                  }}
+                                  onRemoveCurrentImage={() => {
+                                    setValue(`siteVisitRatings.${index}.image_url`, null, { shouldValidate: true });
+                                    setValue(`siteVisitRatings.${index}.image_file`, null, { shouldValidate: true });
+                                  }}
+                                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                                />
+                              )}
+                            />
                           </div>
                         </div>
                       );
@@ -491,7 +632,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+              disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending || !user}
             >
               {(isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending) ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

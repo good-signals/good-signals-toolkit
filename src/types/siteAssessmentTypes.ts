@@ -5,12 +5,12 @@ export type SiteAssessmentInsert = Database["public"]["Tables"]["site_assessment
 export type SiteAssessmentUpdate = Database["public"]["Tables"]["site_assessments"]["Update"];
 
 export type AssessmentSiteVisitRating = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Row"];
-export type AssessmentSiteVisitRatingInsert = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Insert"];
+export type AssessmentSiteVisitRatingInsert = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Insert"] & { image_url?: string | null };
 
 // New types for Assessment Metric Values
 export type AssessmentMetricValue = Database["public"]["Tables"]["assessment_metric_values"]["Row"];
-export type AssessmentMetricValueInsert = Database["public"]["Tables"]["assessment_metric_values"]["Insert"];
-export type AssessmentMetricValueUpdate = Database["public"]["Tables"]["assessment_metric_values"]["Update"];
+export type AssessmentMetricValueInsert = Database["public"]["Tables"]["assessment_metric_values"]["Insert"] & { image_url?: string | null };
+export type AssessmentMetricValueUpdate = Database["public"]["Tables"]["assessment_metric_values"]["Update"] & { image_url?: string | null };
 
 export type SiteVisitCriterionKey = Database["public"]["Enums"]["site_visit_criterion_key"];
 export type SiteVisitRatingGrade = Database["public"]["Enums"]["site_visit_rating_grade"];
