@@ -1,9 +1,13 @@
 
 import React from 'react';
 import ProfileDetailsForm from '@/components/settings/ProfileDetailsForm';
-import AvatarUpload from '@/components/settings/AvatarUpload'; // Keep this for the next step
+import AvatarUpload from '@/components/settings/AvatarUpload'; 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button'; // Added Button
+import { Link } from 'react-router-dom'; // Added Link
+import { Briefcase } from 'lucide-react'; // Added Icon
+
 
 const ProfileSettingsPage: React.FC = () => {
   return (
@@ -29,18 +33,23 @@ const ProfileSettingsPage: React.FC = () => {
           </CardContent>
         </Card>
         
-        {/* Future sections for Account Management, Security, etc. can be added here */}
-        {/* 
         <Card>
           <CardHeader>
             <CardTitle>Account Management</CardTitle>
-            <CardDescription>Manage your company settings and team members.</CardDescription>
+            <CardDescription>Manage your company settings, logo, and team members.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Company logo upload, user management, and account deletion will be here.</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Access settings related to your company account, including company details and logo.
+            </p>
+             <Link to="/account-management">
+              <Button variant="outline">
+                <Briefcase className="mr-2 h-4 w-4" />
+                Go to Account Management
+              </Button>
+            </Link>
           </CardContent>
         </Card>
-        */}
       </div>
     </div>
   );

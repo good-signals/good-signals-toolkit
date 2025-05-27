@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
@@ -16,14 +15,13 @@ import {
 // import { toast } from 'sonner'; // Toasts for signout handled by service
 
 const Header = () => {
-  const { user, profile, signOut, authLoading } = useAuth(); // Updated: authLoading
+  const { user, profile, signOut, authLoading } = useAuth(); 
   const navigate = useNavigate();
   const isLoggedIn = !!user;
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/'); 
-    // Toast handled by signOutService
   };
 
   return (
@@ -36,9 +34,9 @@ const Header = () => {
           </h1>
         </Link>
         <nav>
-          {authLoading ? ( // Updated: authLoading
+          {authLoading ? ( 
             <div className="text-sm animate-pulse">Loading...</div>
-          ) : isLoggedIn && user ? ( // Check user directly
+          ) : isLoggedIn && user ? ( 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full hover:bg-primary/80 focus-visible:ring-gold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
@@ -60,8 +58,7 @@ const Header = () => {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
-                {/* Placeholder for future Account Management Link */}
-                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
+                <DropdownMenuItem onClick={() => navigate('/account-management')} className="cursor-pointer">
                   <Briefcase className="mr-2 h-4 w-4" />
                   <span>Account Management</span>
                 </DropdownMenuItem>
