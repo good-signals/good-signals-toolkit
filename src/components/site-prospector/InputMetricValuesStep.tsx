@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +21,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const metricValueSchema = z.object({
   metric_identifier: z.string(),
@@ -29,7 +35,7 @@ const metricValueSchema = z.object({
   category: z.string(),
   entered_value: z.preprocess(
     (val) => (val === "" || val === null || val === undefined ? null : parseFloat(String(val))),
-    z.number({ required_error: "Value is required" }).min(-Infinity).max(Infinity) // Basic numeric validation
+    z.number({ required_error: "Value is required" }).min(-Infinity).max(Infinity)
   ),
   measurement_type: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -47,6 +53,26 @@ interface InputMetricValuesStepProps {
   onMetricsSubmitted: (assessmentId: string) => void;
   onBack: () => void;
 }
+
+const metricDropdownOptions: Record<string, Array<{ label: string; value: number }>> = {
+  market_saturation_trade_area_overlap: [
+    { label: "No Overlap", value: 100 },
+    { label: "Some Overlap", value: 50 },
+    { label: "Major Overlap", value: 0 },
+  ],
+  market_saturation_heat_map_intersection: [
+    { label: "Cold Spot", value: 100 },
+    { label: "Warm Spot", value: 50 },
+    { label: "Hot Spot", value: 0 },
+  ],
+  demand_supply_balance: [
+    { label: "Positive Demand", value: 100 },
+    { label: "Equal Demand", value: 50 },
+    { label: "Negative Demand", value: 0 },
+  ],
+};
+
+const specificDropdownMetrics = Object.keys(metricDropdownOptions);
 
 const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   assessmentId,
@@ -87,21 +113,31 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     if (metricSet?.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) {
       const initialMetrics = metricSet.user_custom_metrics_settings.map(metric => {
         const existingValue = existingMetricValues?.find(ev => ev.metric_identifier === metric.metric_identifier);
+        
+        let defaultValue: number;
+        if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
+          defaultValue = existingValue.entered_value;
+        } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
+          // Default to the middle option (50) for new dropdowns if no existing value
+          defaultValue = 50; 
+        } else {
+          defaultValue = metric.measurement_type === 'Index' ? 50 : 0;
+        }
+
         return {
           metric_identifier: metric.metric_identifier,
           label: metric.label,
           category: metric.category,
-          entered_value: existingValue?.entered_value ?? (metric.measurement_type === 'Index' ? 50 : 0), // Default or existing
+          entered_value: defaultValue,
           measurement_type: metric.measurement_type,
           notes: existingValue?.notes ?? '',
-          // For display only, not part of form data for submission but useful for UI
           target_value: metric.target_value,
           higher_is_better: metric.higher_is_better,
         };
       });
-      replace(initialMetrics); // Use replace to set the array
+      replace(initialMetrics);
     } else if (metricSet && metricSet.user_custom_metrics_settings?.length === 0) {
-      replace([]); // Clear fields if metric set has no metrics
+      replace([]);
     }
   }, [metricSet, existingMetricValues, replace]);
 
@@ -123,7 +159,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   const onSubmit: SubmitHandler<MetricValuesFormData> = (data) => {
     const payload: AssessmentMetricValueInsert[] = data.metrics.map(m => ({
-      assessment_id: assessmentId, // Will be set in service, but good to have
+      assessment_id: assessmentId,
       metric_identifier: m.metric_identifier,
       label: m.label,
       category: m.category,
@@ -201,23 +237,47 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                             </TooltipContent>
                           </Tooltip>
                         </Label>
-                        <Controller
-                          name={`metrics.${metricField.originalIndex}.entered_value`}
-                          control={control}
-                          render={({ field }) => (
-                            <Input
-                              {...field}
-                              id={`metrics.${metricField.originalIndex}.entered_value`}
-                              type="number"
-                              step="any"
-                              placeholder={`Enter value for ${metricField.label}`}
-                              className="mt-1"
-                              value={field.value === null || field.value === undefined ? '' : String(field.value)}
-                              onChange={e => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
-
-                            />
-                          )}
-                        />
+                        
+                        {specificDropdownMetrics.includes(metricField.metric_identifier) ? (
+                          <Controller
+                            name={`metrics.${metricField.originalIndex}.entered_value`}
+                            control={control}
+                            render={({ field }) => (
+                              <Select
+                                value={field.value !== null && field.value !== undefined ? String(field.value) : ""}
+                                onValueChange={(value) => field.onChange(parseFloat(value))}
+                              >
+                                <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
+                                  <SelectValue placeholder={`Select value for ${metricField.label}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {metricDropdownOptions[metricField.metric_identifier].map(option => (
+                                    <SelectItem key={option.value} value={String(option.value)}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        ) : (
+                          <Controller
+                            name={`metrics.${metricField.originalIndex}.entered_value`}
+                            control={control}
+                            render={({ field }) => (
+                              <Input
+                                {...field}
+                                id={`metrics.${metricField.originalIndex}.entered_value`}
+                                type="number"
+                                step="any"
+                                placeholder={`Enter value for ${metricField.label}`}
+                                className="mt-1"
+                                value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                                onChange={e => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                              />
+                            )}
+                          />
+                        )}
                         {errors.metrics?.[metricField.originalIndex]?.entered_value && (
                           <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message}</p>
                         )}
