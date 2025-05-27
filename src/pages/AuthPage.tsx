@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { companyCategoriesData, CompanySubcategory } from '@/data/companyCategories';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const AuthPage: React.FC = () => {
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyCategory, setCompanyCategory] = useState('');
   const [companySubcategory, setCompanySubcategory] = useState('');
+  const [availableSubcategories, setAvailableSubcategories] = useState<CompanySubcategory[]>([]);
 
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -43,13 +45,16 @@ const AuthPage: React.FC = () => {
       toast.error("Please fill in all required fields for sign up (Email, Password, First Name, Last Name, Company Name).");
       return;
     }
+    // Category and Subcategory are optional from the UI perspective as per original logic (pass null if empty)
+    // but with dropdowns, they'll likely always have a value if interacted with.
+    // If not interacted with, they remain empty strings, which is fine.
     await signUpWithEmail(
       signUpEmail,
       signUpPassword,
       firstName,
       lastName,
       companyName,
-      companyAddress || null, // Pass null if empty
+      companyAddress || null, 
       companyCategory || null,
       companySubcategory || null
     );
@@ -62,10 +67,17 @@ const AuthPage: React.FC = () => {
     }
   }, [currentUser, currentSession, navigate]);
 
+  const handleCategoryChange = (value: string) => {
+    setCompanyCategory(value);
+    const selectedCategoryData = companyCategoriesData.find(cat => cat.name === value);
+    setAvailableSubcategories(selectedCategoryData ? selectedCategoryData.subcategories : []);
+    setCompanySubcategory(""); // Reset subcategory when category changes
+  };
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <Tabs defaultValue="signin" className="w-[400px] md:w-[500px]">
+      <Tabs defaultValue="signup" className="w-[400px] md:w-[550px]"> {/* Increased width for new fields */}
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -188,23 +200,43 @@ const AuthPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-companycategory">Category</Label>
-                    <Input
-                      id="signup-companycategory"
-                      type="text"
-                      placeholder="e.g., Retail, Restaurant"
-                      value={companyCategory}
-                      onChange={(e) => setCompanyCategory(e.target.value)}
-                    />
+                    <Select onValueChange={handleCategoryChange} value={companyCategory}>
+                      <SelectTrigger id="signup-companycategory">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Categories</SelectLabel>
+                          {companyCategoriesData.map((cat) => (
+                            <SelectItem key={cat.name} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-companysubcategory">Subcategory</Label>
-                    <Input
-                      id="signup-companysubcategory"
-                      type="text"
-                      placeholder="e.g., Coffee Shop, QSR"
+                    <Select 
+                      onValueChange={setCompanySubcategory} 
                       value={companySubcategory}
-                      onChange={(e) => setCompanySubcategory(e.target.value)}
-                    />
+                      disabled={!companyCategory || availableSubcategories.length === 0}
+                    >
+                      <SelectTrigger id="signup-companysubcategory">
+                        <SelectValue placeholder="Select subcategory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Subcategories</SelectLabel>
+                          {availableSubcategories.map((subcat) => (
+                            <SelectItem key={subcat.name} value={subcat.name}>
+                              {subcat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardContent>
