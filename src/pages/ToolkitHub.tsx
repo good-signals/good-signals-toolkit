@@ -34,7 +34,7 @@ const ToolkitHub = () => {
     <div className="py-8">
       <div className="text-center mb-12">
         <Compass size={48} className="text-primary mx-auto mb-4" />
-        <h1 className="text-4xl md:text-5xl font-bold font-serif mb-3 text-primary">Toolkit Hub</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-3 text-primary">Toolkit Hub</h1> {/* Removed font-serif */}
         <p className="text-xl text-foreground/80 max-w-2xl mx-auto">
           Your command center for unearthing valuable location insights. Select a tool to begin your expedition.
         </p>
@@ -47,7 +47,7 @@ const ToolkitHub = () => {
               <div className="p-3 bg-primary/10 rounded-full mb-4">
                 {tool.icon}
               </div>
-              <CardTitle className="text-2xl font-serif text-primary">{tool.title}</CardTitle>
+              <CardTitle className="text-2xl text-primary">{tool.title}</CardTitle> {/* Removed font-serif from CardTitle default in Card component, so no change needed here explicitly unless CardTitle itself had font-serif */}
               <CardDescription className="text-foreground/70">{tool.description}</CardDescription>
             </CardHeader>
             <CardContent className="text-center">

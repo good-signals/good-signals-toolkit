@@ -22,7 +22,7 @@ export default {
 		extend: {
 			fontFamily: {
         sans: ["Lato", ...fontFamily.sans],
-        serif: ["Merriweather", ...fontFamily.serif],
+        // serif: ["Merriweather", ...fontFamily.serif], // Removed serif
       },
 			colors: {
 				border: 'hsl(var(--border))',

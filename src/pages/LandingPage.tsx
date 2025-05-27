@@ -8,7 +8,7 @@ const LandingPage = () => {
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 md:py-20">
       <MapPin size={64} className="text-gold mb-6" />
-      <h1 className="text-5xl md:text-6xl font-bold font-serif mb-6 text-primary">
+      <h1 className="text-5xl md:text-6xl font-bold mb-6 text-primary"> {/* Removed font-serif */}
         Discover Your Next <span className="text-gold">Goldmine</span> Location
       </h1>
       <p className="text-xl md:text-2xl text-foreground max-w-3xl mb-10">
@@ -50,7 +50,7 @@ interface FeatureCardProps {
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => (
   <div className="bg-card p-6 rounded-lg shadow-lg border border-border flex flex-col items-center">
     <div className="mb-4 text-gold">{icon}</div>
-    <h3 className="text-2xl font-serif font-semibold text-primary mb-2">{title}</h3>
+    <h3 className="text-2xl font-semibold text-primary mb-2">{title}</h3> {/* Removed font-serif */}
     <p className="text-foreground/80 text-sm">{description}</p>
   </div>
 );

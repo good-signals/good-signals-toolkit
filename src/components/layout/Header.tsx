@@ -1,18 +1,18 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button'; // Assuming Button component exists
-import { LogIn, UserCircle, Settings, Compass } from 'lucide-react'; // Icons
+import { Button } from '@/components/ui/button'; 
+import { LogIn, UserCircle, Settings, Compass } from 'lucide-react'; 
 
 const Header = () => {
-  const isLoggedIn = false; // Placeholder for auth state
+  const isLoggedIn = false; 
 
   return (
     <header className="bg-primary text-primary-foreground shadow-md">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
         <Link to={isLoggedIn ? "/toolkit-hub" : "/"} className="flex items-center space-x-2">
           <Compass size={36} className="text-gold" />
-          <h1 className="text-3xl font-bold font-serif text-gold">
+          <h1 className="text-3xl font-bold text-gold"> {/* Removed font-serif */}
             Good Signals
           </h1>
         </Link>
