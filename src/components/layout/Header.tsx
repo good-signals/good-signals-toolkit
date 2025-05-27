@@ -107,9 +107,9 @@ const Header = () => {
                   <ListChecks className="mr-2 h-4 w-4" />
                   <span>Target Metrics</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/signal-threshold-settings')} className="cursor-pointer">
+                <DropdownMenuItem onClick={() => navigate('/signal-settings')} className="cursor-pointer">
                   <BarChart3 className="mr-2 h-4 w-4" />
-                  <span>Signal Thresholds</span>
+                  <span>Signal Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive hover:!text-destructive hover:!bg-destructive/10 focus:text-destructive focus:bg-destructive/10">
