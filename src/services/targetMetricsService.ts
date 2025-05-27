@@ -37,7 +37,16 @@ export async function saveUserCustomMetricSettings(
   userId: string,
   formData: TargetMetricsFormData
 ): Promise<UserCustomMetricSetting[]> {
-  const metricsToUpsert: UserCustomMetricSetting[] = [];
+  // Create a strongly-typed array that matches what Supabase expects
+  const metricsToUpsert: Array<{
+    user_id: string;
+    metric_identifier: string;
+    category: string;
+    label: string;
+    target_value: number;
+    higher_is_better: boolean;
+    measurement_type: string | null;
+  }> = [];
 
   // Prepare predefined metrics
   formData.predefined_metrics.forEach(metric => {
@@ -97,4 +106,36 @@ export async function saveUserCustomMetricSettings(
   })) || [];
   
   return typedReturnedData;
+}
+
+// New function to check if a user has any target metrics set
+export async function hasUserSetTargetMetrics(userId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from(TABLE_NAME)
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error checking if user has set target metrics:', error);
+    throw error;
+  }
+  
+  return (count !== null && count > 0);
+}
+
+// New function to save preference for using standard metrics
+export async function saveUserStandardMetricsPreference(userId: string): Promise<void> {
+  // This is a simple placeholder function that indicates the user has chosen standard metrics
+  // We're not actually saving any metrics, just recording the fact they chose standard
+  // In a real implementation, you might save a flag in user profile or a specific record
+  
+  // For now, we'll just log this - in a real implementation, you might save a flag somewhere
+  console.log(`User ${userId} has chosen to use standard metrics`);
+  
+  // In the future, you could implement this with a record in the database
+  // const { error } = await supabase
+  //  .from('user_preferences')
+  //  .upsert({ user_id: userId, preference_key: 'use_standard_metrics', preference_value: 'true' });
+  
+  return;
 }

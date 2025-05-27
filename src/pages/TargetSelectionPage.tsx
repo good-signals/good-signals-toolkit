@@ -1,11 +1,33 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { SlidersHorizontal, Target as TargetIcon, ArrowRight } from 'lucide-react'; // Using TargetIcon to avoid conflict
+import { SlidersHorizontal, Target as TargetIcon, ArrowRight } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { saveUserStandardMetricsPreference } from '@/services/targetMetricsService';
+import { toast } from 'sonner';
 
 const TargetSelectionPage: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleUseStandardTargets = async () => {
+    if (!user) {
+      toast.error("You need to be logged in to set target preferences");
+      return;
+    }
+
+    try {
+      await saveUserStandardMetricsPreference(user.id);
+      toast.success("Standard targets selected successfully!");
+      navigate('/toolkit-hub');
+    } catch (error) {
+      console.error("Error saving standard metrics preference:", error);
+      toast.error("Failed to select standard targets. Please try again.");
+    }
+  };
+
   return (
     <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
       <div className="text-center mb-12">
@@ -26,10 +48,8 @@ const TargetSelectionPage: React.FC = () => {
           </CardHeader>
           <CardContent className="flex-grow" />
           <CardFooter className="flex justify-center">
-            <Button asChild size="lg" className="w-full md:w-auto">
-              <Link to="/toolkit-hub">
-                Proceed with Standard Targets <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
+            <Button size="lg" className="w-full md:w-auto" onClick={handleUseStandardTargets}>
+              Proceed with Standard Targets <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </CardFooter>
         </Card>

@@ -6,16 +6,38 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
+import { hasUserSetTargetMetrics } from '@/services/targetMetricsService';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser, session: currentSession } = useAuth();
 
   useEffect(() => {
-    if (currentUser && currentSession) {
-      toast.success("Redirecting to Toolkit Hub...");
-      navigate('/toolkit-hub'); 
-    }
+    const checkUserAndRedirect = async () => {
+      if (currentUser && currentSession) {
+        try {
+          // Check if the user has already set target metrics
+          const hasSetMetrics = await hasUserSetTargetMetrics(currentUser.id);
+          
+          if (hasSetMetrics) {
+            // User has already set metrics, redirect to toolkit hub
+            toast.success("Welcome back! Redirecting to Toolkit Hub...");
+            navigate('/toolkit-hub');
+          } else {
+            // New user or user hasn't set metrics yet, redirect to target selection
+            toast.success("Welcome! Let's set up your target metrics...");
+            navigate('/target-selection');
+          }
+        } catch (error) {
+          console.error("Error checking user metrics:", error);
+          // On error, default to toolkit hub
+          toast.success("Redirecting to Toolkit Hub...");
+          navigate('/toolkit-hub');
+        }
+      }
+    };
+    
+    checkUserAndRedirect();
   }, [currentUser, currentSession, navigate]);
 
   return (
