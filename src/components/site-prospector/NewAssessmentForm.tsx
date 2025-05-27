@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -10,17 +10,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { useAuth } from '@/contexts/AuthContext';
 import { createSiteAssessment } from '@/services/siteAssessmentService';
 import { SiteAssessmentInsert } from '@/types/siteAssessmentTypes';
-import { useToast } from '@/components/ui/use-toast'; // Corrected import path
+import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
+import AddressAutocompleteInput from './AddressAutocompleteInput'; // Import the new component
 
 const addressSchema = z.object({
   assessment_name: z.string().min(1, "Assessment name is required"),
+  address_search: z.string().optional(), // For the autocomplete input itself
   address_line1: z.string().min(1, "Address is required"),
   address_line2: z.string().optional(),
   city: z.string().min(1, "City is required"),
   state_province: z.string().min(1, "State/Province is required"),
   postal_code: z.string().min(1, "Postal Code is required"),
   country: z.string().min(1, "Country is required"),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 type AddressFormData = z.infer<typeof addressSchema>;
@@ -34,10 +38,39 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autocompleteAddress, setAutocompleteAddress] = useState('');
 
-  const { register, handleSubmit, formState: { errors } } = useForm<AddressFormData>({
+  const { register, handleSubmit, formState: { errors }, control, setValue, trigger } = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
+    defaultValues: {
+      address_line1: '',
+      city: '',
+      state_province: '',
+      postal_code: '',
+      country: '',
+    }
   });
+
+  const handleAddressSelected = (selected: {
+    addressLine1: string;
+    city: string;
+    stateProvince: string;
+    postalCode: string;
+    country: string;
+    latitude?: number;
+    longitude?: number;
+  }) => {
+    setValue("address_line1", selected.addressLine1, { shouldValidate: true });
+    setValue("city", selected.city, { shouldValidate: true });
+    setValue("state_province", selected.stateProvince, { shouldValidate: true });
+    setValue("postal_code", selected.postalCode, { shouldValidate: true });
+    setValue("country", selected.country, { shouldValidate: true });
+    if (selected.latitude) setValue("latitude", selected.latitude);
+    if (selected.longitude) setValue("longitude", selected.longitude);
+    
+    // Trigger validation for all dependent fields after setting them
+    trigger(["address_line1", "city", "state_province", "postal_code", "country"]);
+  };
 
   const onSubmit: SubmitHandler<AddressFormData> = async (data) => {
     if (!user) {
@@ -46,8 +79,15 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
     }
     setIsSubmitting(true);
     try {
-      // For now, latitude and longitude are not handled, will be added with map integration
-      const assessmentPayload: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'latitude' | 'longitude' | 'target_metric_set_id'> = data;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { address_search, ...assessmentData } = data; // Exclude address_search from payload
+
+      const assessmentPayload: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'> = {
+        ...assessmentData,
+        // Ensure latitude and longitude are numbers or null
+        latitude: assessmentData.latitude ?? null,
+        longitude: assessmentData.longitude ?? null,
+      };
       
       const newAssessment = await createSiteAssessment(assessmentPayload, user.id);
       toast({ title: "Success", description: "New site assessment initiated." });
@@ -67,12 +107,35 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
         <CardTitle>New Site Assessment - Step 1: Address</CardTitle>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div>
             <Label htmlFor="assessment_name">Assessment Name</Label>
             <Input id="assessment_name" {...register("assessment_name")} />
             {errors.assessment_name && <p className="text-sm text-destructive">{errors.assessment_name.message}</p>}
           </div>
+
+          <Controller
+            name="address_search"
+            control={control}
+            render={({ field }) => (
+              <AddressAutocompleteInput
+                id="address_search_input"
+                label="Search for Address (Autocomplete)"
+                address={autocompleteAddress}
+                onAddressChange={(newAddress) => {
+                  setAutocompleteAddress(newAddress);
+                  // field.onChange(newAddress); // We don't strictly need to store this in form state if only for search
+                }}
+                onAddressSelect={handleAddressSelected}
+                error={errors.address_line1?.message} // Show general address error here for simplicity
+              />
+            )}
+          />
+          
+          <p className="text-sm text-muted-foreground">
+            Or enter address details manually below. Autocomplete will populate these fields.
+          </p>
+
           <div>
             <Label htmlFor="address_line1">Address Line 1</Label>
             <Input id="address_line1" {...register("address_line1")} />
@@ -107,7 +170,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
             </div>
           </div>
            <p className="text-sm text-muted-foreground">
-            Note: Google Maps autocomplete and pin drop will be added later. For now, please enter the address manually.
+            Latitude/Longitude will be captured if available from autocomplete.
           </p>
         </CardContent>
         <CardFooter className="flex justify-end space-x-2">
@@ -125,4 +188,3 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
 };
 
 export default NewAssessmentForm;
-

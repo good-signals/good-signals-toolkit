@@ -20,6 +20,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0uIBK31aziMeMFD8Mspgn0fpVZFufJCs&libraries=places&callback=initMap" async defer></script>
+    <script>
+      // Define initMap on the window object so Google Maps API can call it
+      window.initMap = function() {
+        // Google Maps API is loaded and ready
+        console.log("Google Maps API loaded.");
+      };
+    </script>
   </head>
 
   <body>
