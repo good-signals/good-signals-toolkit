@@ -21,15 +21,26 @@ export type MetricCategory = typeof ALL_METRIC_CATEGORIES[number];
 export const MEASUREMENT_TYPES = ["Index", "Amount"] as const;
 export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 
+// Schema for a target metric set from the database
+export const TargetMetricSetSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  name: z.string().min(1, "Set name is required."),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type TargetMetricSet = z.infer<typeof TargetMetricSetSchema>;
+
 // Schema for a single custom metric setting from the database
 export const UserCustomMetricSettingSchema = z.object({
   id: z.string().uuid().optional(),
-  user_id: z.string().uuid(), 
+  user_id: z.string().uuid(), // This might be redundant if we always fetch via set
+  metric_set_id: z.string().uuid(), // Now required, as metrics belong to a set
   metric_identifier: z.string().min(1),
   category: z.string().min(1),
   label: z.string().min(1),
   target_value: z.number(),
-  measurement_type: z.enum(MEASUREMENT_TYPES).nullable(), // CHANGED: Removed .optional()
+  measurement_type: z.enum(MEASUREMENT_TYPES).nullable(),
   higher_is_better: z.boolean(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
@@ -42,11 +53,11 @@ const PredefinedMetricFormSchema = z.object({
   label: z.string(),
   category: z.string(),
   target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
-  higher_is_better: z.boolean(), // Fixed for predefined, but part of the data model
+  higher_is_better: z.boolean(),
 });
 
 const VisitorProfileMetricFormSchema = z.object({
-  metric_identifier: z.string(), // Will be generated or based on label
+  metric_identifier: z.string(),
   label: z.string().min(1, "Attribute name is required."),
   category: z.literal(VISITOR_PROFILE_CATEGORY),
   target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
@@ -57,6 +68,8 @@ export type VisitorProfileMetricFormData = z.infer<typeof VisitorProfileMetricFo
 
 
 export const TargetMetricsFormSchema = z.object({
+  metric_set_id: z.string().uuid().optional(), // For identifying which set is being edited
+  metric_set_name: z.string().min(1, "Metric set name is required."),
   predefined_metrics: z.array(PredefinedMetricFormSchema),
   visitor_profile_metrics: z.array(VisitorProfileMetricFormSchema),
 });

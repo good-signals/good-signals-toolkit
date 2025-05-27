@@ -95,6 +95,30 @@ export type Database = {
         }
         Relationships: []
       }
+      target_metric_sets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_custom_metrics_settings: {
         Row: {
           category: string
@@ -104,6 +128,7 @@ export type Database = {
           label: string
           measurement_type: string | null
           metric_identifier: string
+          metric_set_id: string | null
           target_value: number
           updated_at: string
           user_id: string
@@ -116,6 +141,7 @@ export type Database = {
           label: string
           measurement_type?: string | null
           metric_identifier: string
+          metric_set_id?: string | null
           target_value: number
           updated_at?: string
           user_id: string
@@ -128,11 +154,20 @@ export type Database = {
           label?: string
           measurement_type?: string | null
           metric_identifier?: string
+          metric_set_id?: string | null
           target_value?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_custom_metrics_settings_metric_set_id_fkey"
+            columns: ["metric_set_id"]
+            isOneToOne: false
+            referencedRelation: "target_metric_sets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_global_roles: {
         Row: {
