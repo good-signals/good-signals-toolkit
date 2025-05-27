@@ -32,10 +32,14 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     queryKey: ['siteVisitRatings', assessmentId],
     queryFn: () => getSiteVisitRatings(assessmentId),
     enabled: !!assessmentId,
-    onSuccess: (data) => {
+  });
+
+  // Initialize form data with existing ratings when they load
+  useEffect(() => {
+    if (existingRatings) {
       const initialData: SiteVisitRatingsFormData = {};
       siteVisitCriteria.forEach(criterion => {
-        const existing = data.find(r => r.criterion_key === criterion.key);
+        const existing = existingRatings.find(r => r.criterion_key === criterion.key);
         initialData[criterion.key] = {
           grade: existing?.rating_grade || '',
           notes: existing?.notes || '',
@@ -43,7 +47,7 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
       });
       setFormData(initialData);
     }
-  });
+  }, [existingRatings]);
 
   const mutation = useMutation({
     mutationFn: (ratingsToSave: AssessmentSiteVisitRatingInsert[]) => saveSiteVisitRatings(assessmentId, ratingsToSave),
@@ -100,8 +104,8 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     mutation.mutate(ratingsToSave);
   };
   
+  // Initialize form data if not already populated by existing ratings
   useEffect(() => {
-    // Initialize form data if not already populated by existing ratings
     if (!isLoadingExistingRatings && Object.keys(formData).length === 0) {
       const initialData: SiteVisitRatingsFormData = {};
       siteVisitCriteria.forEach(criterion => {
@@ -109,7 +113,7 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
       });
       setFormData(initialData);
     }
-  }, [isLoadingExistingRatings, siteVisitCriteria, formData]);
+  }, [isLoadingExistingRatings, formData]);
 
 
   if (isLoadingExistingRatings) {
@@ -184,4 +188,3 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
 };
 
 export default InputSiteVisitRatingsStep;
-

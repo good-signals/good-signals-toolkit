@@ -109,16 +109,10 @@ const SiteProspectorPage = () => {
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
     setActiveAssessmentId(assessmentId);
-    setCurrentStep('inputSiteVisitRatings'); 
-    // queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // Potentially refetch if list view needs update
-  };
-
-  const handleSiteVisitRatingsSubmitted = (assessmentId: string) => {
-    setActiveAssessmentId(assessmentId);
     setCurrentStep('assessmentDetails');
-    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // Refetch to update table if needed
-    queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] }); // Refetch details for the view
-    queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] }); // Refetch ratings for the view
+    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
+    queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] });
+    queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] });
   };
 
   const handleCancelAssessmentProcess = () => {
@@ -134,25 +128,11 @@ const SiteProspectorPage = () => {
   };
 
   const handleBackFromMetricInput = () => {
-    if (activeAssessmentId && selectedMetricSetId) {
-      setCurrentStep('inputMetrics'); // Go back to inputting metric values
-    } else if (activeAssessmentId) {
-      setCurrentStep('selectMetrics'); // Fallback, though should have metricSetId
+    if (activeAssessmentId) {
+      setCurrentStep('selectMetrics');
     } else {
       setCurrentStep('idle');
     }
-    // No immediate refetch needed here, just changing step
-  };
-
-  const handleBackFromSiteVisitRatingsInput = () => {
-    if (activeAssessmentId && selectedMetricSetId) {
-      setCurrentStep('inputMetrics'); // Go back to inputting metric values
-    } else if (activeAssessmentId) {
-      setCurrentStep('selectMetrics'); // Fallback, though should have metricSetId
-    } else {
-      setCurrentStep('idle');
-    }
-    // No immediate refetch needed here, just changing step
   };
 
   const handleViewAssessment = (assessment: SiteAssessment) => {
@@ -293,14 +273,6 @@ const SiteProspectorPage = () => {
               targetMetricSetId={selectedMetricSetId}
               onMetricsSubmitted={handleMetricValuesSubmitted}
               onBack={handleBackFromMetricInput}
-            />;
-  }
-
-  if (currentStep === 'inputSiteVisitRatings' && activeAssessmentId && selectedMetricSetId) {
-    return <InputSiteVisitRatingsStep
-              assessmentId={activeAssessmentId}
-              onSiteVisitRatingsSubmitted={handleSiteVisitRatingsSubmitted}
-              onBack={handleBackFromSiteVisitRatingsInput}
             />;
   }
 
