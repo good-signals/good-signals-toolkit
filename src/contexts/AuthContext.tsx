@@ -30,6 +30,7 @@ interface AuthContextType {
     companySubcategory: string | null
   ) => Promise<void>;
   signOut: () => Promise<void>;
+  updateUserProfile: (updates: { full_name?: string; avatar_url?: string }) => Promise<boolean>;
 }
 
 // Create the context with a default undefined value
@@ -48,35 +49,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const getInitialSession = async () => {
+      setLoading(true); // Start loading
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       if (currentSession?.user) {
         await fetchProfile(currentSession.user.id);
       }
-      setLoading(false);
+      setLoading(false); // End loading
     };
 
     getInitialSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setLoading(true); // Start loading on auth state change
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
         // Defer fetchProfile call if it involves async operations that might call Supabase again
         setTimeout(async () => {
             await fetchProfile(newSession.user.id);
+            setLoading(false); // End loading after profile fetch
         }, 0);
       } else {
         setProfile(null); // Clear profile on logout
+        setLoading(false); // End loading if no user
       }
-      if (_event === 'INITIAL_SESSION') {
-        // Already handled by getInitialSession
-      } else if (_event === "SIGNED_IN" && newSession?.user) {
-        // Profile fetch is handled above.
-        // Potentially could trigger other post-sign-in actions here.
-      }
-      setLoading(false); // Ensure loading is set to false after auth state changes
+      // Removed specific event handling for SIMPLICITY, general handling above covers most cases.
     });
 
     return () => {
@@ -101,7 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data) {
         setProfile(data as UserProfile);
       } else {
-        setProfile(null); // Explicitly set to null if no profile found or after error
+        setProfile(null); 
       }
     } catch (error) {
       console.error('Catch Error fetching profile:', error);
@@ -201,14 +200,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(false);
   };
 
+  const updateUserProfile = async (updates: { full_name?: string; avatar_url?: string }) => {
+    if (!user) {
+      toast.error("You must be logged in to update your profile.");
+      return false;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        toast.error(error.message || 'Failed to update profile.');
+        setLoading(false);
+        return false;
+      }
+
+      if (data) {
+        setProfile(data as UserProfile);
+        toast.success('Profile updated successfully!');
+        setLoading(false);
+        return true;
+      }
+      setLoading(false);
+      return false;
+    } catch (error) {
+      console.error('Catch error updating profile:', error);
+      toast.error('An unexpected error occurred while updating your profile.');
+      setLoading(false);
+      return false;
+    }
+  };
+
   const signOut = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signOut();
+    setSession(null); // Clear session immediately
+    setUser(null); // Clear user immediately
+    setProfile(null); // Clear profile immediately
     if (error) {
       console.error('Error signing out:', error.message);
       toast.error(error.message || 'Sign out failed.');
     } else {
-      setProfile(null); 
       toast.success('Signed out successfully!');
     }
     setLoading(false);
@@ -222,6 +260,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithEmail,
     signUpWithEmail,
     signOut,
+    updateUserProfile, // Add new function to context value
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
