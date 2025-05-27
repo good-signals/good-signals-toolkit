@@ -10,7 +10,8 @@ import { companyCategoriesData, CompanySubcategory } from '@/data/companyCategor
 import { toast } from 'sonner';
 
 const SignUpForm: React.FC = () => {
-  const { signUpWithEmail, loading } = useAuth();
+  const { signUpWithEmail, authLoading } = useAuth(); // Updated: authLoading
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +27,7 @@ const SignUpForm: React.FC = () => {
     setCompanyCategory(value);
     const selectedCategoryData = companyCategoriesData.find(cat => cat.name === value);
     setAvailableSubcategories(selectedCategoryData ? selectedCategoryData.subcategories : []);
-    setCompanySubcategory(""); // Reset subcategory when category changes
+    setCompanySubcategory(""); 
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -35,6 +36,7 @@ const SignUpForm: React.FC = () => {
       toast.error("Please fill in all required fields for sign up (Email, Password, First Name, Last Name, Company Name).");
       return;
     }
+    setIsSubmitting(true);
     await signUpWithEmail(
       email,
       password,
@@ -45,6 +47,8 @@ const SignUpForm: React.FC = () => {
       companyCategory || null,
       companySubcategory || null
     );
+    setIsSubmitting(false);
+    // Toasts handled by service/context
   };
 
   return (
@@ -66,6 +70,7 @@ const SignUpForm: React.FC = () => {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
+                autoComplete="given-name"
               />
             </div>
             <div className="space-y-2">
@@ -77,6 +82,7 @@ const SignUpForm: React.FC = () => {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
+                autoComplete="family-name"
               />
             </div>
           </div>
@@ -89,6 +95,7 @@ const SignUpForm: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
             />
           </div>
           <div className="space-y-2">
@@ -99,6 +106,7 @@ const SignUpForm: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="new-password"
             />
           </div>
           
@@ -112,6 +120,7 @@ const SignUpForm: React.FC = () => {
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               required
+              autoComplete="organization"
             />
           </div>
           <div className="space-y-2">
@@ -122,6 +131,7 @@ const SignUpForm: React.FC = () => {
               placeholder="123 Main St, Anytown, USA"
               value={companyAddress}
               onChange={(e) => setCompanyAddress(e.target.value)}
+              autoComplete="street-address"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -168,8 +178,8 @@ const SignUpForm: React.FC = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing Up...' : 'Sign Up & Create Company'}
+          <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
+            {isSubmitting || authLoading ? 'Signing Up...' : 'Sign Up & Create Company'}
           </Button>
         </CardFooter>
       </form>

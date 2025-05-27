@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
-import { LogIn, Settings, UserCircle, LogOut, Briefcase, Compass } from 'lucide-react'; 
+import { LogIn, Settings, UserCircle, LogOut, Briefcase, Compass, Upload } from 'lucide-react'; 
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/components/auth/UserAvatar';
 import {
@@ -13,17 +13,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from 'sonner';
+// import { toast } from 'sonner'; // Toasts for signout handled by service
 
 const Header = () => {
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, profile, signOut, authLoading } = useAuth(); // Updated: authLoading
   const navigate = useNavigate();
   const isLoggedIn = !!user;
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/'); 
-    toast.success("You have been signed out.");
+    // Toast handled by signOutService
   };
 
   return (
@@ -36,20 +36,20 @@ const Header = () => {
           </h1>
         </Link>
         <nav>
-          {loading ? (
-            <div className="text-sm">Loading...</div>
-          ) : isLoggedIn && profile ? (
+          {authLoading ? ( // Updated: authLoading
+            <div className="text-sm animate-pulse">Loading...</div>
+          ) : isLoggedIn && user ? ( // Check user directly
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full hover:bg-primary/80">
-                  <UserAvatar avatarUrl={profile.avatar_url} fullName={profile.full_name} size={8} />
-                  <span className="hidden md:inline text-sm font-medium">{profile.full_name || user.email}</span>
+                <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full hover:bg-primary/80 focus-visible:ring-gold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
+                  <UserAvatar avatarUrl={profile?.avatar_url} fullName={profile?.full_name || user.email} size={8} />
+                  <span className="hidden md:inline text-sm font-medium">{profile?.full_name || user.email}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-card border-border shadow-lg mt-1">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none text-card-foreground">{profile.full_name}</p>
+                    <p className="text-sm font-medium leading-none text-card-foreground">{profile?.full_name || "User"}</p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
@@ -61,12 +61,12 @@ const Header = () => {
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
                 {/* Placeholder for future Account Management Link */}
-                <DropdownMenuItem disabled className="cursor-not-allowed">
+                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
                   <Briefcase className="mr-2 h-4 w-4" />
                   <span>Account Management</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-500 hover:!text-red-500 hover:!bg-red-500/10 focus:text-red-600">
+                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive hover:!text-destructive hover:!bg-destructive/10 focus:text-destructive focus:bg-destructive/10">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sign Out</span>
                 </DropdownMenuItem>
@@ -74,7 +74,7 @@ const Header = () => {
             </DropdownMenu>
           ) : (
             <Link to="/auth">
-              <Button variant="outline" className="bg-gold text-gold-foreground hover:bg-gold/90 border-gold">
+              <Button variant="outline" className="bg-gold text-gold-foreground hover:bg-gold/90 border-gold focus-visible:ring-gold">
                 <LogIn className="mr-2 h-5 w-5" />
                 Access Toolkit
               </Button>

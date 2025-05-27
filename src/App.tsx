@@ -1,10 +1,9 @@
-
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom"; // Added Navigate
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom"; 
 
 import MainLayout from "./components/layout/MainLayout";
 import LandingPage from "./pages/LandingPage";
@@ -13,29 +12,26 @@ import SiteProspectorPage from "./pages/SiteProspectorPage";
 import TerritoryTargeterPage from "./pages/TerritoryTargeterPage";
 import SiteTreasureMapPage from "./pages/SiteTreasureMapPage";
 import AuthPage from "./pages/AuthPage"; 
-import ProfileSettingsPage from "./pages/ProfileSettingsPage"; // Import the new page
+import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import NotFound from "./pages/NotFound";
-import { useAuth } from "./contexts/AuthContext"; // For ProtectedRoute
+import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
 // ProtectedRoute component
 const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, authLoading } = useAuth();
 
-  if (loading) {
-    // You can return a loading spinner here
-    return <div>Loading authentication state...</div>;
+  if (authLoading) {
+    return <div className="flex justify-center items-center h-screen"><p>Loading authentication state...</p></div>;
   }
 
   if (!user) {
-    // User not authenticated, redirect to auth page
     return <Navigate to="/auth" replace />;
   }
 
-  return children; // User authenticated, render the requested component
+  return children;
 };
-
 
 const AppRoutes = () => (
   <MainLayout>

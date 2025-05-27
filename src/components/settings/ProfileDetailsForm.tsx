@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,9 +5,7 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { toast } from 'sonner';
 
 const profileFormSchema = z.object({
   full_name: z.string().min(2, { message: "Full name must be at least 2 characters." }).max(100),
@@ -18,7 +15,7 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 const ProfileDetailsForm: React.FC = () => {
-  const { user, profile, updateUserProfile, loading: authLoading } = useAuth();
+  const { user, profile, updateContextUserProfile, authLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ProfileFormValues>({
@@ -37,7 +34,7 @@ const ProfileDetailsForm: React.FC = () => {
       });
     } else if (user) {
         form.reset({
-        full_name: '', // No profile yet, or profile.full_name is null
+        full_name: '', 
         email: user.email || '',
       });
     }
@@ -45,21 +42,28 @@ const ProfileDetailsForm: React.FC = () => {
 
   const onSubmit: SubmitHandler<ProfileFormValues> = async (data) => {
     setIsSubmitting(true);
-    const success = await updateUserProfile({ full_name: data.full_name });
-    if (success) {
-      // Profile state in context is updated, form will re-sync via useEffect
-    } else {
-      // Error toast handled by updateUserProfile
+    // Make sure full_name is part of data, even if unchanged, to satisfy service/db update
+    const nameToUpdate = data.full_name === (profile?.full_name || '') ? profile?.full_name : data.full_name;
+
+    if (nameToUpdate !== undefined && nameToUpdate !== null) {
+         await updateContextUserProfile({ full_name: nameToUpdate });
+    } else if (data.full_name) { // Fallback if profile.full_name was null
+         await updateContextUserProfile({ full_name: data.full_name });
     }
+    // Success/error toasts are handled by updateContextUserProfile
     setIsSubmitting(false);
   };
 
-  if (authLoading && !profile) {
-    return <p>Loading profile information...</p>;
+  if (authLoading && !profile && !user) {
+    return <p>Loading user session...</p>;
   }
   
   if (!user) {
     return <p>Please log in to view your profile.</p>;
+  }
+  
+  if (authLoading && !profile && user) {
+    return <p>Loading profile information...</p>;
   }
 
   return (
@@ -88,7 +92,7 @@ const ProfileDetailsForm: React.FC = () => {
               <FormControl>
                 <Input placeholder="your@email.com" {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
               </FormControl>
-              <FormMessage /> {/* Should not show errors for readOnly field */}
+              <FormMessage />
             </FormItem>
           )}
         />

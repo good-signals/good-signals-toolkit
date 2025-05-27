@@ -1,10 +1,13 @@
+
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from "sonner";
+import { signInWithEmailService, signUpWithEmailService, signOutService } from '@/services/authService';
+import { fetchProfileById, updateProfileService } from '@/services/profileService';
 
-// Define the shape of the profile data
-interface UserProfile {
+// Define the shape of the profile data (can be moved to a types file later)
+export interface UserProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
@@ -17,7 +20,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: UserProfile | null;
-  loading: boolean;
+  authLoading: boolean; // Renamed from 'loading'
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (
     email: string,
@@ -30,7 +33,8 @@ interface AuthContextType {
     companySubcategory: string | null
   ) => Promise<void>;
   signOut: () => Promise<void>;
-  updateUserProfile: (updates: { full_name?: string; avatar_url?: string }) => Promise<boolean>;
+  updateContextUserProfile: (updates: { full_name?: string; avatar_url?: string }) => Promise<boolean>;
+  uploadAvatarAndUpdateProfile: (file: File) => Promise<boolean>;
 }
 
 // Create the context with a default undefined value
@@ -45,37 +49,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true); // Renamed
+
+  const fetchProfileAndUpdateContext = async (userId: string) => {
+    const { data: profileData, error: profileError } = await fetchProfileById(userId);
+    if (profileError && !profileData) { // Allow profileData to be null if record doesn't exist (406)
+        toast.error('Error fetching profile details.');
+        setProfile(null);
+    } else if (profileData) {
+        setProfile(profileData);
+    } else {
+        // No profile data found, but no error (e.g. new user, profile not yet created by trigger)
+        setProfile(null);
+    }
+  };
 
   useEffect(() => {
-    const getInitialSession = async () => {
-      setLoading(true); // Start loading
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+    setAuthLoading(true);
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       if (currentSession?.user) {
-        await fetchProfile(currentSession.user.id);
+        await fetchProfileAndUpdateContext(currentSession.user.id);
       }
-      setLoading(false); // End loading
-    };
-
-    getInitialSession();
+      setAuthLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setLoading(true); // Start loading on auth state change
+      setAuthLoading(true);
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
-        // Defer fetchProfile call if it involves async operations that might call Supabase again
         setTimeout(async () => {
-            await fetchProfile(newSession.user.id);
-            setLoading(false); // End loading after profile fetch
+            await fetchProfileAndUpdateContext(newSession.user.id);
+            setAuthLoading(false);
         }, 0);
       } else {
-        setProfile(null); // Clear profile on logout
-        setLoading(false); // End loading if no user
+        setProfile(null);
+        setAuthLoading(false);
       }
-      // Removed specific event handling for SIMPLICITY, general handling above covers most cases.
     });
 
     return () => {
@@ -83,43 +95,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error, status } = await supabase
-        .from('profiles')
-        .select(`id, full_name, avatar_url, updated_at`)
-        .eq('id', userId)
-        .single();
-
-      if (error && status !== 406) { 
-        console.error('Error fetching profile:', error);
-        toast.error('Error fetching profile.');
-        setProfile(null);
-        return;
-      }
-      if (data) {
-        setProfile(data as UserProfile);
-      } else {
-        setProfile(null); 
-      }
-    } catch (error) {
-      console.error('Catch Error fetching profile:', error);
-      toast.error('An unexpected error occurred while fetching your profile.');
-      setProfile(null);
-    }
-  };
-
   const signInWithEmail = async (email: string, password: string) => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      console.error('Error signing in:', error.message);
-      toast.error(error.message || 'Sign in failed. Please check your credentials.');
-    } else {
-      toast.success('Signed in successfully!');
-      // Profile will be fetched by onAuthStateChange
-    }
-    setLoading(false);
+    setAuthLoading(true);
+    await signInWithEmailService(email, password);
+    // onAuthStateChange will handle state updates.
+    // Setting authLoading to false is tricky here as onAuthStateChange is async.
+    // For simplicity, we let onAuthStateChange handle the final authLoading(false).
+    // Or, we can optimistically set it false after a short delay if no immediate error.
+    // However, the service already shows toasts.
+    // The global authLoading primarily reflects the context's readiness.
+    // Let's ensure onAuthStateChange consistently sets authLoading false.
   };
 
   const signUpWithEmail = async (
@@ -132,135 +117,89 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     companyCategory: string | null,
     companySubcategory: string | null
   ) => {
-    setLoading(true);
-    const fullName = `${firstName} ${lastName}`.trim();
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (signUpError) {
-      console.error('Error signing up:', signUpError.message);
-      toast.error(signUpError.message || 'Sign up failed. Please try again.');
-      setLoading(false);
-      return;
-    }
-    
-    if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
-      toast.info('User already exists but is unconfirmed. Please check your email to confirm your account or try signing in.');
-      setLoading(false);
-      return;
-    }
-
-    if (!signUpData.user) {
-      // This case might happen if user already exists and is confirmed, Supabase returns an error which should be caught by signUpError block.
-      // Or if email confirmation is required, and user is not "active" yet.
-      toast.error('Sign up process did not return a user. If you are already registered, please try signing in. Otherwise, check your email for confirmation.');
-      setLoading(false);
-      return;
-    }
-    
-    // User created in auth.users, now call Edge Function to create account and membership
-    try {
-      const { error: functionError } = await supabase.functions.invoke('create-account-and-admin', {
-        body: { 
-          userId: signUpData.user.id, 
-          companyName,
-          companyAddress,
-          companyCategory,
-          companySubcategory
-        },
-      });
-
-      if (functionError) {
-        throw functionError;
-      }
-      
-      // If email confirmation is not required, user session might be active.
-      // If email confirmation is required, user needs to confirm email then sign in.
-      // The onAuthStateChange listener will handle setting the session and user.
-      if (signUpData.session) { // User is immediately active (e.g. auto-confirm is on)
-        toast.success('Sign up successful! Company account created.');
-        // onAuthStateChange will fetch profile and set session.
-      } else { // Email confirmation likely required
-        toast.success('Sign up successful! Company account created. Please check your email to confirm your account.');
-      }
-
-    } catch (error) {
-      console.error('Error creating company account/admin role:', error);
-      toast.error(`Sign up succeeded, but failed to set up company: ${error.message}. Please contact support.`);
-      // Potentially add logic here to "rollback" user creation or guide user, though complex.
-    }
-
-    setLoading(false);
+    setAuthLoading(true);
+    await signUpWithEmailService(
+      email, password, firstName, lastName, companyName, 
+      companyAddress, companyCategory, companySubcategory
+    );
+    // onAuthStateChange will handle state updates.
   };
 
-  const updateUserProfile = async (updates: { full_name?: string; avatar_url?: string }) => {
+  const signOut = async () => {
+    setAuthLoading(true); // To show loading state during sign out process
+    await signOutService();
+    // onAuthStateChange handles clearing session, user, profile and sets authLoading to false.
+    // Explicitly clear here for immediate UI feedback before onAuthStateChange if desired, but can lead to race conditions.
+    // Sticking to onAuthStateChange for consistency.
+  };
+  
+  const updateContextUserProfile = async (updates: { full_name?: string; avatar_url?: string }) => {
     if (!user) {
       toast.error("You must be logged in to update your profile.");
       return false;
     }
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', user.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating profile:', error);
-        toast.error(error.message || 'Failed to update profile.');
-        setLoading(false);
-        return false;
-      }
-
-      if (data) {
-        setProfile(data as UserProfile);
-        toast.success('Profile updated successfully!');
-        setLoading(false);
-        return true;
-      }
-      setLoading(false);
-      return false;
-    } catch (error) {
-      console.error('Catch error updating profile:', error);
-      toast.error('An unexpected error occurred while updating your profile.');
-      setLoading(false);
+    // Potentially use a different loading state like 'isUpdatingProfile'
+    // For now, re-using authLoading might be okay if updates are quick
+    // Or introduce a new state: const [profileUpdating, setProfileUpdating] = useState(false);
+    setAuthLoading(true); // Or setProfileUpdating(true)
+    const { data: updatedProfile, error } = await updateProfileService(user.id, updates);
+    if (error || !updatedProfile) {
+      toast.error(error?.message || 'Failed to update profile.');
+      setAuthLoading(false); // Or setProfileUpdating(false)
       return false;
     }
+    setProfile(updatedProfile);
+    toast.success('Profile updated successfully!');
+    setAuthLoading(false); // Or setProfileUpdating(false)
+    return true;
   };
 
-  const signOut = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signOut();
-    setSession(null); // Clear session immediately
-    setUser(null); // Clear user immediately
-    setProfile(null); // Clear profile immediately
-    if (error) {
-      console.error('Error signing out:', error.message);
-      toast.error(error.message || 'Sign out failed.');
-    } else {
-      toast.success('Signed out successfully!');
+  const uploadAvatarAndUpdateProfile = async (file: File): Promise<boolean> => {
+    if (!user) {
+      toast.error("You must be logged in to upload an avatar.");
+      return false;
     }
-    setLoading(false);
+    setAuthLoading(true); // Or a specific 'isUploadingAvatar' state
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Math.random()}.${fileExt}`; // user.id as folder
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true }); // upsert: true to overwrite if exists
+
+    if (uploadError) {
+      console.error('Error uploading avatar:', uploadError);
+      toast.error(uploadError.message || 'Failed to upload avatar.');
+      setAuthLoading(false);
+      return false;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+    if (!publicUrl) {
+        toast.error('Failed to get public URL for avatar.');
+        setAuthLoading(false);
+        return false;
+    }
+    
+    // Update profile with new avatar_url
+    const success = await updateContextUserProfile({ avatar_url: publicUrl });
+    // updateContextUserProfile already sets authLoading to false
+    return success;
   };
   
   const value = {
     session,
     user,
     profile,
-    loading,
+    authLoading, // Renamed
     signInWithEmail,
     signUpWithEmail,
     signOut,
-    updateUserProfile, // Add new function to context value
+    updateContextUserProfile, // Renamed from updateUserProfile
+    uploadAvatarAndUpdateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -8,9 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 
 const SignInForm: React.FC = () => {
-  const { signInWithEmail, loading } = useAuth();
+  const { signInWithEmail, authLoading } = useAuth(); // Updated: authLoading
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +20,10 @@ const SignInForm: React.FC = () => {
       toast.error("Please enter both email and password for sign in.");
       return;
     }
+    setIsSubmitting(true);
     await signInWithEmail(email, password);
+    setIsSubmitting(false);
+    // Toasts for success/failure are handled by signInWithEmailService / AuthContext
   };
 
   return (
@@ -38,6 +43,7 @@ const SignInForm: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
             />
           </div>
           <div className="space-y-2">
@@ -48,12 +54,13 @@ const SignInForm: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing In...' : 'Sign In'}
+          <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
+            {isSubmitting || authLoading ? 'Signing In...' : 'Sign In'}
           </Button>
         </CardFooter>
       </form>
