@@ -1,4 +1,6 @@
+
 import type { Config } from "tailwindcss";
+import { fontFamily } from "tailwindcss/defaultTheme";
 
 export default {
 	darkMode: ["class"],
@@ -18,6 +20,10 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+        sans: ["Lato", ...fontFamily.sans],
+        serif: ["Merriweather", ...fontFamily.serif],
+      },
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -25,11 +31,15 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))'
+					DEFAULT: 'hsl(var(--primary))', // Deep Blue
+					foreground: 'hsl(var(--primary-foreground))' // Light text for deep blue bg
 				},
+        gold: {
+          DEFAULT: 'hsl(var(--gold))', // Rich Gold
+          foreground: 'hsl(var(--gold-foreground))' // Dark text for gold bg
+        },
 				secondary: {
-					DEFAULT: 'hsl(var(--secondary))',
+					DEFAULT: 'hsl(var(--secondary))', // Parchment accent
 					foreground: 'hsl(var(--secondary-foreground))'
 				},
 				destructive: {
@@ -41,7 +51,7 @@ export default {
 					foreground: 'hsl(var(--muted-foreground))'
 				},
 				accent: {
-					DEFAULT: 'hsl(var(--accent))',
+					DEFAULT: 'hsl(var(--accent))', // Could be a brighter gold or teal
 					foreground: 'hsl(var(--accent-foreground))'
 				},
 				popover: {
