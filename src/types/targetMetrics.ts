@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 export const PREDEFINED_METRIC_CATEGORIES = [
@@ -21,21 +20,11 @@ export type MetricCategory = typeof ALL_METRIC_CATEGORIES[number];
 export const MEASUREMENT_TYPES = ["Index", "Amount"] as const;
 export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 
-// Schema for a target metric set from the database
-export const TargetMetricSetSchema = z.object({
-  id: z.string().uuid(),
-  user_id: z.string().uuid(),
-  name: z.string().min(1, "Set name is required."),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
-});
-export type TargetMetricSet = z.infer<typeof TargetMetricSetSchema>;
-
 // Schema for a single custom metric setting from the database
 export const UserCustomMetricSettingSchema = z.object({
-  id: z.string().uuid().optional(),
-  user_id: z.string().uuid(), // This might be redundant if we always fetch via set
-  metric_set_id: z.string().uuid(), // Now required, as metrics belong to a set
+  id: z.string().uuid().optional(), // Made optional as it's DB generated
+  user_id: z.string().uuid(),
+  metric_set_id: z.string().uuid(),
   metric_identifier: z.string().min(1),
   category: z.string().min(1),
   label: z.string().min(1),
@@ -46,6 +35,17 @@ export const UserCustomMetricSettingSchema = z.object({
   updated_at: z.string().optional(),
 });
 export type UserCustomMetricSetting = z.infer<typeof UserCustomMetricSettingSchema>;
+
+// Schema for a target metric set from the database
+export const TargetMetricSetSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  name: z.string().min(1, "Set name is required."),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+  user_custom_metrics_settings: z.array(UserCustomMetricSettingSchema).optional(), // Added this line
+});
+export type TargetMetricSet = z.infer<typeof TargetMetricSetSchema>;
 
 // Schema for the form
 const PredefinedMetricFormSchema = z.object({
@@ -66,7 +66,6 @@ const VisitorProfileMetricFormSchema = z.object({
 });
 export type VisitorProfileMetricFormData = z.infer<typeof VisitorProfileMetricFormSchema>;
 
-
 export const TargetMetricsFormSchema = z.object({
   metric_set_id: z.string().uuid().optional(), // For identifying which set is being edited
   metric_set_name: z.string().min(1, "Metric set name is required."),
@@ -74,4 +73,3 @@ export const TargetMetricsFormSchema = z.object({
   visitor_profile_metrics: z.array(VisitorProfileMetricFormSchema),
 });
 export type TargetMetricsFormData = z.infer<typeof TargetMetricsFormSchema>;
-

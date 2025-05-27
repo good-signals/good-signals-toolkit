@@ -48,21 +48,44 @@ export async function getTargetMetricSets(userId: string): Promise<TargetMetricS
 }
 
 export async function getTargetMetricSetById(metricSetId: string, userId: string): Promise<TargetMetricSet | null> {
-  const { data, error } = await supabase
+  const { data: metricSetData, error: metricSetError } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .select('*')
     .eq('id', metricSetId)
     .eq('user_id', userId)
     .single();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
+  if (metricSetError) {
+    if (metricSetError.code === 'PGRST116') { // Not found
       return null;
     }
-    console.error('Error fetching target metric set by ID:', error);
-    throw error;
+    console.error('Error fetching target metric set by ID:', metricSetError);
+    throw metricSetError;
   }
-  return data ? TargetMetricSetSchema.parse(data) : null;
+
+  if (!metricSetData) {
+    return null;
+  }
+
+  // Fetch associated custom metrics
+  const { data: customMetricsData, error: customMetricsError } = await supabase
+    .from(USER_METRICS_TABLE_NAME)
+    .select('*')
+    .eq('metric_set_id', metricSetId);
+
+  if (customMetricsError) {
+    console.error('Error fetching user custom metric settings for set:', customMetricsError);
+    // Decide if this should throw or return the set without metrics
+    // For now, let's return the set but log the error. The UI can handle missing metrics.
+    // Alternatively, throw customMetricsError;
+  }
+  
+  const parsedMetricSet = TargetMetricSetSchema.parse(metricSetData);
+  
+  return {
+    ...parsedMetricSet,
+    user_custom_metrics_settings: customMetricsData ? z.array(UserCustomMetricSettingSchema).parse(customMetricsData) : [],
+  };
 }
 
 export async function updateTargetMetricSetName(metricSetId: string, userId: string, newName: string): Promise<TargetMetricSet> {
