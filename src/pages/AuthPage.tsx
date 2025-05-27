@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
-import { hasUserSetTargetMetrics } from '@/services/targetMetricsService';
+import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,7 +16,7 @@ const AuthPage: React.FC = () => {
       if (currentUser && currentSession) {
         try {
           // Check if the user has already set target metrics
-          const hasSetMetrics = await hasUserSetTargetMetrics(currentUser.id);
+          const hasSetMetrics = await hasUserSetAnyMetrics(currentUser.id);
           
           if (hasSetMetrics) {
             // User has already set metrics, redirect to toolkit hub
@@ -31,7 +30,7 @@ const AuthPage: React.FC = () => {
         } catch (error) {
           console.error("Error checking user metrics:", error);
           // On error, default to toolkit hub
-          toast.success("Redirecting to Toolkit Hub...");
+          toast.error("Error checking setup. Redirecting to Toolkit Hub...");
           navigate('/toolkit-hub');
         }
       }

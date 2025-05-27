@@ -1,10 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod'; // Added missing import for Zod
 import { 
   UserCustomMetricSetting, 
   TargetMetricsFormData, 
   VISITOR_PROFILE_CATEGORY,
   TargetMetricSet,
-  TargetMetricSetSchema
+  TargetMetricSetSchema,
+  UserCustomMetricSettingSchema // Added for explicit parsing if needed
 } from '@/types/targetMetrics';
 import { PostgrestResponse } from '@supabase/supabase-js';
 
@@ -128,16 +130,7 @@ export async function saveUserCustomMetricSettings(
   formData: TargetMetricsFormData // This formData should contain the metrics, not set name/id
 ): Promise<UserCustomMetricSetting[]> {
 
-  const metricsToUpsert: Array<{
-    metric_set_id: string; // All metrics will belong to this set
-    user_id: string; // Denormalized, but good for RLS if needed directly on this table
-    metric_identifier: string;
-    category: string;
-    label: string;
-    target_value: number;
-    higher_is_better: boolean;
-    measurement_type: string | null;
-  }> = [];
+  const metricsToUpsert: Array<Omit<UserCustomMetricSetting, 'id' | 'created_at' | 'updated_at'>> = [];
 
   formData.predefined_metrics.forEach(metric => {
     metricsToUpsert.push({
@@ -148,7 +141,7 @@ export async function saveUserCustomMetricSettings(
       label: metric.label,
       target_value: metric.target_value,
       higher_is_better: metric.higher_is_better,
-      measurement_type: null,
+      measurement_type: null, // Predefined metrics might not have this explicitly set in form
     });
   });
 
@@ -156,7 +149,7 @@ export async function saveUserCustomMetricSettings(
     metricsToUpsert.push({
       metric_set_id: metricSetId,
       user_id: userId,
-      metric_identifier: metric.metric_identifier || `visitor_profile_${metric.label.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
+      metric_identifier: metric.metric_identifier || `vp_${metric.label.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
       category: VISITOR_PROFILE_CATEGORY,
       label: metric.label,
       target_value: metric.target_value,
@@ -164,10 +157,31 @@ export async function saveUserCustomMetricSettings(
       higher_is_better: metric.higher_is_better,
     });
   });
+  
+  if (metricsToUpsert.length === 0) {
+    // If there are no metrics to save, but the set itself was created/updated,
+    // we might still want to return an empty array or handle this case.
+    // For now, return empty array if nothing to upsert.
+    // This can happen if a user creates a set but adds no custom metrics.
+    // Check if we should delete metrics not present in formData (full sync)
+    // For now, it's an upsert of provided metrics.
+    // To implement a full sync (delete metrics not in formData):
+    // 1. Fetch existing metrics for the set.
+    // 2. Compare with formData and identify metrics to delete.
+    // 3. Perform delete operations.
+    // This is more complex and not implemented here. Current logic only adds/updates.
+    console.log("No metrics to upsert for set:", metricSetId);
+    // We should still fetch existing metrics for this set to return them if no changes were made to metrics list but set name changed.
+    // Or, if the intent is to return the *upserted* metrics, and none were, return [].
+    // Let's return the result of upsert, which would be empty if metricsToUpsert is empty.
+  }
 
   const { data, error } = await supabase
     .from(USER_METRICS_TABLE_NAME)
-    .upsert(metricsToUpsert, { onConflict: 'metric_set_id, metric_identifier', defaultToNull: false })
+    .upsert(metricsToUpsert, { 
+      onConflict: 'metric_set_id, metric_identifier', 
+      defaultToNull: false // Important for measurement_type if it can be null
+    })
     .select();
 
   if (error) {
@@ -175,21 +189,7 @@ export async function saveUserCustomMetricSettings(
     throw error;
   }
   
-  const typedReturnedData: UserCustomMetricSetting[] = data?.map(item => ({
-    id: item.id,
-    user_id: item.user_id,
-    metric_set_id: item.metric_set_id,
-    metric_identifier: item.metric_identifier,
-    category: item.category,
-    label: item.label,
-    target_value: item.target_value,
-    measurement_type: item.measurement_type as UserCustomMetricSetting['measurement_type'],
-    higher_is_better: item.higher_is_better,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-  })) || [];
-  
-  return typedReturnedData;
+  return z.array(UserCustomMetricSettingSchema).parse(data || []);
 }
 
 // Updated function to check if a user has any target metric sets
@@ -232,12 +232,29 @@ export async function saveUserStandardMetricsPreference(userId: string): Promise
   console.log(`User ${userId} has chosen to use standard metrics. Consider saving this preference.`);
   // Example: Create a default, non-editable metric set named "Standard Metrics" for the user.
   // Or, set a flag on their user_profile.
-  // const { error } = await supabase
-  //  .from('user_preferences')
-  //  .upsert({ user_id: userId, preference_key: 'use_standard_metrics', preference_value: 'true' }, { onConflict: 'user_id, preference_key' });
-  // if (error) {
-  //   console.error('Error saving standard metrics preference:', error);
-  //   throw error;
+  // For now, this is a placeholder. A real implementation might create a default metric set.
+  // To make this fully robust with the new set structure, we might:
+  // 1. Check if a "Standard Metrics" set exists for the user.
+  // 2. If not, create one with default predefined metrics.
+  // This implies `saveUserStandardMetricsPreference` could become async and interact with DB.
+  // For the purpose of `hasUserSetAnyMetrics`, simply having *any* set (custom or standard) counts.
+  // This function's current role is more about the *intent* to use standard, less about *creating* them.
+  // If no custom sets exist, and they choose "standard", `hasUserSetAnyMetrics` would be false
+  // unless this function creates a "Standard" set.
+  // Let's assume for now it doesn't auto-create a set, just logs.
+  // The redirection to /toolkit-hub implies some metrics path is now considered "set".
+  
+  // A potential enhancement:
+  // try {
+  //   const existingStandardSet = await getTargetMetricSets(userId).then(sets => sets.find(s => s.name === "Standard Default Metrics"));
+  //   if (!existingStandardSet) {
+  //     const standardSet = await createTargetMetricSet(userId, "Standard Default Metrics");
+  //     // Optionally populate with default predefined metrics
+  //     // const defaultMetricsFormData = { predefined_metrics: predefinedMetricsConfig.map(...), visitor_profile_metrics: []};
+  //     // await saveUserCustomMetricSettings(userId, standardSet.id, defaultMetricsFormData);
+  //   }
+  // } catch (e) {
+  //   console.error("Failed to ensure standard metrics set on preference save", e);
   // }
   return;
 }
