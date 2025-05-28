@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -73,33 +74,60 @@ const SiteProspectorPage = () => {
   });
   
   const deleteMutation = useMutation({
-    mutationFn: (assessmentId: string) => {
+    mutationFn: async (assessmentId: string) => {
+      console.log('Attempting to delete assessment:', assessmentId);
       if (!user?.id) throw new Error("User not authenticated");
-      return deleteSiteAssessment(assessmentId, user.id);
+      
+      // Add more detailed logging for deletion attempts
+      const assessment = assessments.find(a => a.id === assessmentId);
+      console.log('Assessment to delete:', assessment);
+      
+      try {
+        await deleteSiteAssessment(assessmentId, user.id);
+        console.log('Assessment deleted successfully:', assessmentId);
+        return assessmentId;
+      } catch (error) {
+        console.error('Error during deletion:', error);
+        throw error;
+      }
     },
-    onSuccess: (_data, deletedAssessmentId) => { 
+    onSuccess: (deletedAssessmentId) => { 
+      console.log('Delete mutation success for:', deletedAssessmentId);
       toast({ title: "Assessment deleted successfully." });
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
       setClearSelectionsKey(prev => prev + 1); 
       
       if (deletedAssessmentId === activeAssessmentId) {
+        console.log('Deleted assessment was active, canceling process');
         handleCancelAssessmentProcess(); 
       } else {
-         refetchAssessments(); 
+        console.log('Refetching assessments after deletion');
+        refetchAssessments(); 
       }
     },
     onError: (error) => {
+      console.error('Delete mutation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error deleting assessment",
-        description: error.message,
+        description: `Failed to delete assessment: ${errorMessage}. Please try again.`,
         variant: "destructive",
       });
     },
   });
   
   const handleDeleteCommit = (idsToDelete: string[]) => {
-    if (idsToDelete.length === 0) return;
-    idsToDelete.forEach(id => deleteMutation.mutate(id));
+    console.log('handleDeleteCommit called with:', idsToDelete);
+    if (idsToDelete.length === 0) {
+      console.log('No assessments to delete');
+      return;
+    }
+    
+    // Delete assessments one by one with proper error handling
+    idsToDelete.forEach((id, index) => {
+      console.log(`Deleting assessment ${index + 1}/${idsToDelete.length}:`, id);
+      deleteMutation.mutate(id);
+    });
   };
 
   const clearSessionStorageAssessmentState = () => {
@@ -109,24 +137,49 @@ const SiteProspectorPage = () => {
   };
 
   const handleStartNewAssessment = () => {
+    console.log('Starting new assessment');
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null);
     setCurrentStep('newAddress');
   };
 
   const handleAddressStepCompleted = (assessmentId: string) => {
-    setActiveAssessmentId(assessmentId);
-    setCurrentStep('selectMetrics');
-    refetchAssessments(); 
+    console.log('Address step completed for assessment:', assessmentId);
+    
+    if (!assessmentId) {
+      console.error('No assessment ID provided to handleAddressStepCompleted');
+      toast({
+        title: "Error",
+        description: "Failed to proceed to next step. Please try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setActiveAssessmentId(assessmentId);
+      setCurrentStep('selectMetrics');
+      refetchAssessments();
+      console.log('Successfully moved to selectMetrics step');
+    } catch (error) {
+      console.error('Error in handleAddressStepCompleted:', error);
+      toast({
+        title: "Error",
+        description: "Failed to proceed to metric selection. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleMetricSetSelected = (assessmentId: string, metricSetId: string) => {
+    console.log('Metric set selected:', { assessmentId, metricSetId });
     setActiveAssessmentId(assessmentId); 
     setSelectedMetricSetId(metricSetId);
     setCurrentStep('inputMetrics');
   };
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
+    console.log('Metric values submitted for assessment:', assessmentId);
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null); 
     setCurrentStep('idle');
@@ -139,6 +192,7 @@ const SiteProspectorPage = () => {
   };
 
   const handleCancelAssessmentProcess = () => {
+    console.log('Canceling assessment process');
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null);
     setCurrentStep('idle');
@@ -147,10 +201,12 @@ const SiteProspectorPage = () => {
   };
   
   const handleBackFromMetricSelection = () => {
+    console.log('Going back from metric selection');
     setCurrentStep('newAddress');
   };
 
   const handleBackFromMetricInput = () => {
+    console.log('Going back from metric input');
     if (activeAssessmentId) {
       const assessmentBeingEdited = assessments.find(a => a.id === activeAssessmentId);
       if (assessmentBeingEdited?.target_metric_set_id) {
@@ -165,6 +221,7 @@ const SiteProspectorPage = () => {
   };
   
   const handleViewAssessment = (assessment: SiteAssessment) => {
+    console.log('Viewing assessment:', assessment.id);
     if (!assessment.target_metric_set_id) {
       toast({
         title: "Cannot View Details",
@@ -179,6 +236,7 @@ const SiteProspectorPage = () => {
   };
 
   const handleEditAssessment = (assessment: SiteAssessment) => {
+    console.log('Editing assessment:', assessment.id);
     setActiveAssessmentId(assessment.id);
     if (assessment.target_metric_set_id) {
       setSelectedMetricSetId(assessment.target_metric_set_id);

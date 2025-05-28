@@ -59,6 +59,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   });
 
   const handleAddressSelected = (addressDetails: AddressComponents) => {
+    console.log('Address selected:', addressDetails);
     setValue("address_line1", addressDetails.addressLine1, { shouldValidate: true });
     setValue("city", addressDetails.city, { shouldValidate: true });
     setValue("state_province", addressDetails.stateProvince, { shouldValidate: true });
@@ -77,12 +78,30 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   };
 
   const onSubmit: SubmitHandler<AddressFormData> = async (data) => {
+    console.log('Form submission started:', { data, user: user?.id });
+    
     if (!user) {
+      console.error('User not authenticated');
       toast({ title: "Error", description: "You must be logged in to create an assessment.", variant: "destructive" });
       return;
     }
+    
     setIsSubmitting(true);
+    
     try {
+      console.log('Creating assessment with payload:', {
+        assessment_name: data.assessment_name,
+        address_line1: data.address_line1,
+        city: data.city,
+        state_province: data.state_province,
+        postal_code: data.postal_code,
+        country: data.country,
+        site_status: data.site_status,
+        latitude: coordinates.lat, 
+        longitude: coordinates.lng,
+        userId: user.id
+      });
+
       const assessmentPayload: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'> = {
         assessment_name: data.assessment_name,
         address_line1: data.address_line1,
@@ -96,12 +115,25 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       };
       
       const newAssessment = await createSiteAssessment(assessmentPayload, user.id);
+      console.log('Assessment created successfully:', newAssessment);
+      
+      if (!newAssessment?.id) {
+        throw new Error('Assessment was created but no ID was returned');
+      }
+
       toast({ title: "Success", description: "New site assessment initiated." });
+      
+      console.log('Calling onAssessmentCreated with ID:', newAssessment.id);
       onAssessmentCreated(newAssessment.id);
+      
     } catch (error) {
       console.error("Failed to create assessment:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      toast({ title: "Error", description: `Failed to create assessment: ${errorMessage}`, variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: `Failed to create assessment: ${errorMessage}`, 
+        variant: "destructive" 
+      });
     } finally {
       setIsSubmitting(false);
     }

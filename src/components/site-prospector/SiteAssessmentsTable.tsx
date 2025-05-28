@@ -65,8 +65,13 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
       const counts: Record<string, number> = {};
       await Promise.all(
         assessmentsData.map(async (assessment) => {
-          const documents = await getAssessmentDocuments(assessment.id);
-          counts[assessment.id] = documents.length;
+          try {
+            const documents = await getAssessmentDocuments(assessment.id);
+            counts[assessment.id] = documents.length;
+          } catch (error) {
+            console.error(`Error fetching documents for assessment ${assessment.id}:`, error);
+            counts[assessment.id] = 0;
+          }
         })
       );
       return counts;
@@ -143,7 +148,12 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   };
 
   const openDeleteDialog = (item: SiteAssessment | string[]) => {
+    console.log('Opening delete dialog for:', item);
     if (Array.isArray(item)) {
+      if (item.length === 0) {
+        console.log('No assessments selected for deletion');
+        return;
+      }
       setAssessmentsToDeleteList(item);
       setAssessmentToDelete(null);
     } else {
@@ -154,8 +164,21 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   };
 
   const confirmDelete = () => {
+    console.log('Confirming delete...');
     const idsToDelete = assessmentToDelete ? [assessmentToDelete.id] : assessmentsToDeleteList;
-    if (idsToDelete.length === 0) return;
+    console.log('IDs to delete:', idsToDelete);
+    
+    if (idsToDelete.length === 0) {
+      console.log('No assessments to delete');
+      return;
+    }
+    
+    // Clear the dialog state immediately
+    setShowDeleteDialog(false);
+    setAssessmentToDelete(null);
+    setAssessmentsToDeleteList([]);
+    
+    // Call the deletion handler
     onDeleteCommit(idsToDelete);
   };
 
@@ -236,13 +259,19 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
             <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
             <AlertDialogDescription>
               {assessmentToDelete
-                ? `This will permanently delete the assessment "${assessmentToDelete.assessment_name || assessmentToDelete.id}".`
-                : `This will permanently delete ${assessmentsToDeleteList.length} selected assessment(s).`}
+                ? `This will permanently delete the assessment "${assessmentToDelete.assessment_name || assessmentToDelete.id}" and all associated data (metric values, site visit ratings, and documents).`
+                : `This will permanently delete ${assessmentsToDeleteList.length} selected assessment(s) and all associated data.`}
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setShowDeleteDialog(false); setAssessmentToDelete(null); setAssessmentsToDeleteList([]); }}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { 
+              setShowDeleteDialog(false); 
+              setAssessmentToDelete(null); 
+              setAssessmentsToDeleteList([]); 
+            }}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={isDeleting}
