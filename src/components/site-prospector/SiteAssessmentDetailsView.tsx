@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
@@ -29,6 +28,8 @@ import AddressMapDisplay from './AddressMapDisplay';
 import { getMetricLabelForValue, specificDropdownMetrics } from '@/config/metricDisplayConfig';
 import { getSignalStatus, SignalStatus } from '@/lib/assessmentDisplayUtils';
 import { format } from 'date-fns';
+import ExportButton from '../export/ExportButton';
+import { ExportData } from '@/services/exportService';
 
 import OverallScoreDisplay from './OverallScoreDisplay';
 import MetricCategorySection, { ProcessedMetric } from './MetricCategorySection';
@@ -267,6 +268,22 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     refetchDocuments();
   };
 
+  // Create export data for the export functionality
+  const exportData: ExportData | null = useMemo(() => {
+    if (!assessment || !targetMetricSet || !user) {
+      return null;
+    }
+    
+    return {
+      assessment,
+      targetMetricSet,
+      accountSettings,
+      detailedMetricScores,
+      overallSiteSignalScore,
+      completionPercentage,
+    };
+  }, [assessment, targetMetricSet, user, accountSettings, detailedMetricScores, overallSiteSignalScore, completionPercentage]);
+
   console.log('Component state:', { 
     isLoadingAssessment, 
     isLoadingAccounts, 
@@ -397,6 +414,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
             <Button variant="outline" onClick={onBackToList}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
             </Button>
+            {exportData && (
+              <ExportButton 
+                exportData={exportData} 
+                disabled={isLoadingAssessment || isLoadingTargetMetricSet} 
+              />
+            )}
             <Button onClick={onEditGoToInputMetrics}>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Assessment Data
             </Button>
