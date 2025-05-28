@@ -8,14 +8,14 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
-import { TargetMetricSet } from '@/types/targetMetrics';
-import { AssessmentMetricValue, SiteVisitRating, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
+import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
+import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
 import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
 import { toast } from '@/components/ui/use-toast';
 import AddressMapDisplay from './AddressMapDisplay';
-import { getMetricLabelForValue, specificDropdownMetrics } from '@/config/metricDisplayConfig'; // Import helper
+import { getMetricLabelForValue, specificDropdownMetrics, metricDropdownOptions } from '@/config/metricDisplayConfig';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
@@ -40,7 +40,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     onSuccess: () => {
       toast({ title: "Scores Updated", description: "The assessment scores have been recalculated and saved." });
       queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
-      queryClient.invalidateQueries({ queryKey: ['siteAssessmentsList', user?.id] }); // Invalidate list if scores affect summary views
+      queryClient.invalidateQueries({ queryKey: ['siteAssessmentsList', user?.id] });
     },
     onError: (error: Error) => {
       toast({ title: "Score Update Failed", description: `Could not save updated scores: ${error.message}`, variant: "destructive" });
@@ -54,27 +54,44 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     if (!targetMetricSet || !metricValues) {
       return { overallSiteSignalScore: null, completionPercentage: 0, detailedMetricScores: new Map() };
     }
-    const completion = calculateCompletionPercentage(targetMetricSet.user_custom_metrics_settings || [], metricValues);
-    const overallScore = calculateOverallSiteSignalScore(targetMetricSet, metricValues, siteVisitRatings);
-    
+
     const details = new Map<string, { score: number | null; enteredValue: number | null; targetValue: number | null; higherIsBetter: boolean; notes: string | null; imageUrl: string | null }>();
     (targetMetricSet.user_custom_metrics_settings || []).forEach(setting => {
       const metricValue = metricValues.find(mv => mv.metric_identifier === setting.metric_identifier);
+      let score: number | null;
+
+      const specialHardcodedScoreMetrics = ['market_saturation_trade_area_overlap', 'market_saturation_heat_map_intersection', 'demand_supply_balance'];
+      if (specialHardcodedScoreMetrics.includes(setting.metric_identifier)) {
+        score = metricValue?.entered_value ?? null; // For these, the entered value is the score
+      } else {
+        score = calculateMetricSignalScore({ // Corrected arguments
+          enteredValue: metricValue?.entered_value ?? null,
+          targetValue: setting.target_value,
+          higherIsBetter: setting.higher_is_better,
+        });
+      }
+      
       details.set(setting.metric_identifier, {
-        score: calculateMetricSignalScore(setting, metricValue?.entered_value ?? null),
+        score: score,
         enteredValue: metricValue?.entered_value ?? null,
         targetValue: setting.target_value,
         higherIsBetter: setting.higher_is_better,
         notes: metricValue?.notes ?? null,
-        imageUrl: metricValue?.image_url ?? null,
+        imageUrl: metricValue?.image_url ?? null, // Assuming AssessmentMetricValue has image_url
       });
     });
+    
+    const numMetricsWithValues = metricValues.filter(mv => mv.entered_value !== null && mv.entered_value !== undefined).length;
+    const completion = calculateCompletionPercentage(targetMetricSet.user_custom_metrics_settings?.length || 0, numMetricsWithValues); // Corrected arguments
+    
+    const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score)); // Corrected arguments
+
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
-  }, [targetMetricSet, metricValues, siteVisitRatings]);
+  }, [targetMetricSet, metricValues, siteVisitRatings]); // siteVisitRatings might be used if it affects overall score in future
 
   React.useEffect(() => {
-    if (assessment && targetMetricSet && user) { // Ensure assessment and targetMetricSet are loaded
-      const storedScore = assessment.overall_site_signal_score;
+    if (assessment && targetMetricSet && user) {
+      const storedScore = assessment.site_signal_score; // Corrected property name
       const storedCompletion = assessment.completion_percentage;
 
       const isOverallScoreValid = typeof overallSiteSignalScore === 'number';
@@ -126,9 +143,15 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
           ? getMetricLabelForValue(setting.metric_identifier, metricDetail?.enteredValue ?? null) ?? (metricDetail?.enteredValue?.toString() ?? 'N/A')
           : metricDetail?.enteredValue?.toString() ?? 'N/A';
         
-        const targetDisplayValue = specificDropdownMetrics.includes(setting.metric_identifier)
-          ? getMetricLabelForValue(setting.metric_identifier, metricDetail?.targetValue ?? null) ?? (metricDetail?.targetValue?.toString() ?? 'N/A')
-          : metricDetail?.targetValue?.toString() ?? 'N/A';
+        const specialHardcodedScoreMetrics = ['market_saturation_trade_area_overlap', 'market_saturation_heat_map_intersection', 'demand_supply_balance'];
+        let targetDisplayValue: string;
+        if (specialHardcodedScoreMetrics.includes(setting.metric_identifier)) {
+            targetDisplayValue = "Predefined"; // Target is predefined/fixed for these
+        } else if (specificDropdownMetrics.includes(setting.metric_identifier)) {
+            targetDisplayValue = getMetricLabelForValue(setting.metric_identifier, metricDetail?.targetValue ?? null) ?? (metricDetail?.targetValue?.toString() ?? 'N/A');
+        } else {
+            targetDisplayValue = metricDetail?.targetValue?.toString() ?? 'N/A';
+        }
 
         return {
           label: setting.label,
@@ -156,10 +179,10 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
           <div>
             <CardTitle className="text-3xl font-bold text-primary flex items-center">
               <Eye className="h-8 w-8 mr-3" />
-              Assessment: {assessment.site_name}
+              Assessment: {assessment.assessment_name || 'N/A'} {/* Corrected property name */}
             </CardTitle>
             <CardDescription className="mt-1">
-              Address: {assessment.address || 'Not specified'}
+              Address: {assessment.address_line1 || 'Not specified'} {/* Corrected property name */}
             </CardDescription>
           </div>
           <div className="flex space-x-3">
@@ -300,7 +323,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {siteVisitRatings.map(rating => {
+                {siteVisitRatings.map((rating: AssessmentSiteVisitRatingInsert) => {
                   const criterionDef = siteVisitCriteria.find(c => c.key === rating.criterion_key);
                   return (
                     <TableRow key={rating.criterion_key}>

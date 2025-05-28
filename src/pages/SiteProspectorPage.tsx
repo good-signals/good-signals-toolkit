@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Save, TrendingUp, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +27,9 @@ import SiteAssessmentDetailsView from '@/components/site-prospector/SiteAssessme
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/siteAssessmentService';
+import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
+import { TargetMetricSet } from '@/types/targetMetrics';
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from '@/components/ui/badge';
 
@@ -65,6 +67,15 @@ const SiteProspectorPage = () => {
     enabled: !!user?.id && currentStep === 'idle',
   });
   
+  const { data: fetchedTargetMetricSetForDetails, isLoading: isLoadingTargetMetricSetForDetails } = useQuery({
+    queryKey: ['targetMetricSetForDetailsView', selectedMetricSetId, user?.id],
+    queryFn: async () => {
+      if (!user?.id || !selectedMetricSetId) return null;
+      return getTargetMetricSetById(selectedMetricSetId, user.id);
+    },
+    enabled: !!user?.id && !!selectedMetricSetId && currentStep === 'assessmentDetails',
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (assessmentId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
@@ -110,7 +121,7 @@ const SiteProspectorPage = () => {
     setActiveAssessmentId(assessmentId);
     setCurrentStep('assessmentDetails');
     queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
-    queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] });
+    queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId]});
     queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId]});
   };
 
@@ -189,7 +200,6 @@ const SiteProspectorPage = () => {
     idsToDelete.forEach(id => deleteMutation.mutate(id));
   };
 
-
   const requestSort = (key: SortableKeys) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -259,11 +269,19 @@ const SiteProspectorPage = () => {
   }
   
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
+    if (isLoadingTargetMetricSetForDetails) {
+        return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading metric set details...</p></div>;
+    }
     return (
       <SiteAssessmentDetailsView
         assessmentId={activeAssessmentId}
-        metricSetId={selectedMetricSetId}
-        onBack={handleCancelAssessmentProcess}
+        targetMetricSet={fetchedTargetMetricSetForDetails || null}
+        onEdit={(assessmentIdToEdit, metricSetIdToEdit) => {
+            setActiveAssessmentId(assessmentIdToEdit);
+            setSelectedMetricSetId(metricSetIdToEdit);
+            setCurrentStep('inputMetrics');
+        }}
+        onBackToList={handleCancelAssessmentProcess}
       />
     );
   }

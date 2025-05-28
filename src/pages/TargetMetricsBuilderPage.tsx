@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Target as TargetIcon, PlusCircle, Trash2, Save, Edit3, List } from 'lucide-react';
+import { Target as TargetIcon, PlusCircle, Trash2, Save, Edit3, List, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,8 +9,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { TargetMetricsFormData, TargetMetricsFormSchema, UserCustomMetricSetting, VISITOR_PROFILE_CATEGORY, MEASUREMENT_TYPES, PredefinedMetricCategory, TargetMetricSet } from '@/types/targetMetrics';
-import { predefinedMetricsConfig as initialPredefinedMetricsConfig, PredefinedMetricConfig } from '@/config/targetMetricsConfig'; // Renamed to avoid conflict
-import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig'; // Import shared config
+import { predefinedMetricsConfig as initialPredefinedMetricsConfig, PredefinedMetricConfig } from '@/config/targetMetricsConfig';
+import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -23,6 +23,18 @@ import {
 import { toast as sonnerToast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+const NON_EDITABLE_PREDEFINED_METRICS = [
+  'market_saturation_trade_area_overlap',
+  'market_saturation_heat_map_intersection',
+  'demand_supply_balance'
+];
 
 const TargetMetricsBuilderPage: React.FC = () => {
   const { user, authLoading } = useAuth();
@@ -30,10 +42,8 @@ const TargetMetricsBuilderPage: React.FC = () => {
   const navigate = useNavigate();
   
   const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
-  // The currentMetricSetId for logic, derived from route or after creating a new set.
   const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
 
-  // Update currentMetricSetId if routeMetricSetId changes (e.g. navigation)
   useEffect(() => {
     setCurrentMetricSetId(routeMetricSetId);
   }, [routeMetricSetId]);
@@ -43,13 +53,26 @@ const TargetMetricsBuilderPage: React.FC = () => {
     defaultValues: {
       metric_set_id: routeMetricSetId, 
       metric_set_name: "", 
-      predefined_metrics: initialPredefinedMetricsConfig.map(config => ({
-        metric_identifier: config.metric_identifier,
-        label: config.label,
-        category: config.category,
-        target_value: specificDropdownMetrics.includes(config.metric_identifier) ? 50 : 0, // Default dropdowns to middle value
-        higher_is_better: config.higher_is_better,
-      })),
+      predefined_metrics: initialPredefinedMetricsConfig.map(config => {
+        let targetValue;
+        if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
+          // For non-editable, we can set a display default (e.g. 100 for "best" or 50 for "neutral")
+          // This value won't be saved as a user target but is for display in the form.
+          // The actual score comes from the entered_value in assessment.
+          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 50;
+        } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
+          targetValue = 50; // Default dropdowns to middle value
+        } else {
+          targetValue = 0;
+        }
+        return {
+          metric_identifier: config.metric_identifier,
+          label: config.label,
+          category: config.category,
+          target_value: targetValue,
+          higher_is_better: config.higher_is_better,
+        };
+      }),
       visitor_profile_metrics: [],
     },
   });
@@ -77,12 +100,24 @@ const TargetMetricsBuilderPage: React.FC = () => {
     enabled: !!user && !!currentMetricSetId && !authLoading,
   });
 
-
   useEffect(() => {
     if (currentMetricSetId && existingMetricSet && existingMetrics) {
       const predefinedMetricsData = initialPredefinedMetricsConfig.map(config => {
         const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier);
-        let targetValue = existing?.target_value ?? (specificDropdownMetrics.includes(config.metric_identifier) ? 50 : 0);
+        let targetValue;
+
+        if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
+          // Display a representative value, actual target is not user-settable
+           targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 
+                         existing?.target_value ?? // Fallback to existing if somehow set
+                         50; // Default display
+        } else if (existing) {
+          targetValue = existing.target_value;
+        } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
+          targetValue = 50;
+        } else {
+          targetValue = 0;
+        }
         return {
           metric_identifier: config.metric_identifier,
           label: config.label,
@@ -110,21 +145,9 @@ const TargetMetricsBuilderPage: React.FC = () => {
         visitor_profile_metrics: visitorProfileMetricsData,
       });
     } else if (!currentMetricSetId && !isLoadingMetricSet && !isLoadingMetrics && !authLoading && user) {
-      form.reset({
-        metric_set_id: undefined,
-        metric_set_name: "",
-        predefined_metrics: initialPredefinedMetricsConfig.map(config => ({
-            metric_identifier: config.metric_identifier,
-            label: config.label,
-            category: config.category,
-            target_value: specificDropdownMetrics.includes(config.metric_identifier) ? 50 : 0, // Default dropdowns to middle value
-            higher_is_better: config.higher_is_better,
-        })),
-        visitor_profile_metrics: [],
-      });
+      form.reset(form.formState.defaultValues);
     }
   }, [currentMetricSetId, existingMetricSet, existingMetrics, form, isLoadingMetricSet, isLoadingMetrics, authLoading, user]);
-
 
   const mutation = useMutation({
     mutationFn: async (formData: TargetMetricsFormData) => {
@@ -149,8 +172,16 @@ const TargetMetricsBuilderPage: React.FC = () => {
       if (!operatingMetricSetId) {
         throw new Error("Failed to get or create metric set ID.");
       }
+      
+      // Filter out non-editable metrics from being saved with user-defined targets
+      const mutableFormData = {
+        ...formData,
+        predefined_metrics: formData.predefined_metrics.filter(
+          metric => !NON_EDITABLE_PREDEFINED_METRICS.includes(metric.metric_identifier)
+        ),
+      };
 
-      return saveUserCustomMetricSettings(user.id, operatingMetricSetId, formData);
+      return saveUserCustomMetricSettings(user.id, operatingMetricSetId, mutableFormData);
     },
     onSuccess: (data, variables) => { 
       sonnerToast.success("Target metrics saved successfully!");
@@ -187,10 +218,10 @@ const TargetMetricsBuilderPage: React.FC = () => {
       return acc;
     }, {} as Record<PredefinedMetricCategory, PredefinedMetricConfig[]>);
 
-
   return (
+    <TooltipProvider>
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-       <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
           <TargetIcon size={48} className="text-primary mr-4" />
           <div>
@@ -237,9 +268,10 @@ const TargetMetricsBuilderPage: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 {form.getValues().predefined_metrics.map((metric, index) => {
-                  // Get the original config for description and other static properties
                   const config = initialPredefinedMetricsConfig.find(c => c.metric_identifier === metric.metric_identifier);
                   if (config?.category !== category) return null;
+
+                  const isNonEditable = NON_EDITABLE_PREDEFINED_METRICS.includes(metric.metric_identifier);
 
                   return (
                     <FormField
@@ -253,17 +285,30 @@ const TargetMetricsBuilderPage: React.FC = () => {
                             {config?.description && <FormDescription>{config.description}</FormDescription>}
                             <FormDescription>
                               {(form.getValues().predefined_metrics[index]?.higher_is_better ?? config?.higher_is_better) ? "(Higher is better)" : "(Lower is better)"}
+                              {isNonEditable && (
+                                <Tooltip delayDuration={100}>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-3 w-3 ml-1.5 text-muted-foreground inline-block" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p>This metric's target and scoring are predefined based on dropdown selection in assessments.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                             </FormDescription>
                           </div>
                           <div className="sm:w-2/5">
                             {specificDropdownMetrics.includes(metric.metric_identifier) ? (
                               <Select
-                                onValueChange={(value) => field.onChange(parseFloat(value))}
+                                onValueChange={(value) => {
+                                  if (!isNonEditable) field.onChange(parseFloat(value));
+                                }}
                                 value={String(field.value)}
-                                defaultValue={String(field.value)}
+                                defaultValue={String(field.value)} // This will show the default for non-editable
+                                disabled={isNonEditable}
                               >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select target" />
+                                <SelectTrigger className={isNonEditable ? "bg-muted/50 cursor-not-allowed" : ""}>
+                                  <SelectValue placeholder={isNonEditable ? "Predefined Target" : "Select target"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {metricDropdownOptions[metric.metric_identifier].map(option => (
@@ -275,7 +320,16 @@ const TargetMetricsBuilderPage: React.FC = () => {
                               </Select>
                             ) : (
                               <FormControl>
-                                <Input type="number" placeholder="Enter target value" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                <Input 
+                                  type="number" 
+                                  placeholder={isNonEditable ? "Predefined Target" : "Enter target value"} 
+                                  {...field} 
+                                  onChange={e => {
+                                    if (!isNonEditable) field.onChange(parseFloat(e.target.value) || 0);
+                                  }} 
+                                  readOnly={isNonEditable}
+                                  className={isNonEditable ? "bg-muted/50" : ""}
+                                />
                               </FormControl>
                             )}
                           </div>
@@ -390,7 +444,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
 
           <div className="flex justify-end space-x-4">
             <Button type="button" variant="ghost" asChild>
-               {/* TODO: This link should go to a page listing metric sets if they exist, or target-selection if no sets yet */}
               <Link to="/target-metric-sets">Cancel</Link>
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
@@ -401,6 +454,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
         </form>
       </Form>
     </div>
+    </TooltipProvider>
   );
 };
 
