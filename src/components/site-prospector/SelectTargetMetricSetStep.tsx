@@ -43,7 +43,7 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({
     },
     onSuccess: (data) => {
       toast({ title: "Success", description: "Target metric set has been selected successfully." });
-      onMetricSetSelected(data.target_metric_set_id!);
+      onMetricSetSelected(assessmentId, data.target_metric_set_id!);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: `Failed to update assessment: ${error.message}`, variant: "destructive" });

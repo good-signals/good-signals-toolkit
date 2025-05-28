@@ -67,7 +67,7 @@ export const saveMetricValuesForAssessment = async (
   metricValues: AssessmentMetricValueInsert[]
 ): Promise<void> => {
   const { saveAssessmentMetricValues } = await import('./siteAssessment/metricValues');
-  return saveAssessmentMetricValues(assessmentId, metricValues);
+  await saveAssessmentMetricValues(assessmentId, metricValues);
 };
 
 export const saveSiteVisitRatingsForAssessment = async (
@@ -75,7 +75,7 @@ export const saveSiteVisitRatingsForAssessment = async (
   siteVisitRatings: AssessmentSiteVisitRatingInsert[]
 ): Promise<void> => {
   const { saveSiteVisitRatings } = await import('./siteAssessment/siteVisitRatings');
-  return saveSiteVisitRatings(assessmentId, siteVisitRatings);
+  await saveSiteVisitRatings(assessmentId, siteVisitRatings);
 };
 
 export const updateAssessmentScores = async (
@@ -84,7 +84,7 @@ export const updateAssessmentScores = async (
   completionPercentage: number | null
 ): Promise<void> => {
   const { updateAssessmentScores: updateScores } = await import('./siteAssessment/scoring');
-  return updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
+  await updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
 };
 
 // New function to update site status
