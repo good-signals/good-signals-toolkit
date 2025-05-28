@@ -78,6 +78,22 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     direction: 'desc',
   });
 
+  // Query to get document counts for all assessments
+  const { data: documentCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ['assessmentDocumentCounts', assessmentsData.map(a => a.id)],
+    queryFn: async () => {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        assessmentsData.map(async (assessment) => {
+          const documents = await getAssessmentDocuments(assessment.id);
+          counts[assessment.id] = documents.length;
+        })
+      );
+      return counts;
+    },
+    enabled: assessmentsData.length > 0,
+  });
+
   const { data: documentsForSelectedAssessment, refetch: refetchDocuments } = useQuery<AssessmentDocument[]>({
     queryKey: ['assessmentDocuments', selectedAssessmentForAttachments?.id],
     queryFn: async () => {
@@ -339,8 +355,17 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
                     onClick={() => handleAttachmentsClick(assessment)}
                     title="Attach Files"
                     disabled={isDeleting}
+                    className="relative"
                   >
                     <Paperclip className="h-4 w-4" />
+                    {documentCounts[assessment.id] > 0 && (
+                      <Badge 
+                        variant="default" 
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                      >
+                        {documentCounts[assessment.id]}
+                      </Badge>
+                    )}
                   </Button>
                   <Button
                     variant="outline"
