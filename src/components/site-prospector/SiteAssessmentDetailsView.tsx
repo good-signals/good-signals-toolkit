@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
-import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService'; // Added
+import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
 import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig';
 import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
@@ -31,8 +31,8 @@ const DEFAULT_BAD_THRESHOLD = 0.50;  // 50%
 
 interface SignalStatus {
   text: string;
-  color: string;
-  iconColor: string;
+  color: string; // Tailwind text color class e.g. 'text-green-600'
+  iconColor: string; // Tailwind text color class for icon
 }
 
 const getSignalStatus = (
@@ -210,13 +210,20 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
             targetDisplayValue = metricDetail?.targetValue?.toString() ?? 'N/A';
         }
 
+        const metricScoreStatus = getSignalStatus(
+          metricDetail?.score ?? null,
+          accountSettings?.signal_good_threshold,
+          accountSettings?.signal_bad_threshold
+        );
+
         return {
           label: setting.label,
           enteredValue: enteredDisplayValue,
           targetValue: targetDisplayValue,
-          score: metricDetail?.score,
+          score: metricDetail?.score, // raw score
+          metricScoreStatus, // status object for coloring
           notes: metricDetail?.notes,
-          imageUrl: assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url,
+          // The imageUrl for the category is handled separately in the main render
         };
       });
   };
@@ -340,10 +347,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
                       <TableCell className="text-center">{metric.targetValue}</TableCell>
                       <TableCell className="text-center">
                         {typeof metric.score === 'number' 
-                          ? <Badge variant={metric.score >= 70 ? 'default' : metric.score >= 40 ? 'secondary' : 'destructive'}>
+                          ? <Badge
+                              variant="outline"
+                              className={`${metric.metricScoreStatus.color} ${metric.metricScoreStatus.color.replace('text-', 'border-')}`}
+                            >
                               {metric.score.toFixed(0)}%
                             </Badge> 
-                          : <Badge variant="outline">N/A</Badge>}
+                          : <Badge variant="outline">{metric.metricScoreStatus.text}</Badge>}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{metric.notes || '-'}</TableCell>
                     </TableRow>
