@@ -31,6 +31,7 @@ import { format } from 'date-fns';
 import OverallScoreDisplay from './OverallScoreDisplay';
 import MetricCategorySection, { ProcessedMetric } from './MetricCategorySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
+import EditableExecutiveSummary from './EditableExecutiveSummary';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
@@ -82,14 +83,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     mutationFn: (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => 
       updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage),
     onSuccess: () => {
-      // toast({ title: "Scores Updated", description: "The assessment scores have been recalculated and saved." });
-      // No toast needed here, as it's an automatic background update.
       queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
     },
     onError: (error: Error) => {
       console.error("Score Update Failed", `Could not save updated scores: ${error.message}`);
-      // No toast for background update failure to avoid bothering user unless critical
     },
   });
 
@@ -313,18 +311,6 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
             </CardDescription>
           </div>
           <div className="flex items-center space-x-3">
-            <Button 
-              onClick={() => generateSummaryMutation.mutate()} 
-              disabled={isGeneratingSummary || updateScoresMutation.isPending}
-              variant="outline"
-            >
-              {isGeneratingSummary ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="mr-2 h-4 w-4" />
-              )}
-              {assessment.executive_summary ? 'Regenerate Executive Summary' : 'Generate Executive Summary'}
-            </Button>
             <Button variant="outline" onClick={onBackToList}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
             </Button>
@@ -344,39 +330,55 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </CardContent>
       </Card>
 
-      {assessment.executive_summary && (
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold flex items-center">
-              <FileText className="h-6 w-6 mr-2 text-primary" />
-              Executive Summary
-            </CardTitle>
-            {assessment.last_summary_generated_at && (
+      {assessment.executive_summary ? (
+        <EditableExecutiveSummary
+          assessmentId={assessmentId}
+          executiveSummary={assessment.executive_summary}
+          lastSummaryGeneratedAt={assessment.last_summary_generated_at}
+          onRegenerateClick={() => generateSummaryMutation.mutate()}
+          isRegenerating={isGeneratingSummary || updateScoresMutation.isPending}
+        />
+      ) : (
+        <>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold flex items-center">
+                <FileText className="h-6 w-6 mr-2 text-primary" />
+                Executive Summary
+              </CardTitle>
               <CardDescription>
-                Last generated: {format(new Date(assessment.last_summary_generated_at), "PPpp")}
+                No executive summary has been generated yet.
               </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-              {assessment.executive_summary}
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => generateSummaryMutation.mutate()} 
+                disabled={isGeneratingSummary || updateScoresMutation.isPending}
+              >
+                {isGeneratingSummary ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="mr-2 h-4 w-4" />
+                )}
+                Generate Executive Summary
+              </Button>
+            </CardContent>
+          </Card>
+          
+          {!completionPercentage && (
+             <Alert variant="default" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Generate Executive Summary</AlertTitle>
+                <AlertDescription>
+                  No metric data has been entered for this assessment yet. 
+                  Please input metric values before generating an executive summary for more meaningful results.
+                  You can still generate a summary, but it will be based on limited information.
+                </AlertDescription>
+              </Alert>
+          )}
+        </>
       )}
       
-      {!assessment.executive_summary && !isGeneratingSummary && !completionPercentage && (
-         <Alert variant="default" className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Generate Executive Summary</AlertTitle>
-            <AlertDescription>
-              No metric data has been entered for this assessment yet. 
-              Please input metric values before generating an executive summary for more meaningful results.
-              You can still generate a summary, but it will be based on limited information.
-            </AlertDescription>
-          </Alert>
-      )}
-
       {typeof assessment.latitude === 'number' && typeof assessment.longitude === 'number' && (
         <Card className="shadow-lg">
           <CardHeader>
