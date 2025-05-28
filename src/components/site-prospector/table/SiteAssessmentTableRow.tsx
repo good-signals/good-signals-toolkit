@@ -1,0 +1,140 @@
+
+import React from 'react';
+import { Eye, Edit, Loader2, Trash2, Paperclip } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TableCell, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from '@/components/ui/badge';
+import { SiteAssessment } from '@/types/siteAssessmentTypes';
+
+interface SiteAssessmentTableRowProps {
+  assessment: SiteAssessment;
+  isSelected: boolean;
+  onSelect: (checked: boolean) => void;
+  onViewDetails: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onAttachmentsClick: () => void;
+  isDeleting: boolean;
+  isDeletingThis: boolean;
+  documentCount: number;
+}
+
+const getSiteStatusColor = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'Prospect': return 'outline';
+    case 'LOI': return 'secondary';
+    case 'Lease': return 'default';
+    case 'Development': return 'secondary';
+    case 'Open': return 'default';
+    case 'Closed': return 'destructive';
+    default: return 'outline';
+  }
+};
+
+const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
+  assessment,
+  isSelected,
+  onSelect,
+  onViewDetails,
+  onEdit,
+  onDelete,
+  onAttachmentsClick,
+  isDeleting,
+  isDeletingThis,
+  documentCount,
+}) => {
+  return (
+    <TableRow 
+      data-state={isSelected ? "selected" : undefined}
+      className={isSelected ? "bg-muted/50" : ""}
+    >
+      <TableCell>
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={onSelect}
+          aria-label={`Select assessment ${assessment.assessment_name || assessment.id}`}
+          disabled={isDeleting}
+        />
+      </TableCell>
+      <TableCell className="font-medium">{assessment.assessment_name || 'N/A'}</TableCell>
+      <TableCell>
+        {assessment.address_line1 || ''}
+        {assessment.address_line1 && assessment.city ? ', ' : ''}
+        {assessment.city || ''}
+      </TableCell>
+      <TableCell className="text-center">
+        <Badge variant={getSiteStatusColor(assessment.site_status)} className="text-sm">
+          {assessment.site_status || 'Prospect'}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-center">
+        {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
+           <Badge variant={assessment.site_signal_score >= 75 ? "default" : assessment.site_signal_score >= 50 ? "secondary" : "destructive"}>
+            {assessment.site_signal_score}%
+           </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">N/A</span>
+        )}
+      </TableCell>
+      <TableCell className="text-center">
+        {assessment.completion_percentage !== null && assessment.completion_percentage !== undefined ? (
+          <span>{assessment.completion_percentage}%</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">N/A</span>
+        )}
+      </TableCell>
+      <TableCell>{new Date(assessment.created_at).toLocaleDateString()}</TableCell>
+      <TableCell className="text-right space-x-1">
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={onViewDetails}
+          disabled={!assessment.target_metric_set_id || isDeleting}
+          title={!assessment.target_metric_set_id ? "Select a metric set to view details" : "View Details"}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={onEdit}
+          title="Edit Assessment"
+          disabled={isDeleting}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onAttachmentsClick}
+          title="Attach Files"
+          disabled={isDeleting}
+          className="relative"
+        >
+          <Paperclip className="h-4 w-4" />
+          {documentCount > 0 && (
+            <Badge 
+              variant="default" 
+              className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+            >
+              {documentCount}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="text-destructive border-destructive hover:bg-destructive/90 hover:text-destructive-foreground"
+          onClick={onDelete}
+          title="Delete Assessment"
+          disabled={isDeletingThis}
+        >
+          {isDeletingThis ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+};
+
+export default SiteAssessmentTableRow;

@@ -1,15 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, CheckCircle, Building, Paperclip } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,11 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from '@/components/ui/badge';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { useQuery } from '@tanstack/react-query';
 import { getAssessmentDocuments, AssessmentDocument } from '@/services/documentService';
 import DocumentUpload from './DocumentUpload';
+import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
 
 type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage' | 'site_status';
 
@@ -44,18 +36,6 @@ interface SiteAssessmentsTableProps {
   isDeleting: boolean;
   forceClearSelectionsKey: string | number;
 }
-
-const getSiteStatusColor = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case 'Prospect': return 'outline';
-    case 'LOI': return 'secondary';
-    case 'Lease': return 'default';
-    case 'Development': return 'secondary';
-    case 'Open': return 'default';
-    case 'Closed': return 'destructive';
-    default: return 'outline';
-  }
-};
 
 const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   assessmentsData,
@@ -147,15 +127,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     }
     return sortableItems;
   }, [assessmentsData, sortConfig]);
-  
-  const getSortIcon = (columnKey: SortableKeys) => {
-    if (sortConfig.key !== columnKey) {
-      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
-    }
-    return sortConfig.direction === 'asc' ? 
-      <ArrowUp className="ml-2 h-4 w-4" /> : 
-      <ArrowDown className="ml-2 h-4 w-4" />;
-  };
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -242,147 +213,22 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           </Button>
         )}
       </div>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <Checkbox
-                  checked={
-                    selectedAssessmentIds.length === sortedAssessments.length && sortedAssessments.length > 0
-                      ? true
-                      : selectedAssessmentIds.length > 0
-                      ? "indeterminate"
-                      : false
-                  }
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all assessments"
-                  disabled={isDeleting}
-                />
-              </TableHead>
-              <TableHead onClick={() => requestSort('assessment_name')} className="cursor-pointer hover:bg-muted/50 transition-colors">
-                <div className="flex items-center">Name {getSortIcon('assessment_name')}</div>
-              </TableHead>
-              <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[200px]">
-                <div className="flex items-center">Address {getSortIcon('address_line1')}</div>
-              </TableHead>
-              <TableHead onClick={() => requestSort('site_status')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
-                <div className="flex items-center justify-center">
-                  <Building className="h-4 w-4 mr-1"/> Status {getSortIcon('site_status')}
-                </div>
-              </TableHead>
-              <TableHead onClick={() => requestSort('site_signal_score')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
-                <div className="flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 mr-1"/> Score {getSortIcon('site_signal_score')}
-                </div>
-              </TableHead>
-              <TableHead onClick={() => requestSort('completion_percentage')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
-                <div className="flex items-center justify-center">
-                  <CheckCircle className="h-4 w-4 mr-1"/> Completion {getSortIcon('completion_percentage')}
-                </div>
-              </TableHead>
-              <TableHead onClick={() => requestSort('created_at')} className="cursor-pointer hover:bg-muted/50 transition-colors">
-                <div className="flex items-center">Created {getSortIcon('created_at')}</div>
-              </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedAssessments.map((assessment) => (
-              <TableRow 
-                key={assessment.id}
-                data-state={selectedAssessmentIds.includes(assessment.id) ? "selected" : undefined}
-                className={selectedAssessmentIds.includes(assessment.id) ? "bg-muted/50" : ""}
-              >
-                <TableCell>
-                  <Checkbox
-                    checked={selectedAssessmentIds.includes(assessment.id)}
-                    onCheckedChange={(checked) => handleSelectRow(assessment.id, !!checked)}
-                    aria-label={`Select assessment ${assessment.assessment_name || assessment.id}`}
-                    disabled={isDeleting}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{assessment.assessment_name || 'N/A'}</TableCell>
-                <TableCell>
-                  {assessment.address_line1 || ''}
-                  {assessment.address_line1 && assessment.city ? ', ' : ''}
-                  {assessment.city || ''}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant={getSiteStatusColor(assessment.site_status)} className="text-sm">
-                    {assessment.site_status || 'Prospect'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-center">
-                  {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
-                     <Badge variant={assessment.site_signal_score >= 75 ? "default" : assessment.site_signal_score >= 50 ? "secondary" : "destructive"}>
-                      {assessment.site_signal_score}%
-                     </Badge>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">N/A</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center">
-                  {assessment.completion_percentage !== null && assessment.completion_percentage !== undefined ? (
-                    <span>{assessment.completion_percentage}%</span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">N/A</span>
-                  )}
-                </TableCell>
-                <TableCell>{new Date(assessment.created_at).toLocaleDateString()}</TableCell>
-                <TableCell className="text-right space-x-1">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => onViewDetails(assessment)}
-                    disabled={!assessment.target_metric_set_id || isDeleting}
-                    title={!assessment.target_metric_set_id ? "Select a metric set to view details" : "View Details"}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => onEdit(assessment)}
-                    title="Edit Assessment"
-                    disabled={isDeleting}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleAttachmentsClick(assessment)}
-                    title="Attach Files"
-                    disabled={isDeleting}
-                    className="relative"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                    {documentCounts[assessment.id] > 0 && (
-                      <Badge 
-                        variant="default" 
-                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                      >
-                        {documentCounts[assessment.id]}
-                      </Badge>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="text-destructive border-destructive hover:bg-destructive/90 hover:text-destructive-foreground"
-                    onClick={() => openDeleteDialog(assessment)}
-                    title="Delete Assessment"
-                    disabled={isDeleting && assessmentToDelete?.id === assessment.id}
-                  >
-                    {isDeleting && assessmentToDelete?.id === assessment.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      
+      <SiteAssessmentsTableContent
+        assessments={sortedAssessments}
+        selectedAssessmentIds={selectedAssessmentIds}
+        sortConfig={sortConfig}
+        onSort={requestSort}
+        onSelectAll={handleSelectAll}
+        onSelectRow={handleSelectRow}
+        onViewDetails={onViewDetails}
+        onEdit={onEdit}
+        onDelete={openDeleteDialog}
+        onAttachmentsClick={handleAttachmentsClick}
+        isDeleting={isDeleting}
+        assessmentToDelete={assessmentToDelete}
+        documentCounts={documentCounts}
+      />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
