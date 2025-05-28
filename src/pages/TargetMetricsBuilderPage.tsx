@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Target as TargetIcon, PlusCircle, Trash2, Save, Edit3, List, Info } from 'lucide-react';
+import { Target as TargetIcon, PlusCircle, Trash2, Save, Edit3, List, Info, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { TargetMetricsFormData, TargetMetricsFormSchema, UserCustomMetricSetting, VISITOR_PROFILE_CATEGORY, MEASUREMENT_TYPES, PredefinedMetricCategory, TargetMetricSet } from '@/types/targetMetrics';
+import { TargetMetricsFormData, TargetMetricsFormSchema, UserCustomMetricSetting, VISITOR_PROFILE_CATEGORY, MEASUREMENT_TYPES, PredefinedMetricCategory, TargetMetricSet, AccountCustomMetric, CreateCustomMetricFormData } from '@/types/targetMetrics';
 import { predefinedMetricsConfig as initialPredefinedMetricsConfig, PredefinedMetricConfig } from '@/config/targetMetricsConfig';
 import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,15 +21,21 @@ import {
   updateTargetMetricSetName,
   getTargetMetricSetById,
 } from '@/services/targetMetricsService';
+import { 
+  getAccountCustomMetrics,
+  createAccountCustomMetric,
+} from '@/services/accountCustomMetricsService';
 import { toast as sonnerToast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import CustomMetricForm from '@/components/target-metrics/CustomMetricForm';
 
 const NON_EDITABLE_PREDEFINED_METRICS = [
   'market_saturation_trade_area_overlap',
@@ -43,6 +50,8 @@ const TargetMetricsBuilderPage: React.FC = () => {
   
   const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
   const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
+  const [customMetricFormOpen, setCustomMetricFormOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   useEffect(() => {
     setCurrentMetricSetId(routeMetricSetId);
@@ -56,12 +65,9 @@ const TargetMetricsBuilderPage: React.FC = () => {
       predefined_metrics: initialPredefinedMetricsConfig.map(config => {
         let targetValue;
         if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-          // For non-editable, we can set a display default (e.g. 100 for "best" or 50 for "neutral")
-          // This value won't be saved as a user target but is for display in the form.
-          // The actual score comes from the entered_value in assessment.
           targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 50;
         } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
-          targetValue = 50; // Default dropdowns to middle value
+          targetValue = 50;
         } else {
           targetValue = 0;
         }
@@ -73,6 +79,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
           higher_is_better: config.higher_is_better,
         };
       }),
+      custom_metrics: [],
       visitor_profile_metrics: [],
     },
   });
@@ -80,6 +87,21 @@ const TargetMetricsBuilderPage: React.FC = () => {
   const { fields: visitorProfileFields, append: appendVisitorProfile, remove: removeVisitorProfile } = useFieldArray({
     control: form.control,
     name: "visitor_profile_metrics",
+  });
+
+  const { fields: customMetricsFields, append: appendCustomMetric, remove: removeCustomMetric } = useFieldArray({
+    control: form.control,
+    name: "custom_metrics",
+  });
+
+  // Query for account custom metrics
+  const { data: accountCustomMetrics, isLoading: isLoadingCustomMetrics } = useQuery({
+    queryKey: ['accountCustomMetrics', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return getAccountCustomMetrics(user.id);
+    },
+    enabled: !!user && !authLoading,
   });
 
   const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
@@ -100,17 +122,44 @@ const TargetMetricsBuilderPage: React.FC = () => {
     enabled: !!user && !!currentMetricSetId && !authLoading,
   });
 
+  // Mutation for creating custom metrics
+  const createCustomMetricMutation = useMutation({
+    mutationFn: async (metricData: CreateCustomMetricFormData) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return createAccountCustomMetric(user.id, metricData);
+    },
+    onSuccess: (newMetric) => {
+      sonnerToast.success("Custom metric created successfully!");
+      queryClient.invalidateQueries({ queryKey: ['accountCustomMetrics', user?.id] });
+      
+      // Add the new custom metric to the form with default target value
+      const newCustomMetricFormData = {
+        metric_identifier: newMetric.metric_identifier,
+        label: newMetric.name,
+        category: newMetric.category,
+        target_value: newMetric.default_target_value || 0,
+        higher_is_better: newMetric.higher_is_better,
+        units: newMetric.units || undefined,
+        is_custom: true as const,
+      };
+      appendCustomMetric(newCustomMetricFormData);
+      setCustomMetricFormOpen(false);
+    },
+    onError: (error) => {
+      sonnerToast.error(`Failed to create custom metric: ${error.message}`);
+    },
+  });
+
   useEffect(() => {
-    if (currentMetricSetId && existingMetricSet && existingMetrics) {
+    if (currentMetricSetId && existingMetricSet && existingMetrics && accountCustomMetrics) {
       const predefinedMetricsData = initialPredefinedMetricsConfig.map(config => {
         const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier);
         let targetValue;
 
         if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-          // Display a representative value, actual target is not user-settable
            targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 
-                         existing?.target_value ?? // Fallback to existing if somehow set
-                         50; // Default display
+                         existing?.target_value ?? 
+                         50;
         } else if (existing) {
           targetValue = existing.target_value;
         } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
@@ -127,6 +176,22 @@ const TargetMetricsBuilderPage: React.FC = () => {
         };
       });
 
+      // Handle custom metrics from account custom metrics
+      const customMetricsData = accountCustomMetrics
+        .filter(customMetric => customMetric.category !== VISITOR_PROFILE_CATEGORY)
+        .map(customMetric => {
+          const existing = existingMetrics.find(s => s.metric_identifier === customMetric.metric_identifier);
+          return {
+            metric_identifier: customMetric.metric_identifier,
+            label: customMetric.name,
+            category: customMetric.category,
+            target_value: existing?.target_value ?? customMetric.default_target_value ?? 0,
+            higher_is_better: existing?.higher_is_better ?? customMetric.higher_is_better,
+            units: customMetric.units || undefined,
+            is_custom: true as const,
+          };
+        });
+
       const visitorProfileMetricsData = existingMetrics
         .filter(s => s.category === VISITOR_PROFILE_CATEGORY)
         .map(s => ({
@@ -142,12 +207,29 @@ const TargetMetricsBuilderPage: React.FC = () => {
         metric_set_id: existingMetricSet.id,
         metric_set_name: existingMetricSet.name,
         predefined_metrics: predefinedMetricsData,
+        custom_metrics: customMetricsData,
         visitor_profile_metrics: visitorProfileMetricsData,
       });
-    } else if (!currentMetricSetId && !isLoadingMetricSet && !isLoadingMetrics && !authLoading && user) {
-      form.reset(form.formState.defaultValues);
+    } else if (!currentMetricSetId && !isLoadingMetricSet && !isLoadingMetrics && !authLoading && user && accountCustomMetrics) {
+      // Initialize custom metrics for new metric set
+      const customMetricsData = accountCustomMetrics
+        .filter(customMetric => customMetric.category !== VISITOR_PROFILE_CATEGORY)
+        .map(customMetric => ({
+          metric_identifier: customMetric.metric_identifier,
+          label: customMetric.name,
+          category: customMetric.category,
+          target_value: customMetric.default_target_value ?? 0,
+          higher_is_better: customMetric.higher_is_better,
+          units: customMetric.units || undefined,
+          is_custom: true as const,
+        }));
+
+      form.reset({
+        ...form.formState.defaultValues,
+        custom_metrics: customMetricsData,
+      });
     }
-  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, isLoadingMetricSet, isLoadingMetrics, authLoading, user]);
+  }, [currentMetricSetId, existingMetricSet, existingMetrics, accountCustomMetrics, form, isLoadingMetricSet, isLoadingMetrics, authLoading, user]);
 
   const mutation = useMutation({
     mutationFn: async (formData: TargetMetricsFormData) => {
@@ -173,7 +255,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
         throw new Error("Failed to get or create metric set ID.");
       }
       
-      // Filter out non-editable metrics from being saved with user-defined targets
       const mutableFormData = {
         ...formData,
         predefined_metrics: formData.predefined_metrics.filter(
@@ -200,7 +281,19 @@ const TargetMetricsBuilderPage: React.FC = () => {
     mutation.mutate(data);
   };
 
-  if (authLoading || isLoadingMetricSet || (currentMetricSetId && isLoadingMetrics)) {
+  const handleAddCustomMetric = (category: string) => {
+    setSelectedCategory(category);
+    setCustomMetricFormOpen(true);
+  };
+
+  const handleCustomMetricSubmit = (data: CreateCustomMetricFormData) => {
+    createCustomMetricMutation.mutate({
+      ...data,
+      category: selectedCategory,
+    });
+  };
+
+  if (authLoading || isLoadingMetricSet || isLoadingCustomMetrics || (currentMetricSetId && isLoadingMetrics)) {
     return <div className="container mx-auto py-12 px-4 text-center">Loading...</div>;
   }
 
@@ -217,6 +310,16 @@ const TargetMetricsBuilderPage: React.FC = () => {
       acc[category].push(metric);
       return acc;
     }, {} as Record<PredefinedMetricCategory, PredefinedMetricConfig[]>);
+
+  // Group custom metrics by category
+  const groupedCustomMetrics = customMetricsFields.reduce((acc, metric, index) => {
+    const category = metric.category as PredefinedMetricCategory;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push({ ...metric, index });
+    return acc;
+  }, {} as Record<PredefinedMetricCategory, Array<(typeof customMetricsFields[0] & { index: number })>>);
 
   return (
     <TooltipProvider>
@@ -260,88 +363,154 @@ const TargetMetricsBuilderPage: React.FC = () => {
             </CardContent>
           </Card>
           
-          {Object.entries(groupedPredefinedMetrics).map(([category, metricsInCategory]) => (
-            <Card key={category}>
-              <CardHeader>
-                <CardTitle className="text-xl">{category}</CardTitle>
-                <CardDescription>Set your target values for {category.toLowerCase()} metrics.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {form.getValues().predefined_metrics.map((metric, index) => {
-                  const config = initialPredefinedMetricsConfig.find(c => c.metric_identifier === metric.metric_identifier);
-                  if (config?.category !== category) return null;
+          {Object.entries(groupedPredefinedMetrics).map(([category, metricsInCategory]) => {
+            const customMetricsInCategory = groupedCustomMetrics[category as PredefinedMetricCategory] || [];
+            
+            return (
+              <Card key={category}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl">{category}</CardTitle>
+                      <CardDescription>Set your target values for {category.toLowerCase()} metrics.</CardDescription>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddCustomMetric(category)}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Custom Metric
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Predefined Metrics */}
+                  {form.getValues().predefined_metrics.map((metric, index) => {
+                    const config = initialPredefinedMetricsConfig.find(c => c.metric_identifier === metric.metric_identifier);
+                    if (config?.category !== category) return null;
 
-                  const isNonEditable = NON_EDITABLE_PREDEFINED_METRICS.includes(metric.metric_identifier);
+                    const isNonEditable = NON_EDITABLE_PREDEFINED_METRICS.includes(metric.metric_identifier);
 
-                  return (
-                    <FormField
-                      key={`${metric.metric_identifier}-${index}-predefined`}
-                      control={form.control}
-                      name={`predefined_metrics.${index}.target_value`}
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-md">
-                          <div className="sm:w-2/5 mb-2 sm:mb-0">
-                            <FormLabel className="text-base">{metric.label}</FormLabel>
-                            {config?.description && <FormDescription>{config.description}</FormDescription>}
-                            <FormDescription>
-                              {(form.getValues().predefined_metrics[index]?.higher_is_better ?? config?.higher_is_better) ? "(Higher is better)" : "(Lower is better)"}
-                              {isNonEditable && (
-                                <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-3 w-3 ml-1.5 text-muted-foreground inline-block" />
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-xs">
-                                    <p>This metric's target and scoring are predefined based on dropdown selection in assessments.</p>
-                                  </TooltipContent>
-                                </Tooltip>
+                    return (
+                      <FormField
+                        key={`${metric.metric_identifier}-${index}-predefined`}
+                        control={form.control}
+                        name={`predefined_metrics.${index}.target_value`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-md">
+                            <div className="sm:w-2/5 mb-2 sm:mb-0">
+                              <FormLabel className="text-base">{metric.label}</FormLabel>
+                              {config?.description && <FormDescription>{config.description}</FormDescription>}
+                              <FormDescription>
+                                {(form.getValues().predefined_metrics[index]?.higher_is_better ?? config?.higher_is_better) ? "(Higher is better)" : "(Lower is better)"}
+                                {isNonEditable && (
+                                  <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 ml-1.5 text-muted-foreground inline-block" />
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs">
+                                      <p>This metric's target and scoring are predefined based on dropdown selection in assessments.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </FormDescription>
+                            </div>
+                            <div className="sm:w-2/5">
+                              {specificDropdownMetrics.includes(metric.metric_identifier) ? (
+                                <Select
+                                  onValueChange={(value) => {
+                                    if (!isNonEditable) field.onChange(parseFloat(value));
+                                  }}
+                                  value={String(field.value)}
+                                  defaultValue={String(field.value)}
+                                  disabled={isNonEditable}
+                                >
+                                  <SelectTrigger className={isNonEditable ? "bg-muted/50 cursor-not-allowed" : ""}>
+                                    <SelectValue placeholder={isNonEditable ? "Predefined Target" : "Select target"} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {metricDropdownOptions[metric.metric_identifier].map(option => (
+                                      <SelectItem key={option.value} value={String(option.value)}>
+                                        {option.label} ({option.value})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder={isNonEditable ? "Predefined Target" : "Enter target value"} 
+                                    {...field} 
+                                    onChange={e => {
+                                      if (!isNonEditable) field.onChange(parseFloat(e.target.value) || 0);
+                                    }} 
+                                    readOnly={isNonEditable}
+                                    className={isNonEditable ? "bg-muted/50" : ""}
+                                  />
+                                </FormControl>
                               )}
+                            </div>
+                            <div className="sm:w-1/5 min-h-[20px] mt-1 sm:mt-0"> <FormMessage /></div>
+                          </FormItem>
+                        )}
+                      />
+                    );
+                  })}
+
+                  {/* Custom Metrics */}
+                  {customMetricsInCategory.map((customMetric) => (
+                    <FormField
+                      key={`${customMetric.metric_identifier}-${customMetric.index}-custom`}
+                      control={form.control}
+                      name={`custom_metrics.${customMetric.index}.target_value`}
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-md bg-blue-50/50">
+                          <div className="sm:w-2/5 mb-2 sm:mb-0">
+                            <div className="flex items-center gap-2">
+                              <FormLabel className="text-base">{customMetric.label}</FormLabel>
+                              <Badge variant="secondary" className="text-xs">Custom</Badge>
+                            </div>
+                            {customMetric.units && (
+                              <FormDescription>Units: {customMetric.units}</FormDescription>
+                            )}
+                            <FormDescription>
+                              {customMetric.higher_is_better ? "(Higher is better)" : "(Lower is better)"}
                             </FormDescription>
                           </div>
                           <div className="sm:w-2/5">
-                            {specificDropdownMetrics.includes(metric.metric_identifier) ? (
-                              <Select
-                                onValueChange={(value) => {
-                                  if (!isNonEditable) field.onChange(parseFloat(value));
-                                }}
-                                value={String(field.value)}
-                                defaultValue={String(field.value)} // This will show the default for non-editable
-                                disabled={isNonEditable}
-                              >
-                                <SelectTrigger className={isNonEditable ? "bg-muted/50 cursor-not-allowed" : ""}>
-                                  <SelectValue placeholder={isNonEditable ? "Predefined Target" : "Select target"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {metricDropdownOptions[metric.metric_identifier].map(option => (
-                                    <SelectItem key={option.value} value={String(option.value)}>
-                                      {option.label} ({option.value})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  placeholder={isNonEditable ? "Predefined Target" : "Enter target value"} 
-                                  {...field} 
-                                  onChange={e => {
-                                    if (!isNonEditable) field.onChange(parseFloat(e.target.value) || 0);
-                                  }} 
-                                  readOnly={isNonEditable}
-                                  className={isNonEditable ? "bg-muted/50" : ""}
-                                />
-                              </FormControl>
-                            )}
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Enter target value" 
+                                {...field} 
+                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)} 
+                              />
+                            </FormControl>
                           </div>
-                           <div className="sm:w-1/5 min-h-[20px] mt-1 sm:mt-0"> <FormMessage /></div>
+                          <div className="sm:w-1/5 flex items-center justify-end gap-2">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => removeCustomMetric(customMetric.index)}
+                              className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <FormMessage />
+                          </div>
                         </FormItem>
                       )}
                     />
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ))}
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })}
 
           <Card>
             <CardHeader>
@@ -453,6 +622,14 @@ const TargetMetricsBuilderPage: React.FC = () => {
           </div>
         </form>
       </Form>
+
+      <CustomMetricForm
+        open={customMetricFormOpen}
+        onOpenChange={setCustomMetricFormOpen}
+        onSubmit={handleCustomMetricSubmit}
+        defaultCategory={selectedCategory}
+        isLoading={createCustomMetricMutation.isPending}
+      />
     </div>
     </TooltipProvider>
   );

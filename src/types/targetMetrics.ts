@@ -21,6 +21,33 @@ export type MetricCategory = typeof ALL_METRIC_CATEGORIES[number];
 export const MEASUREMENT_TYPES = ["Index", "Amount"] as const;
 export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 
+// Schema for account custom metrics
+export const AccountCustomMetricSchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid(),
+  metric_identifier: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  category: z.string().min(1),
+  units: z.string().nullable(),
+  default_target_value: z.number().nullable(),
+  higher_is_better: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type AccountCustomMetric = z.infer<typeof AccountCustomMetricSchema>;
+
+// Schema for creating custom metrics
+export const CreateCustomMetricFormSchema = z.object({
+  name: z.string().min(1, "Metric name is required"),
+  description: z.string().optional(),
+  category: z.string().min(1, "Category is required"),
+  units: z.string().optional(),
+  default_target_value: z.coerce.number().optional(),
+  higher_is_better: z.boolean(),
+});
+export type CreateCustomMetricFormData = z.infer<typeof CreateCustomMetricFormSchema>;
+
 // Schema for a single custom metric setting from the database
 export const UserCustomMetricSettingSchema = z.object({
   id: z.string().uuid().optional(), // Made optional as it's DB generated
@@ -58,6 +85,16 @@ const PredefinedMetricFormSchema = z.object({
   higher_is_better: z.boolean(),
 });
 
+const CustomMetricFormSchema = z.object({
+  metric_identifier: z.string(),
+  label: z.string(),
+  category: z.string(),
+  target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
+  higher_is_better: z.boolean(),
+  units: z.string().optional(),
+  is_custom: z.literal(true),
+});
+
 const VisitorProfileMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string().min(1, "Attribute name is required."),
@@ -72,6 +109,7 @@ export const TargetMetricsFormSchema = z.object({
   metric_set_id: z.string().uuid().optional(), // For identifying which set is being edited
   metric_set_name: z.string().min(1, "Metric set name is required."),
   predefined_metrics: z.array(PredefinedMetricFormSchema),
+  custom_metrics: z.array(CustomMetricFormSchema),
   visitor_profile_metrics: z.array(VisitorProfileMetricFormSchema),
 });
 export type TargetMetricsFormData = z.infer<typeof TargetMetricsFormSchema>;

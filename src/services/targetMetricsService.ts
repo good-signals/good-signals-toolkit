@@ -218,6 +218,7 @@ export async function saveUserCustomMetricSettings(
 
   const metricsToUpsert: MetricForUpsert[] = [];
 
+  // Handle predefined metrics
   formData.predefined_metrics.forEach(metric => {
     metricsToUpsert.push({
       metric_set_id: metricSetId,
@@ -232,6 +233,22 @@ export async function saveUserCustomMetricSettings(
     });
   });
 
+  // Handle custom metrics
+  formData.custom_metrics?.forEach(metric => {
+    metricsToUpsert.push({
+      metric_set_id: metricSetId,
+      user_id: userId,
+      account_id: accountId,
+      metric_identifier: metric.metric_identifier,
+      category: metric.category,
+      label: metric.label,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      measurement_type: null,
+    });
+  });
+
+  // Handle visitor profile metrics
   formData.visitor_profile_metrics.forEach(metric => {
     metricsToUpsert.push({
       metric_set_id: metricSetId,
