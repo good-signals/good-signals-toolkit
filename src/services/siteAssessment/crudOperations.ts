@@ -98,7 +98,7 @@ export const updateSiteAssessment = async (assessmentId: string, updates: SiteAs
   return {
     ...data,
     assessment_metric_values: data.assessment_metric_values || [],
-    site_visit_ratings: data.assessment_site_visit_ratings || [] // Corrected property name
+    site_visit_ratings: data.assessment_site_visit_ratings || []
   } as SiteAssessment;
 };
 
@@ -116,48 +116,35 @@ export const deleteSiteAssessment = async (assessmentId: string, userId: string)
 };
 
 export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAssessment> => {
-  // Fetch the main assessment
-  const { data: assessmentData, error: assessmentError } = await supabase
+  console.log('Fetching assessment details for ID:', assessmentId);
+  
+  const { data, error } = await supabase
     .from('site_assessments')
-    .select('*')
+    .select(`
+      *,
+      assessment_metric_values(*),
+      assessment_site_visit_ratings(*)
+    `)
     .eq('id', assessmentId)
     .single();
 
-  if (assessmentError) {
-    console.error('Error fetching site assessment core data:', assessmentError);
-    throw assessmentError;
+  if (error) {
+    console.error('Error fetching site assessment details:', error);
+    throw error;
   }
-  if (!assessmentData) {
+  
+  if (!data) {
     throw new Error(`Site assessment with ID ${assessmentId} not found.`);
   }
 
-  // Fetch related metric values
-  const { data: metricValues, error: metricsError } = await supabase
-    .from('assessment_metric_values')
-    .select('*')
-    .eq('assessment_id', assessmentId);
+  console.log('Raw assessment data:', data);
 
-  if (metricsError) {
-    console.error('Error fetching assessment metric values:', metricsError);
-    // Decide if this is a critical error or if we can proceed without metrics
-    // For now, let's proceed and return empty array or handle in UI
-  }
+  const result = {
+    ...data,
+    assessment_metric_values: data.assessment_metric_values || [],
+    site_visit_ratings: data.assessment_site_visit_ratings || []
+  } as SiteAssessment;
 
-  // Fetch related site visit ratings
-  const { data: siteVisitRatingsData, error: ratingsError } = await supabase
-    .from('assessment_site_visit_ratings')
-    .select('*')
-    .eq('assessment_id', assessmentId);
-  
-  if (ratingsError) {
-    console.error('Error fetching site visit ratings:', ratingsError);
-    // Decide if this is a critical error
-  }
-  
-  // Combine and return
-  return {
-    ...assessmentData,
-    assessment_metric_values: metricValues || [],
-    site_visit_ratings: siteVisitRatingsData || [], // Ensure mapping to site_visit_ratings
-  };
+  console.log('Processed assessment result:', result);
+  return result;
 };

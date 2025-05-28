@@ -50,9 +50,21 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const queryClient = useQueryClient();
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
+  console.log('SiteAssessmentDetailsView props:', { assessmentId, selectedMetricSetId });
+
   const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError, refetch: refetchAssessment } = useQuery<SiteAssessment, Error>({
     queryKey: ['assessmentDetails', assessmentId],
-    queryFn: () => getAssessmentDetails(assessmentId),
+    queryFn: async () => {
+      console.log('Query function called for assessment ID:', assessmentId);
+      try {
+        const result = await getAssessmentDetails(assessmentId);
+        console.log('Assessment query result:', result);
+        return result;
+      } catch (error) {
+        console.error('Assessment query error:', error);
+        throw error;
+      }
+    },
     enabled: !!assessmentId,
   });
 
@@ -217,11 +229,22 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     accountSettings?.signal_bad_threshold
   );
 
+  console.log('Component state:', { 
+    isLoadingAssessment, 
+    isLoadingAccounts, 
+    isLoadingTargetMetricSet,
+    assessmentError: assessmentError?.message,
+    targetMetricSetError: targetMetricSetError?.message,
+    assessment: !!assessment,
+    targetMetricSet: !!targetMetricSet
+  });
+
   if (isLoadingAssessment || isLoadingAccounts || isLoadingTargetMetricSet) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading assessment details...</p></div>;
   }
 
   if (assessmentError) {
+    console.error('Assessment error details:', assessmentError);
     return <Alert variant="destructive" className="max-w-2xl mx-auto my-8">
       <AlertTitle>Error Loading Assessment</AlertTitle>
       <AlertDescription>{assessmentError.message}</AlertDescription>
