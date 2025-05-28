@@ -183,7 +183,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   if (!assessment || !targetMetricSet) { // Added check for targetMetricSet
      return (
         <div className="flex flex-col items-center justify-center h-screen">
-            <Alert variant="warning" className="max-w-2xl mx-auto my-8">
+            <Alert variant="default" className="max-w-2xl mx-auto my-8"> {/* Changed "warning" to "default" */}
                 <AlertTitle>Incomplete Data</AlertTitle>
                 <AlertDescription>Could not load complete assessment details. The target metric set might be missing or invalid.</AlertDescription>
             </Alert>
