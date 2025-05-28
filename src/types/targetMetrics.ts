@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const PREDEFINED_METRIC_CATEGORIES = [
@@ -24,6 +25,7 @@ export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 export const UserCustomMetricSettingSchema = z.object({
   id: z.string().uuid().optional(), // Made optional as it's DB generated
   user_id: z.string().uuid(),
+  account_id: z.string().uuid(), // Added account_id
   metric_set_id: z.string().uuid(),
   metric_identifier: z.string().min(1),
   category: z.string().min(1),
@@ -39,11 +41,11 @@ export type UserCustomMetricSetting = z.infer<typeof UserCustomMetricSettingSche
 // Schema for a target metric set from the database
 export const TargetMetricSetSchema = z.object({
   id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  account_id: z.string().uuid(), // Changed from user_id to account_id
   name: z.string().min(1, "Set name is required."),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
-  user_custom_metrics_settings: z.array(UserCustomMetricSettingSchema).optional(), // Added this line
+  user_custom_metrics_settings: z.array(UserCustomMetricSettingSchema).optional(),
 });
 export type TargetMetricSet = z.infer<typeof TargetMetricSetSchema>;
 

@@ -9,6 +9,56 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      account_custom_metrics: {
+        Row: {
+          account_id: string
+          category: string
+          created_at: string
+          default_target_value: number | null
+          description: string | null
+          higher_is_better: boolean
+          id: string
+          metric_identifier: string
+          name: string
+          units: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          category?: string
+          created_at?: string
+          default_target_value?: number | null
+          description?: string | null
+          higher_is_better?: boolean
+          id?: string
+          metric_identifier: string
+          name: string
+          units?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          category?: string
+          created_at?: string
+          default_target_value?: number | null
+          description?: string | null
+          higher_is_better?: boolean
+          id?: string
+          metric_identifier?: string
+          name?: string
+          units?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_custom_metrics_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_memberships: {
         Row: {
           account_id: string
@@ -325,30 +375,39 @@ export type Database = {
       }
       target_metric_sets: {
         Row: {
+          account_id: string
           created_at: string
           id: string
           name: string
           updated_at: string
-          user_id: string
         }
         Insert: {
+          account_id: string
           created_at?: string
           id?: string
           name: string
           updated_at?: string
-          user_id: string
         }
         Update: {
+          account_id?: string
           created_at?: string
           id?: string
           name?: string
           updated_at?: string
-          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_target_metric_sets_account"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_custom_metrics_settings: {
         Row: {
+          account_id: string
           category: string
           created_at: string
           higher_is_better: boolean
@@ -362,6 +421,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           category: string
           created_at?: string
           higher_is_better: boolean
@@ -375,6 +435,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           category?: string
           created_at?: string
           higher_is_better?: boolean
@@ -388,6 +449,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_user_custom_metrics_account"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_custom_metrics_settings_metric_set_id_fkey"
             columns: ["metric_set_id"]

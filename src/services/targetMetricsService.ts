@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
@@ -17,12 +18,33 @@ const METRIC_SETS_TABLE_NAME = 'target_metric_sets';
 // Type for inserting/upserting metrics
 type MetricForUpsert = Database['public']['Tables']['user_custom_metrics_settings']['Insert'];
 
+// Helper function to get user's account ID (assumes user is admin of first account)
+async function getUserAccountId(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('account_memberships')
+    .select('account_id')
+    .eq('user_id', userId)
+    .eq('role', 'account_admin')
+    .single();
+
+  if (error) {
+    console.error('Error fetching user account:', error);
+    return null;
+  }
+  return data?.account_id || null;
+}
+
 // --- Target Metric Set Functions ---
 
 export async function createTargetMetricSet(userId: string, name: string): Promise<TargetMetricSet> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    throw new Error('User must be an account admin to create metric sets');
+  }
+
   const { data, error } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
-    .insert({ user_id: userId, name: name })
+    .insert({ account_id: accountId, name: name })
     .select()
     .single();
 
@@ -34,10 +56,15 @@ export async function createTargetMetricSet(userId: string, name: string): Promi
 }
 
 export async function getTargetMetricSets(userId: string): Promise<TargetMetricSet[]> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    return [];
+  }
+
   const { data, error } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .select('*')
-    .eq('user_id', userId)
+    .eq('account_id', accountId)
     .order('name', { ascending: true });
 
   if (error) {
@@ -48,11 +75,16 @@ export async function getTargetMetricSets(userId: string): Promise<TargetMetricS
 }
 
 export async function getTargetMetricSetById(metricSetId: string, userId: string): Promise<TargetMetricSet | null> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    return null;
+  }
+
   const { data: metricSetData, error: metricSetError } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .select('*')
     .eq('id', metricSetId)
-    .eq('user_id', userId)
+    .eq('account_id', accountId)
     .single();
 
   if (metricSetError) {
@@ -75,9 +107,6 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
 
   if (customMetricsError) {
     console.error('Error fetching user custom metric settings for set:', customMetricsError);
-    // Decide if this should throw or return the set without metrics
-    // For now, let's return the set but log the error. The UI can handle missing metrics.
-    // Alternatively, throw customMetricsError;
   }
   
   const parsedMetricSet = TargetMetricSetSchema.parse(metricSetData);
@@ -89,11 +118,16 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
 }
 
 export async function updateTargetMetricSetName(metricSetId: string, userId: string, newName: string): Promise<TargetMetricSet> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    throw new Error('User must be an account admin to update metric sets');
+  }
+
   const { data, error } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .update({ name: newName, updated_at: new Date().toISOString() })
     .eq('id', metricSetId)
-    .eq('user_id', userId)
+    .eq('account_id', accountId)
     .select()
     .single();
 
@@ -105,18 +139,22 @@ export async function updateTargetMetricSetName(metricSetId: string, userId: str
 }
 
 export async function deleteTargetMetricSet(metricSetId: string, userId: string): Promise<void> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    throw new Error('User must be an account admin to delete metric sets');
+  }
+
   const { error } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .delete()
     .eq('id', metricSetId)
-    .eq('user_id', userId);
+    .eq('account_id', accountId);
 
   if (error) {
     console.error('Error deleting target metric set:', error);
     throw error;
   }
 }
-
 
 // --- User Custom Metric Settings Functions (now associated with a set) ---
 
@@ -153,6 +191,10 @@ export async function saveUserCustomMetricSettings(
   metricSetId: string,
   formData: TargetMetricsFormData
 ): Promise<UserCustomMetricSetting[]> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    throw new Error('User must be an account admin to save metric settings');
+  }
 
   const metricsToUpsert: MetricForUpsert[] = [];
 
@@ -160,6 +202,7 @@ export async function saveUserCustomMetricSettings(
     metricsToUpsert.push({
       metric_set_id: metricSetId,
       user_id: userId, 
+      account_id: accountId,
       metric_identifier: metric.metric_identifier,
       category: metric.category,
       label: metric.label,
@@ -173,6 +216,7 @@ export async function saveUserCustomMetricSettings(
     metricsToUpsert.push({
       metric_set_id: metricSetId,
       user_id: userId,
+      account_id: accountId,
       metric_identifier: metric.metric_identifier || `vp_${metric.label.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
       category: VISITOR_PROFILE_CATEGORY,
       label: metric.label,
@@ -184,12 +228,6 @@ export async function saveUserCustomMetricSettings(
   
   if (metricsToUpsert.length === 0) {
     console.log("No metrics to upsert for set:", metricSetId);
-    // To ensure consistency, if no metrics are provided, perhaps existing metrics for the set should be deleted.
-    // This is a "sync" operation. Current logic is "upsert only".
-    // For now, if `metricsToUpsert` is empty, Supabase `upsert` with an empty array will do nothing, which is fine.
-    // We will return the result of the `select()` call, which would be empty if nothing was upserted and the table was empty.
-    // Or, we could fetch and return existing metrics if no upsert happened.
-    // Let's stick to returning what was upserted, which is an empty array if metricsToUpsert is empty.
   }
 
   const { data, error } = await supabase
@@ -210,10 +248,15 @@ export async function saveUserCustomMetricSettings(
 
 // Updated function to check if a user has any target metric sets
 export async function hasUserSetAnyMetrics(userId: string): Promise<boolean> {
+  const accountId = await getUserAccountId(userId);
+  if (!accountId) {
+    return false;
+  }
+
   const { count: setCounts, error: setError } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId);
+    .eq('account_id', accountId);
 
   if (setError) {
     console.error('Error checking for metric sets:', setError);
@@ -226,8 +269,6 @@ export async function hasUserSetAnyMetrics(userId: string): Promise<boolean> {
 }
 
 // Function to save preference for using standard metrics (conceptual)
-// To make 'hasUserSetAnyMetrics' fully robust for standard metrics,
-// this function should actually create a record or set a flag.
 export async function saveUserStandardMetricsPreference(userId: string): Promise<void> {
   console.log(`User ${userId} has chosen to use standard metrics. Consider saving this preference.`);
   return;
