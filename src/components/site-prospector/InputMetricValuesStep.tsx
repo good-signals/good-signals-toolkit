@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -167,42 +168,41 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     },
   });
 
-  // Save form data to session storage whenever form data changes
+  // Save form data to session storage whenever form data changes - with debouncing
   useEffect(() => {
     const subscription = watch((value) => {
-      try {
-        // Convert the form data to a serializable format (excluding File objects)
-        const serializableData = {
-          metrics: value.metrics?.map(metric => ({
-            ...metric,
-            image_file: null, // Don't persist files in session storage
-          })) || [],
-          siteVisitRatings: value.siteVisitRatings || [],
-          siteStatus: value.siteStatus || 'Prospect',
-        };
-        
-        sessionStorage.setItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
-      } catch (error) {
-        console.warn('Failed to save form data to session storage:', error);
-      }
+      // Debounce the session storage save to avoid excessive writes
+      const timeoutId = setTimeout(() => {
+        try {
+          // Convert the form data to a serializable format (excluding File objects)
+          const serializableData = {
+            metrics: value.metrics?.map(metric => ({
+              ...metric,
+              image_file: null, // Don't persist files in session storage
+            })) || [],
+            siteVisitRatings: value.siteVisitRatings || [],
+            siteStatus: value.siteStatus || 'Prospect',
+          };
+          
+          sessionStorage.setItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
+          console.log('Form data saved to session storage:', serializableData);
+        } catch (error) {
+          console.warn('Failed to save form data to session storage:', error);
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
     });
     
     return () => subscription.unsubscribe();
   }, [watch, assessmentId]);
 
-  // Clear session storage when component unmounts (assessment is completed)
-  useEffect(() => {
-    return () => {
-      // Only clear on unmount if we're not just navigating away
-      const cleanup = () => {
-        sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
-        sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
-      };
-      
-      // Add a small delay to allow for navigation detection
-      setTimeout(cleanup, 100);
-    };
-  }, [assessmentId]);
+  // Only clear session storage when assessment is actually completed (not on navigation)
+  const clearSessionStorageOnCompletion = () => {
+    sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
+    sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+    console.log('Session storage cleared after assessment completion');
+  };
 
   // Load saved form data from session storage and merge with database data
   const loadSavedFormData = () => {
@@ -210,6 +210,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       const savedDataJson = sessionStorage.getItem(getFormDataSessionKey(assessmentId));
       if (savedDataJson) {
         const savedData = JSON.parse(savedDataJson) as Partial<MetricValuesFormData>;
+        console.log('Loaded saved form data from session storage:', savedData);
         return savedData;
       }
     } catch (error) {
@@ -234,11 +235,13 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         
         let defaultValue: number | null;
         if (savedMetricData?.entered_value !== undefined && savedMetricData?.entered_value !== null) {
-          // Use saved form data if available
+          // Use saved form data if available (highest priority)
           defaultValue = savedMetricData.entered_value;
+          console.log(`Using saved form data for ${metric.metric_identifier}:`, defaultValue);
         } else if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
           // Fall back to database value
           defaultValue = existingValue.entered_value;
+          console.log(`Using database value for ${metric.metric_identifier}:`, defaultValue);
         } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
           defaultValue = 50;
         } else {
@@ -345,8 +348,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] });
       
       // Clear session storage on successful completion
-      sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
-      sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+      clearSessionStorageOnCompletion();
       
       onMetricsSubmitted(assessmentId); 
     },
@@ -511,8 +513,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         toast({ title: 'Site Visit Ratings', description: 'No new site visit ratings to save.' });
         
         // Clear session storage and proceed even if no ratings
-        sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
-        sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+        clearSessionStorageOnCompletion();
         
         onMetricsSubmitted(assessmentId); // If no ratings, submit directly
       }
@@ -575,7 +576,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           <CardDescription>
             Enter metric values and site visit ratings. Upload one image per section if needed. Assessment ID: {assessmentId}
             <br />
-            <span className="text-xs text-muted-foreground">Your progress is automatically saved as you type.</span>
+            <span className="text-xs text-muted-foreground">Your progress is automatically saved as you type and will be restored if you navigate away.</span>
           </CardDescription>
         </CardHeader>
         
