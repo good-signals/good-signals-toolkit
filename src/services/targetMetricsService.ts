@@ -20,6 +20,8 @@ type MetricForUpsert = Database['public']['Tables']['user_custom_metrics_setting
 
 // Helper function to get user's account ID (assumes user is admin of first account)
 async function getUserAccountId(userId: string): Promise<string | null> {
+  console.log('Getting account ID for user:', userId);
+  
   const { data, error } = await supabase
     .from('account_memberships')
     .select('account_id')
@@ -31,12 +33,16 @@ async function getUserAccountId(userId: string): Promise<string | null> {
     console.error('Error fetching user account:', error);
     return null;
   }
+  
+  console.log('Found account ID:', data?.account_id);
   return data?.account_id || null;
 }
 
 // --- Target Metric Set Functions ---
 
 export async function createTargetMetricSet(userId: string, name: string): Promise<TargetMetricSet> {
+  console.log('Creating target metric set for user:', userId, 'with name:', name);
+  
   const accountId = await getUserAccountId(userId);
   if (!accountId) {
     throw new Error('User must be an account admin to create metric sets');
@@ -52,15 +58,22 @@ export async function createTargetMetricSet(userId: string, name: string): Promi
     console.error('Error creating target metric set:', error);
     throw error;
   }
+  
+  console.log('Created target metric set:', data);
   return TargetMetricSetSchema.parse(data);
 }
 
 export async function getTargetMetricSets(userId: string): Promise<TargetMetricSet[]> {
+  console.log('Getting target metric sets for user:', userId);
+  
   const accountId = await getUserAccountId(userId);
   if (!accountId) {
+    console.log('No account ID found for user, returning empty array');
     return [];
   }
 
+  console.log('Querying metric sets for account:', accountId);
+  
   const { data, error } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
     .select('*')
@@ -71,12 +84,17 @@ export async function getTargetMetricSets(userId: string): Promise<TargetMetricS
     console.error('Error fetching target metric sets:', error);
     throw error;
   }
+  
+  console.log('Found metric sets:', data?.length || 0);
   return z.array(TargetMetricSetSchema).parse(data || []);
 }
 
 export async function getTargetMetricSetById(metricSetId: string, userId: string): Promise<TargetMetricSet | null> {
+  console.log('Getting target metric set by ID:', metricSetId, 'for user:', userId);
+  
   const accountId = await getUserAccountId(userId);
   if (!accountId) {
+    console.log('No account ID found for user');
     return null;
   }
 
@@ -89,6 +107,7 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
 
   if (metricSetError) {
     if (metricSetError.code === 'PGRST116') { // Not found
+      console.log('Metric set not found');
       return null;
     }
     console.error('Error fetching target metric set by ID:', metricSetError);
@@ -172,6 +191,7 @@ export async function getUserCustomMetricSettings(metricSetId: string): Promise<
   const typedData: UserCustomMetricSetting[] = data?.map(item => ({
     id: item.id,
     user_id: item.user_id,
+    account_id: item.account_id,
     metric_set_id: item.metric_set_id,
     metric_identifier: item.metric_identifier,
     category: item.category,
