@@ -8,7 +8,7 @@ import {
   AssessmentMetricValueInsert
 } from '@/types/siteAssessmentTypes';
 import { Account, fetchUserAccountsWithAdminRole } from '@/services/accountService'; 
-import { TargetMetricSet } from '@/types/targetMetrics'; // Ensure this is imported for payload
+import { TargetMetricSet } from '@/types/targetMetrics';
 
 export const createSiteAssessment = async (assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id'>, userId: string): Promise<SiteAssessment> => {
   // Fetch user's first admin account
@@ -286,7 +286,7 @@ export const generateExecutiveSummaryForAssessment = async (
     accountSignalGoodThreshold: accountSettings?.signal_good_threshold,
     accountSignalBadThreshold: accountSettings?.signal_bad_threshold,
     metricCategories: metricCategories,
-    targetMetricSet: { // Pass only necessary parts of targetMetricSet
+    targetMetricSet: {
         user_custom_metrics_settings: targetMetricSet.user_custom_metrics_settings?.map(s => ({
             metric_identifier: s.metric_identifier,
             label: s.label,
@@ -295,7 +295,7 @@ export const generateExecutiveSummaryForAssessment = async (
     }
   };
 
-  console.log("Invoking generate-executive-summary function with payload:", payload);
+  console.log("Invoking generate-executive-summary function with payload:", JSON.stringify(payload, null, 2));
 
 
   const { data, error } = await supabase.functions.invoke('generate-executive-summary', {
@@ -318,7 +318,7 @@ export const generateExecutiveSummaryForAssessment = async (
 export const updateSiteAssessmentSummary = async (
   assessmentId: string,
   executiveSummary: string,
-  userId: string // Assuming userId is needed for RLS or auditing
+  userId: string
 ): Promise<SiteAssessment> => {
   const updates: SiteAssessmentUpdate = {
     executive_summary: executiveSummary,
@@ -329,11 +329,10 @@ export const updateSiteAssessmentSummary = async (
     .from('site_assessments')
     .update(updates)
     .eq('id', assessmentId)
-    .eq('user_id', userId) // Assuming RLS requires user_id for updates
     .select(`
       *,
       assessment_metric_values(*),
-      site_visit_ratings(*)
+      assessment_site_visit_ratings(*)
     `)
     .single();
 
@@ -344,6 +343,6 @@ export const updateSiteAssessmentSummary = async (
    return {
     ...data,
     assessment_metric_values: data.assessment_metric_values || [],
-    site_visit_ratings: data.site_visit_ratings || []
+    site_visit_ratings: data.assessment_site_visit_ratings || [] 
   } as SiteAssessment;
 };
