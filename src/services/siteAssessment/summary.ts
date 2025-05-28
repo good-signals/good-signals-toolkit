@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { SiteAssessment, SiteAssessmentUpdate } from '@/types/siteAssessmentTypes';
 import { Account } from '@/services/accountService';
@@ -30,6 +29,7 @@ export const generateExecutiveSummaryForAssessment = async (
     accountSignalBadThreshold: accountSettings?.signal_bad_threshold,
     metricCategories: metricCategories,
     targetMetricSet: {
+        name: targetMetricSet.name, // Add the target metric set name
         user_custom_metrics_settings: targetMetricSet.user_custom_metrics_settings?.map(s => ({
             metric_identifier: s.metric_identifier,
             label: s.label,
