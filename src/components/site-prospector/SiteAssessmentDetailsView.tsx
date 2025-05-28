@@ -41,6 +41,18 @@ interface SiteAssessmentDetailsViewProps {
   onBackToList: () => void;
 }
 
+const getSiteStatusColor = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'Prospect': return 'outline';
+    case 'LOI': return 'secondary';
+    case 'Lease': return 'default';
+    case 'Development': return 'secondary';
+    case 'Open': return 'default';
+    case 'Closed': return 'destructive';
+    default: return 'outline';
+  }
+};
+
 const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   assessmentId,
   selectedMetricSetId,
@@ -332,17 +344,25 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
             </CardTitle>
             <CardDescription className="mt-1 space-y-2">
               <div>Address: {assessment.address_line1 || 'Not specified'}</div>
-              {targetMetricSet && (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm text-muted-foreground">Target Metric Set:</span>
-                  <Badge variant="outline" className="text-sm">
-                    {targetMetricSet.name}
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Site Status:</span>
+                  <Badge variant={getSiteStatusColor(assessment.site_status)} className="text-sm">
+                    {assessment.site_status || 'Prospect'}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    ({targetMetricSet.user_custom_metrics_settings?.length || 0} metrics)
-                  </span>
                 </div>
-              )}
+                {targetMetricSet && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Target Metric Set:</span>
+                    <Badge variant="outline" className="text-sm">
+                      {targetMetricSet.name}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      ({targetMetricSet.user_custom_metrics_settings?.length || 0} metrics)
+                    </span>
+                  </div>
+                )}
+              </div>
             </CardDescription>
           </div>
           <div className="flex items-center space-x-3">

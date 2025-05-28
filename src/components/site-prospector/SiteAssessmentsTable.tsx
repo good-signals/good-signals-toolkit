@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, CheckCircle } from 'lucide-react';
+import { Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, CheckCircle, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -24,7 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 
-type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage';
+type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage' | 'site_status';
 
 interface SiteAssessmentsTableProps {
   assessmentsData: SiteAssessment[];
@@ -36,6 +35,18 @@ interface SiteAssessmentsTableProps {
   isDeleting: boolean;
   forceClearSelectionsKey: string | number;
 }
+
+const getSiteStatusColor = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'Prospect': return 'outline';
+    case 'LOI': return 'secondary';
+    case 'Lease': return 'default';
+    case 'Development': return 'secondary';
+    case 'Open': return 'default';
+    case 'Closed': return 'destructive';
+    default: return 'outline';
+  }
+};
 
 const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   assessmentsData,
@@ -157,7 +168,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     }
   }, [isDeleting, showDeleteDialog]);
 
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-10">
@@ -219,6 +229,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
               <TableHead onClick={() => requestSort('address_line1')} className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[200px]">
                 <div className="flex items-center">Address {getSortIcon('address_line1')}</div>
               </TableHead>
+              <TableHead onClick={() => requestSort('site_status')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
+                <div className="flex items-center justify-center">
+                  <Building className="h-4 w-4 mr-1"/> Status {getSortIcon('site_status')}
+                </div>
+              </TableHead>
               <TableHead onClick={() => requestSort('site_signal_score')} className="cursor-pointer hover:bg-muted/50 transition-colors text-center">
                 <div className="flex items-center justify-center">
                   <TrendingUp className="h-4 w-4 mr-1"/> Score {getSortIcon('site_signal_score')}
@@ -255,6 +270,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
                   {assessment.address_line1 || ''}
                   {assessment.address_line1 && assessment.city ? ', ' : ''}
                   {assessment.city || ''}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge variant={getSiteStatusColor(assessment.site_status)} className="text-sm">
+                    {assessment.site_status || 'Prospect'}
+                  </Badge>
                 </TableCell>
                 <TableCell className="text-center">
                   {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
@@ -338,4 +358,3 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
 };
 
 export default SiteAssessmentsTable;
-

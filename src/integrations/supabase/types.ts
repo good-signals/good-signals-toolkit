@@ -212,6 +212,7 @@ export type Database = {
           longitude: number | null
           postal_code: string | null
           site_signal_score: number | null
+          site_status: string | null
           state_province: string | null
           target_metric_set_id: string | null
           updated_at: string
@@ -233,6 +234,7 @@ export type Database = {
           longitude?: number | null
           postal_code?: string | null
           site_signal_score?: number | null
+          site_status?: string | null
           state_province?: string | null
           target_metric_set_id?: string | null
           updated_at?: string
@@ -254,6 +256,7 @@ export type Database = {
           longitude?: number | null
           postal_code?: string | null
           site_signal_score?: number | null
+          site_status?: string | null
           state_province?: string | null
           target_metric_set_id?: string | null
           updated_at?: string

@@ -1,3 +1,4 @@
+
 import { Database } from "@/integrations/supabase/types";
 
 export type SiteAssessment = Database["public"]["Tables"]["site_assessments"]["Row"] & {
@@ -5,6 +6,7 @@ export type SiteAssessment = Database["public"]["Tables"]["site_assessments"]["R
   completion_percentage?: number | null;
   executive_summary?: string | null;
   last_summary_generated_at?: string | null;
+  site_status?: string | null;
   assessment_metric_values?: AssessmentMetricValue[]; // Added
   site_visit_ratings?: AssessmentSiteVisitRatingInsert[]; // Added (using Insert as it was used in the component, can be changed to AssessmentSiteVisitRating if more appropriate)
 };
@@ -14,6 +16,7 @@ export type SiteAssessmentUpdate = Database["public"]["Tables"]["site_assessment
   completion_percentage?: number | null;
   executive_summary?: string | null;
   last_summary_generated_at?: string | null;
+  site_status?: string | null;
 };
 
 export type AssessmentSiteVisitRating = Database["public"]["Tables"]["assessment_site_visit_ratings"]["Row"];
