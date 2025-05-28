@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -74,30 +73,48 @@ const SiteProspectorPage = () => {
   });
   
   const deleteMutation = useMutation({
-    mutationFn: async (assessmentId: string) => {
-      console.log('Attempting to delete assessment:', assessmentId);
+    mutationFn: async (assessmentIds: string[]) => {
+      console.log('Attempting to delete assessments:', assessmentIds);
       if (!user?.id) throw new Error("User not authenticated");
       
-      // Add more detailed logging for deletion attempts
-      const assessment = assessments.find(a => a.id === assessmentId);
-      console.log('Assessment to delete:', assessment);
-      
-      try {
-        await deleteSiteAssessment(assessmentId, user.id);
-        console.log('Assessment deleted successfully:', assessmentId);
-        return assessmentId;
-      } catch (error) {
-        console.error('Error during deletion:', error);
-        throw error;
+      const deletionPromises = assessmentIds.map(async (assessmentId) => {
+        console.log('Deleting assessment:', assessmentId);
+        const assessment = assessments.find(a => a.id === assessmentId);
+        console.log('Assessment to delete:', assessment);
+        
+        try {
+          await deleteSiteAssessment(assessmentId, user.id);
+          console.log('Assessment deleted successfully:', assessmentId);
+          return { id: assessmentId, success: true };
+        } catch (error) {
+          console.error('Error deleting assessment:', assessmentId, error);
+          return { id: assessmentId, success: false, error };
+        }
+      });
+
+      const results = await Promise.allSettled(deletionPromises);
+      const successCount = results.filter(result => 
+        result.status === 'fulfilled' && result.value.success
+      ).length;
+      const failureCount = results.length - successCount;
+
+      if (failureCount > 0) {
+        console.error(`${failureCount} deletions failed out of ${results.length}`);
+        throw new Error(`Failed to delete ${failureCount} out of ${results.length} assessments`);
       }
+
+      return { successCount, deletedIds: assessmentIds };
     },
-    onSuccess: (deletedAssessmentId) => { 
-      console.log('Delete mutation success for:', deletedAssessmentId);
-      toast({ title: "Assessment deleted successfully." });
+    onSuccess: ({ successCount, deletedIds }) => { 
+      console.log('Bulk delete mutation success:', { successCount, deletedIds });
+      toast({ 
+        title: `Successfully deleted ${successCount} assessment${successCount > 1 ? 's' : ''}` 
+      });
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
       setClearSelectionsKey(prev => prev + 1); 
       
-      if (deletedAssessmentId === activeAssessmentId) {
+      // If the active assessment was deleted, cancel the process
+      if (activeAssessmentId && deletedIds.includes(activeAssessmentId)) {
         console.log('Deleted assessment was active, canceling process');
         handleCancelAssessmentProcess(); 
       } else {
@@ -106,11 +123,11 @@ const SiteProspectorPage = () => {
       }
     },
     onError: (error) => {
-      console.error('Delete mutation error:', error);
+      console.error('Bulk delete mutation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
-        title: "Error deleting assessment",
-        description: `Failed to delete assessment: ${errorMessage}. Please try again.`,
+        title: "Error deleting assessments",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -123,11 +140,8 @@ const SiteProspectorPage = () => {
       return;
     }
     
-    // Delete assessments one by one with proper error handling
-    idsToDelete.forEach((id, index) => {
-      console.log(`Deleting assessment ${index + 1}/${idsToDelete.length}:`, id);
-      deleteMutation.mutate(id);
-    });
+    // Delete all assessments in a single mutation
+    deleteMutation.mutate(idsToDelete);
   };
 
   const clearSessionStorageAssessmentState = () => {
