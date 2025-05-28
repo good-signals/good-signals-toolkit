@@ -205,7 +205,9 @@ export type Database = {
           completion_percentage: number | null
           country: string | null
           created_at: string
+          executive_summary: string | null
           id: string
+          last_summary_generated_at: string | null
           latitude: number | null
           longitude: number | null
           postal_code: string | null
@@ -224,7 +226,9 @@ export type Database = {
           completion_percentage?: number | null
           country?: string | null
           created_at?: string
+          executive_summary?: string | null
           id?: string
+          last_summary_generated_at?: string | null
           latitude?: number | null
           longitude?: number | null
           postal_code?: string | null
@@ -243,7 +247,9 @@ export type Database = {
           completion_percentage?: number | null
           country?: string | null
           created_at?: string
+          executive_summary?: string | null
           id?: string
+          last_summary_generated_at?: string | null
           latitude?: number | null
           longitude?: number | null
           postal_code?: string | null
