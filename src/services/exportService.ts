@@ -1,4 +1,3 @@
-
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -26,6 +25,31 @@ const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   includeImages: true,
   pageOrientation: 'portrait',
   imageQuality: 'medium',
+};
+
+// Helper function to get simple status string
+const getSimpleSignalStatus = (
+  score: number | null,
+  accountGoodThreshold?: number | null,
+  accountBadThreshold?: number | null
+): 'good' | 'bad' | 'neutral' => {
+  if (score === null || score === undefined) {
+    return 'neutral';
+  }
+
+  const DEFAULT_GOOD_THRESHOLD = 0.75;
+  const DEFAULT_BAD_THRESHOLD = 0.50;
+  
+  const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
+  const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
+
+  if (score >= goodThreshold) {
+    return 'good';
+  }
+  if (score <= badThreshold) {
+    return 'bad';
+  }
+  return 'neutral';
 };
 
 // Convert image URL to base64 for embedding in PDF
@@ -129,7 +153,7 @@ const generateOverviewPage = async (
   
   // Overall score
   if (overallSiteSignalScore !== null) {
-    const signalStatus = getSignalStatus(
+    const signalStatus = getSimpleSignalStatus(
       overallSiteSignalScore,
       accountSettings?.signal_good_threshold,
       accountSettings?.signal_bad_threshold
