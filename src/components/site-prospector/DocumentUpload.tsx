@@ -95,12 +95,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     try {
       const url = await getDocumentDownloadUrl(document.file_path);
       if (url) {
-        const link = document.createElement('a');
+        const link = window.document.createElement('a');
         link.href = url;
         link.download = document.file_name;
-        document.body.appendChild(link);
+        window.document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        window.document.body.removeChild(link);
       } else {
         toast({
           title: "Download failed",

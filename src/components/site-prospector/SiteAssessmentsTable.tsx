@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, CheckCircle, Building } from 'lucide-react';
+import { Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, CheckCircle, Building, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -20,8 +20,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from '@/components/ui/badge';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
+import { useQuery } from '@tanstack/react-query';
+import { getAssessmentDocuments, AssessmentDocument } from '@/services/documentService';
+import DocumentUpload from './DocumentUpload';
 
 type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage' | 'site_status';
 
@@ -62,16 +71,26 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null);
   const [assessmentsToDeleteList, setAssessmentsToDeleteList] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAttachmentsDialog, setShowAttachmentsDialog] = useState(false);
+  const [selectedAssessmentForAttachments, setSelectedAssessmentForAttachments] = useState<SiteAssessment | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys | null; direction: 'asc' | 'desc' }>({
     key: 'created_at',
     direction: 'desc',
+  });
+
+  const { data: documentsForSelectedAssessment, refetch: refetchDocuments } = useQuery<AssessmentDocument[]>({
+    queryKey: ['assessmentDocuments', selectedAssessmentForAttachments?.id],
+    queryFn: async () => {
+      if (!selectedAssessmentForAttachments?.id) return [];
+      return getAssessmentDocuments(selectedAssessmentForAttachments.id);
+    },
+    enabled: !!selectedAssessmentForAttachments?.id && showAttachmentsDialog,
   });
 
   useEffect(() => {
     setSelectedAssessmentIds([]);
   }, [forceClearSelectionsKey]);
 
-  // Reset selections if the underlying data changes significantly (e.g., after filtering or full refresh)
   useEffect(() => {
     setSelectedAssessmentIds(prevSelected =>
       prevSelected.filter(id => assessmentsData.some(a => a.id === id))
@@ -151,17 +170,19 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     const idsToDelete = assessmentToDelete ? [assessmentToDelete.id] : assessmentsToDeleteList;
     if (idsToDelete.length === 0) return;
     onDeleteCommit(idsToDelete);
-    // Dialog will be closed by parent or by isDeleting prop change effect if needed
-    // Selections will be cleared by forceClearSelectionsKey effect
   };
 
-  // Close dialog when delete operation finishes (isDeleting becomes false)
-   useEffect(() => {
+  const handleAttachmentsClick = (assessment: SiteAssessment) => {
+    setSelectedAssessmentForAttachments(assessment);
+    setShowAttachmentsDialog(true);
+  };
+
+  const handleDocumentsChange = () => {
+    refetchDocuments();
+  };
+
+  useEffect(() => {
     if (!isDeleting && showDeleteDialog) {
-      // Check if it was a real delete attempt that finished
-      // This is tricky, might need a flag if delete was initiated from this component
-      // For now, let's assume parent handles toasts and we just close dialog
-      // The success of deletion will trigger forceClearSelectionsKey which clears selection
       setShowDeleteDialog(false);
       setAssessmentToDelete(null);
       setAssessmentsToDeleteList([]);
@@ -278,7 +299,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
                 </TableCell>
                 <TableCell className="text-center">
                   {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
-                     <Badge variant={assessment.site_signal_score >= 75 ? "success" : assessment.site_signal_score >= 50 ? "secondary" : "destructive"}>
+                     <Badge variant={assessment.site_signal_score >= 75 ? "default" : assessment.site_signal_score >= 50 ? "secondary" : "destructive"}>
                       {assessment.site_signal_score}%
                      </Badge>
                   ) : (
@@ -311,6 +332,15 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
                     disabled={isDeleting}
                   >
                     <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleAttachmentsClick(assessment)}
+                    title="Attach Files"
+                    disabled={isDeleting}
+                  >
+                    <Paperclip className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
@@ -353,6 +383,23 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showAttachmentsDialog} onOpenChange={setShowAttachmentsDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Attachments for {selectedAssessmentForAttachments?.assessment_name || 'Assessment'}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedAssessmentForAttachments && (
+            <DocumentUpload
+              assessmentId={selectedAssessmentForAttachments.id}
+              documents={documentsForSelectedAssessment || []}
+              onDocumentsChange={handleDocumentsChange}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
