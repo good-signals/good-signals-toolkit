@@ -4,297 +4,202 @@ import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, Ch
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  getSiteAssessmentById, 
-  getAssessmentMetricValues, 
-  getSiteVisitRatings,
-  updateSiteAssessment 
-} from '@/services/siteAssessmentService';
-import { getTargetMetricSetById } from '@/services/targetMetricsService';
-import { SiteAssessment, AssessmentMetricValue, AssessmentSiteVisitRatingInsert, siteVisitCriteria, SiteAssessmentUpdate } from '@/types/siteAssessmentTypes';
-import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
+import { TargetMetricSet } from '@/types/targetMetrics';
+import { AssessmentMetricValue, SiteVisitRating, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
+import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
 import { toast } from '@/components/ui/use-toast';
 import AddressMapDisplay from './AddressMapDisplay';
+import { getMetricLabelForValue, specificDropdownMetrics } from '@/config/metricDisplayConfig'; // Import helper
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
-  metricSetId: string;
-  onBack: () => void;
-  // onEditMetrics: (assessmentId: string, metricSetId: string) => void; // Potentially for an edit button
-  // onEditSiteVisitRatings: (assessmentId: string) => void; // Potentially for an edit button
+  targetMetricSet: TargetMetricSet | null;
+  onEdit: (assessmentId: string, targetMetricSetId: string) => void;
+  onBackToList: () => void;
 }
 
-const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
-  assessmentId,
-  metricSetId,
-  onBack,
-  // onEditMetrics,
-  // onEditSiteVisitRatings,
-}) => {
+const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ assessmentId, targetMetricSet, onEdit, onBackToList }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError } = useQuery<SiteAssessment | null, Error>({
-    queryKey: ['siteAssessment', assessmentId, user?.id],
-    queryFn: () => {
-      if (!user?.id) throw new Error('User not authenticated');
-      return getSiteAssessmentById(assessmentId, user.id);
-    },
-    enabled: !!assessmentId && !!user?.id,
-  });
-
-  const { data: metricSet, isLoading: isLoadingMetricSet, error: metricSetError } = useQuery<TargetMetricSet | null, Error>({
-    queryKey: ['targetMetricSet', metricSetId, user?.id],
-    queryFn: () => {
-      if (!user?.id) throw new Error('User not authenticated');
-      return getTargetMetricSetById(metricSetId, user.id);
-    },
-    enabled: !!metricSetId && !!user?.id,
-  });
-
-  const { data: metricValues, isLoading: isLoadingMetricValues, error: metricValuesError } = useQuery<AssessmentMetricValue[], Error>({
-    queryKey: ['assessmentMetricValues', assessmentId],
-    queryFn: () => getAssessmentMetricValues(assessmentId),
+  const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError } = useQuery<SiteAssessment, Error>({
+    queryKey: ['assessmentDetails', assessmentId],
+    queryFn: () => getAssessmentDetails(assessmentId),
     enabled: !!assessmentId,
   });
 
-  const { data: siteVisitRatings, isLoading: isLoadingSiteVisitRatings, error: siteVisitRatingsError } = useQuery<AssessmentSiteVisitRatingInsert[], Error>({
-    queryKey: ['siteVisitRatings', assessmentId],
-    queryFn: () => getSiteVisitRatings(assessmentId),
-    enabled: !!assessmentId,
+  const updateScoresMutation = useMutation({
+    mutationFn: (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => 
+      updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage),
+    onSuccess: () => {
+      toast({ title: "Scores Updated", description: "The assessment scores have been recalculated and saved." });
+      queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessmentsList', user?.id] }); // Invalidate list if scores affect summary views
+    },
+    onError: (error: Error) => {
+      toast({ title: "Score Update Failed", description: `Could not save updated scores: ${error.message}`, variant: "destructive" });
+    },
   });
 
-  const metricsWithScores = useMemo(() => {
-    if (!metricSet?.user_custom_metrics_settings || !metricValues) return [];
+  const metricValues = useMemo(() => assessment?.assessment_metric_values || [], [assessment]);
+  const siteVisitRatings = useMemo(() => assessment?.site_visit_ratings || [], [assessment]);
+
+  const { overallSiteSignalScore, completionPercentage, detailedMetricScores } = useMemo(() => {
+    if (!targetMetricSet || !metricValues) {
+      return { overallSiteSignalScore: null, completionPercentage: 0, detailedMetricScores: new Map() };
+    }
+    const completion = calculateCompletionPercentage(targetMetricSet.user_custom_metrics_settings || [], metricValues);
+    const overallScore = calculateOverallSiteSignalScore(targetMetricSet, metricValues, siteVisitRatings);
     
-    return metricSet.user_custom_metrics_settings.map(setting => {
-      const enteredMetricValue = metricValues.find(mv => mv.metric_identifier === setting.metric_identifier);
-      const score = calculateMetricSignalScore({
-        enteredValue: enteredMetricValue?.entered_value,
+    const details = new Map<string, { score: number | null; enteredValue: number | null; targetValue: number | null; higherIsBetter: boolean; notes: string | null; imageUrl: string | null }>();
+    (targetMetricSet.user_custom_metrics_settings || []).forEach(setting => {
+      const metricValue = metricValues.find(mv => mv.metric_identifier === setting.metric_identifier);
+      details.set(setting.metric_identifier, {
+        score: calculateMetricSignalScore(setting, metricValue?.entered_value ?? null),
+        enteredValue: metricValue?.entered_value ?? null,
         targetValue: setting.target_value,
         higherIsBetter: setting.higher_is_better,
+        notes: metricValue?.notes ?? null,
+        imageUrl: metricValue?.image_url ?? null,
       });
-      return {
-        ...setting,
-        entered_value: enteredMetricValue?.entered_value,
-        notes: enteredMetricValue?.notes,
-        image_url: enteredMetricValue?.image_url,
-        metric_id_from_assessment: enteredMetricValue?.id,
-        score,
-      };
     });
-  }, [metricSet, metricValues]);
+    return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
+  }, [targetMetricSet, metricValues, siteVisitRatings]);
 
-  const overallSiteSignalScore = useMemo(() => {
-    const scores = metricsWithScores.map(m => m.score);
-    return calculateOverallSiteSignalScore(scores);
-  }, [metricsWithScores]);
+  React.useEffect(() => {
+    if (assessment && targetMetricSet && user) { // Ensure assessment and targetMetricSet are loaded
+      const storedScore = assessment.overall_site_signal_score;
+      const storedCompletion = assessment.completion_percentage;
 
-  const completionPercentage = useMemo(() => {
-    if (!metricSet?.user_custom_metrics_settings) return 0;
-    const totalMetricsInSet = metricSet.user_custom_metrics_settings.length;
-    const metricsWithEnteredValues = metricsWithScores.filter(m => typeof m.entered_value === 'number').length;
-    return calculateCompletionPercentage(totalMetricsInSet, metricsWithEnteredValues);
-  }, [metricSet, metricsWithScores]);
+      const isOverallScoreValid = typeof overallSiteSignalScore === 'number';
+      const isCompletionValid = typeof completionPercentage === 'number';
 
-  const updateAssessmentScoresMutation = useMutation({
-    mutationFn: (scores: { site_signal_score: number | null; completion_percentage: number | null }) => {
-      if (!assessmentId || !user?.id) throw new Error('Missing assessment ID or user ID');
-      const updateData: SiteAssessmentUpdate = { 
-        site_signal_score: scores.site_signal_score,
-        completion_percentage: scores.completion_percentage,
-       };
-      return updateSiteAssessment(assessmentId, updateData, user.id);
-    },
-    onSuccess: (updatedAssessment) => {
-      toast({ title: "Scores Updated", description: "Overall Site Signal Score and Completion Percentage have been saved to the database." });
-      queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // To update the list view
-    },
-    onError: (error) => {
-      toast({ title: "Error Updating Scores", description: error.message, variant: "destructive" });
+      const scoreChanged = isOverallScoreValid && overallSiteSignalScore !== storedScore;
+      const completionChanged = isCompletionValid && completionPercentage !== storedCompletion;
+      
+      const scoreNowNullButWasNumber = overallSiteSignalScore === null && typeof storedScore === 'number';
+      const completionNowNullButWasNumber = completionPercentage === null && typeof storedCompletion === 'number';
+      
+      const scoreNowNumberButWasNull = typeof overallSiteSignalScore === 'number' && storedScore === null;
+      const completionNowNumberButWasNull = typeof completionPercentage === 'number' && storedCompletion === null;
+
+      if (scoreChanged || completionChanged || scoreNowNullButWasNumber || completionNowNullButWasNumber || scoreNowNumberButWasNull || completionNowNumberButWasNull) {
+        console.log("Recalculated scores differ or initialized, attempting to update DB.", {
+          assessmentId,
+          newScore: overallSiteSignalScore,
+          storedScore,
+          newCompletion: completionPercentage,
+          storedCompletion,
+        });
+        updateScoresMutation.mutate({ 
+          assessmentId, 
+          overallSiteSignalScore: typeof overallSiteSignalScore === 'number' ? overallSiteSignalScore : null, 
+          completionPercentage: typeof completionPercentage === 'number' ? completionPercentage : null 
+        });
+      }
     }
-  });
+  }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, updateScoresMutation, user]);
 
-  const handleSaveScores = () => {
-    if (overallSiteSignalScore === null && completionPercentage === null) {
-      toast({ title: "No Scores to Save", description: "Calculated scores are not available.", variant: "default" });
-      return;
-    }
-    updateAssessmentScoresMutation.mutate({
-      site_signal_score: overallSiteSignalScore,
-      completion_percentage: completionPercentage,
-    });
+  if (isLoadingAssessment || !assessment || !targetMetricSet) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading assessment details...</p></div>;
+  }
+
+  if (assessmentError) {
+    return <Alert variant="destructive" className="max-w-2xl mx-auto my-8">
+      <AlertTitle>Error Loading Assessment</AlertTitle>
+      <AlertDescription>{assessmentError.message}</AlertDescription>
+    </Alert>;
+  }
+
+  const getCategoryMetrics = (category: string) => {
+    return (targetMetricSet?.user_custom_metrics_settings || [])
+      .filter(setting => setting.category === category)
+      .map(setting => {
+        const metricDetail = detailedMetricScores.get(setting.metric_identifier);
+        const enteredDisplayValue = specificDropdownMetrics.includes(setting.metric_identifier)
+          ? getMetricLabelForValue(setting.metric_identifier, metricDetail?.enteredValue ?? null) ?? (metricDetail?.enteredValue?.toString() ?? 'N/A')
+          : metricDetail?.enteredValue?.toString() ?? 'N/A';
+        
+        const targetDisplayValue = specificDropdownMetrics.includes(setting.metric_identifier)
+          ? getMetricLabelForValue(setting.metric_identifier, metricDetail?.targetValue ?? null) ?? (metricDetail?.targetValue?.toString() ?? 'N/A')
+          : metricDetail?.targetValue?.toString() ?? 'N/A';
+
+        return {
+          label: setting.label,
+          enteredValue: enteredDisplayValue,
+          targetValue: targetDisplayValue,
+          score: metricDetail?.score,
+          notes: metricDetail?.notes,
+          imageUrl: assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url,
+        };
+      });
   };
   
-  const calculatedScoresDifferFromStored = useMemo(() => {
-    if (!assessment) return false;
-    const storedScore = assessment.site_signal_score;
-    const storedCompletion = assessment.completion_percentage;
-    
-    // Check if calculated scores are valid numbers before comparing
-    const isOverallScoreValid = typeof overallSiteSignalScore === 'number';
-    const isCompletionValid = typeof completionPercentage === 'number';
+  const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall`;
 
-    const scoreChanged = isOverallScoreValid && overallSiteSignalScore !== storedScore;
-    const completionChanged = isCompletionValid && completionPercentage !== storedCompletion;
-    
-    const scoreNowNullButWasNumber = overallSiteSignalScore === null && typeof storedScore === 'number';
-    const completionNowNullButWasNumber = completionPercentage === null && typeof storedCompletion === 'number';
-    
-    const scoreNowNumberButWasNull = typeof overallSiteSignalScore === 'number' && storedScore === null;
-    const completionNowNumberButWasNull = typeof completionPercentage === 'number' && storedCompletion === null;
-
-    return scoreChanged || completionChanged || scoreNowNullButWasNumber || completionNowNullButWasNumber || scoreNowNumberButWasNull || completionNowNumberButWasNull;
-  }, [assessment, overallSiteSignalScore, completionPercentage]);
-
-  if (isLoadingAssessment || isLoadingMetricSet || isLoadingMetricValues || isLoadingSiteVisitRatings) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Loading assessment details...</p>
-      </div>
-    );
-  }
-
-  if (assessmentError || metricSetError || metricValuesError || siteVisitRatingsError) {
-    return (
-      <div className="container mx-auto py-10 px-4 text-center">
-        <p className="text-destructive text-xl">
-          Error loading assessment details: {assessmentError?.message || metricSetError?.message || metricValuesError?.message || siteVisitRatingsError?.message}
-        </p>
-        <Button onClick={onBack} variant="outline" className="mt-6">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-      </div>
-    );
-  }
-
-  if (!assessment) {
-    return (
-      <div className="container mx-auto py-10 px-4 text-center">
-        <p className="text-xl">Assessment not found.</p>
-        <Button onClick={onBack} variant="outline" className="mt-6">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-      </div>
-    );
-  }
-
-  const getFullAddress = (assess: SiteAssessment) => {
-    const parts = [
-      assess.address_line1,
-      assess.address_line2,
-      assess.city,
-      assess.state_province,
-      assess.postal_code,
-      assess.country,
-    ];
-    return parts.filter(Boolean).join(', ');
-  };
-
-  const metricsByCategory: Record<string, (UserCustomMetricSetting & { entered_value?: number | null; notes?: string | null; score?: number | null })[]> = {};
-  metricsWithScores.forEach(mws => {
-    if (!metricsByCategory[mws.category]) {
-      metricsByCategory[mws.category] = [];
-    }
-    metricsByCategory[mws.category].push(mws);
-  });
+  const allCategories = targetMetricSet?.user_custom_metrics_settings 
+    ? [...new Set(targetMetricSet.user_custom_metrics_settings.map(m => m.category))] 
+    : [];
+  
+  const siteVisitSectionImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === 'site_visit_section_image_overall')?.image_url;
 
   return (
-    <div className="container mx-auto py-10 px-4 space-y-8">
-      <div className="flex justify-between items-center mb-6">
-        <Button onClick={onBack} variant="outline" size="lg">
-          <ArrowLeft className="mr-2 h-5 w-5" /> Back to Prospector Home
-        </Button>
-        {calculatedScoresDifferFromStored && (
-           <Button 
-            onClick={handleSaveScores} 
-            size="lg"
-            disabled={updateAssessmentScoresMutation.isPending}
-          >
-            {updateAssessmentScoresMutation.isPending ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-5 w-5" />
-            )}
-            Save Calculated Scores
-          </Button>
-        )}
-      </div>
-
+    <div className="container mx-auto py-8 px-4 space-y-8">
       <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-3xl font-bold text-primary flex items-center">
-                <MapPin className="h-7 w-7 mr-3 text-primary" />
-                {assessment.assessment_name || 'Site Assessment Details'}
-              </CardTitle>
-              <CardDescription className="text-md mt-1">
-                {getFullAddress(assessment)}
-              </CardDescription>
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-3xl font-bold text-primary flex items-center">
+              <Eye className="h-8 w-8 mr-3" />
+              Assessment: {assessment.site_name}
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Address: {assessment.address || 'Not specified'}
+            </CardDescription>
+          </div>
+          <div className="flex space-x-3">
+             <Button variant="outline" onClick={onBackToList}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+            </Button>
+            <Button onClick={() => onEdit(assessmentId, assessment.target_metric_set_id)}>
+              <Edit3 className="mr-2 h-4 w-4" /> Edit Assessment Data
+            </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground">Assessment ID</h3>
-              <p className="text-sm">{assessment.id}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground">Date Created</h3>
-              <p className="text-sm">{new Date(assessment.created_at).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground">Target Metric Set</h3>
-              <p className="text-sm text-primary font-semibold">{metricSet?.name || 'N/A'}</p>
-            </div>
-          </div>
-          
-          {/* Overall Scores Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t mt-6">
-            <div>
-              <h3 className="text-lg font-semibold text-primary flex items-center mb-2">
-                <TrendingUp className="h-5 w-5 mr-2" />
-                Overall Site Signal Score
-              </h3>
-              {overallSiteSignalScore !== null ? (
-                <div className="flex items-center">
-                  <Progress value={overallSiteSignalScore} className="w-3/4 mr-2 h-3" />
-                  <span className="text-xl font-bold">{overallSiteSignalScore}%</span>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Not enough data to calculate score.</p>
-              )}
-              <p className="text-xs text-muted-foreground mt-1">
-                Stored Score: {assessment.site_signal_score !== null ? `${assessment.site_signal_score}%` : 'N/A'}
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground/90 mb-2">Overall Site Signal Score</h3>
+            <div className="flex items-center space-x-2">
+              <TrendingUp className={`h-10 w-10 ${ (overallSiteSignalScore ?? 0) >= 70 ? 'text-green-500' : (overallSiteSignalScore ?? 0) >= 40 ? 'text-yellow-500' : 'text-red-500'}`} />
+              <p className={`text-4xl font-bold ${(overallSiteSignalScore ?? 0) >= 70 ? 'text-green-600' : (overallSiteSignalScore ?? 0) >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {typeof overallSiteSignalScore === 'number' ? `${overallSiteSignalScore.toFixed(0)}%` : 'N/A'}
               </p>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-primary flex items-center mb-2">
-                <CheckCircle className="h-5 w-5 mr-2" />
-                Completion Percentage
-              </h3>
-              <div className="flex items-center">
-                <Progress value={completionPercentage} className="w-3/4 mr-2 h-3" />
-                <span className="text-xl font-bold">{completionPercentage}%</span>
-              </div>
-               <p className="text-xs text-muted-foreground mt-1">
-                Stored Percentage: {assessment.completion_percentage !== null ? `${assessment.completion_percentage}%` : 'N/A'}
+            <p className="text-sm text-muted-foreground mt-1">
+              A measure of overall site suitability based on your targets.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground/90 mb-2">Assessment Completion</h3>
+            <div className="flex items-center space-x-2">
+              <CheckCircle className={`h-10 w-10 ${completionPercentage >= 100 ? 'text-green-500' : 'text-yellow-500'}`} />
+              <p className={`text-4xl font-bold ${completionPercentage >= 100 ? 'text-green-600' : 'text-yellow-600'}`}>
+                {completionPercentage.toFixed(0)}%
               </p>
             </div>
+             <Progress value={completionPercentage} className="w-full mt-2 h-3" />
+            <p className="text-sm text-muted-foreground mt-1">
+              Percentage of metrics with entered values.
+            </p>
           </div>
-
         </CardContent>
       </Card>
 
-      {/* New Card for Map Display */}
       {typeof assessment.latitude === 'number' && typeof assessment.longitude === 'number' && (
         <Card className="shadow-lg">
           <CardHeader>
@@ -312,121 +217,107 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </Card>
       )}
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold flex items-center">
-            <ListChecks className="h-6 w-6 mr-2 text-primary" />
-            Metric Values & Scores
-          </CardTitle>
-          <CardDescription>
-            Detailed breakdown of metric values and their calculated signal scores.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {Object.keys(metricsByCategory).length > 0 ? (
-            Object.entries(metricsByCategory).map(([category, values]) => (
-              <div key={category} className="mb-8 last:mb-0">
-                <h3 className="text-xl font-semibold text-primary mb-3 capitalize">{category}</h3>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[25%]">Metric</TableHead>
-                        <TableHead className="text-right w-[15%]">Entered Value</TableHead>
-                        <TableHead className="text-right w-[15%]">Target Value</TableHead>
-                        <TableHead className="text-right w-[15%]">Signal Score</TableHead>
-                        <TableHead className="w-[30%]">Notes</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {values.map((metric) => (
-                        <TableRow key={metric.metric_identifier}>
-                          <TableCell className="font-medium">{metric.label}</TableCell>
-                          <TableCell className="text-right">
-                            {typeof metric.entered_value === 'number' ? metric.entered_value : <span className="text-xs text-muted-foreground">N/A</span>}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {typeof metric.target_value === 'number' ? metric.target_value : <span className="text-xs text-muted-foreground">N/A</span>}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {typeof metric.score === 'number' ? (
-                              <Badge variant={metric.score >= 75 ? "success" : metric.score >= 50 ? "secondary" : "destructive"} className="text-sm">
-                                {metric.score}%
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">N/A</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground italic">
-                            {metric.notes || 'No notes'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+      {allCategories.map(category => {
+        const metricsForCategory = getCategoryMetrics(category);
+        if (metricsForCategory.length === 0) return null;
+        const categoryImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url;
+
+        return (
+          <Card key={category} className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold flex items-center">
+                <Tag className="h-6 w-6 mr-2 text-primary" />
+                {category}
+              </CardTitle>
+              {categoryImage && (
+                <CardDescription>Optional image for this section:</CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              {categoryImage && (
+                <div className="mb-6">
+                  <img src={categoryImage} alt={`${category} section image`} className="rounded-md max-h-80 w-auto object-contain border" />
                 </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground">No metric values have been recorded for this assessment yet, or metric set not fully loaded.</p>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold flex items-center">
-            <Eye className="h-6 w-6 mr-2 text-primary" />
-            Site Visit Ratings
-          </CardTitle>
-          <CardDescription>
-            Subjective ratings based on on-site observations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {siteVisitRatings && siteVisitRatings.length > 0 ? (
-            <div className="overflow-x-auto">
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[20%]">Criterion</TableHead>
-                    <TableHead className="text-center w-[10%]">Grade</TableHead>
-                    <TableHead className="w-[40%]">Description</TableHead>
+                    <TableHead className="w-[30%]">Metric</TableHead>
+                    <TableHead className="text-center">Entered Value</TableHead>
+                    <TableHead className="text-center">Target Value</TableHead>
+                    <TableHead className="text-center">Signal Score</TableHead>
                     <TableHead className="w-[30%]">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {siteVisitCriteria.map((criterion) => {
-                    const savedRating = siteVisitRatings.find(r => r.criterion_key === criterion.key);
-                    const gradeDetail = savedRating ? criterion.grades.find(g => g.grade === savedRating.rating_grade) : null;
-                    
-                    return (
-                      <TableRow key={criterion.key}>
-                        <TableCell className="font-medium">{criterion.label}</TableCell>
-                        <TableCell className="text-center">
-                          {savedRating ? (
-                            <Badge variant="secondary" className="text-sm">{savedRating.rating_grade}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">N/A</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {gradeDetail ? gradeDetail.description : (savedRating ? savedRating.rating_description || 'N/A' : <span className="text-muted-foreground text-xs">Not Rated</span>)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground italic">
-                          {savedRating?.notes || (savedRating ? 'No notes' : '')}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {metricsForCategory.map(metric => (
+                    <TableRow key={metric.label}>
+                      <TableCell className="font-medium">{metric.label}</TableCell>
+                      {/* Display label for specific dropdown metrics, else the value */}
+                      <TableCell className="text-center">{metric.enteredValue}</TableCell>
+                      <TableCell className="text-center">{metric.targetValue}</TableCell>
+                      <TableCell className="text-center">
+                        {typeof metric.score === 'number' 
+                          ? <Badge variant={metric.score >= 70 ? 'default' : metric.score >= 40 ? 'secondary' : 'destructive'}>
+                              {metric.score.toFixed(0)}%
+                            </Badge> 
+                          : <Badge variant="outline">N/A</Badge>}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{metric.notes || '-'}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No site visit ratings have been recorded for this assessment yet.</p>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        );
+      })}
+      
+      {siteVisitRatings && siteVisitRatings.length > 0 && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl font-semibold flex items-center">
+              <ListChecks className="h-6 w-6 mr-2 text-primary" />
+              Site Visit Ratings
+            </CardTitle>
+             {siteVisitSectionImage && (
+                <CardDescription>Optional image for this section:</CardDescription>
+              )}
+          </CardHeader>
+          <CardContent>
+            {siteVisitSectionImage && (
+                <div className="mb-6">
+                  <img src={siteVisitSectionImage} alt="Site Visit section image" className="rounded-md max-h-80 w-auto object-contain border" />
+                </div>
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30%]">Criterion</TableHead>
+                  <TableHead className="text-center">Rating</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-[30%]">Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {siteVisitRatings.map(rating => {
+                  const criterionDef = siteVisitCriteria.find(c => c.key === rating.criterion_key);
+                  return (
+                    <TableRow key={rating.criterion_key}>
+                      <TableCell className="font-medium">{criterionDef?.label || rating.criterion_key}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary">{rating.rating_grade || 'N/A'}</Badge>
+                      </TableCell>
+                       <TableCell className="text-sm text-muted-foreground">{rating.rating_description || criterionDef?.grades.find(g => g.grade === rating.rating_grade)?.description || '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{rating.notes || '-'}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

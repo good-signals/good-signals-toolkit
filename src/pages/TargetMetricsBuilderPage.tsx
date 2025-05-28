@@ -9,7 +9,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { TargetMetricsFormData, TargetMetricsFormSchema, UserCustomMetricSetting, VISITOR_PROFILE_CATEGORY, MEASUREMENT_TYPES, PredefinedMetricCategory, TargetMetricSet } from '@/types/targetMetrics';
-import { predefinedMetricsConfig, PredefinedMetricConfig } from '@/config/targetMetricsConfig';
+import { predefinedMetricsConfig as initialPredefinedMetricsConfig, PredefinedMetricConfig } from '@/config/targetMetricsConfig'; // Renamed to avoid conflict
+import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig'; // Import shared config
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -42,11 +43,11 @@ const TargetMetricsBuilderPage: React.FC = () => {
     defaultValues: {
       metric_set_id: routeMetricSetId, 
       metric_set_name: "", 
-      predefined_metrics: predefinedMetricsConfig.map(config => ({
+      predefined_metrics: initialPredefinedMetricsConfig.map(config => ({
         metric_identifier: config.metric_identifier,
         label: config.label,
         category: config.category,
-        target_value: 0,
+        target_value: specificDropdownMetrics.includes(config.metric_identifier) ? 50 : 0, // Default dropdowns to middle value
         higher_is_better: config.higher_is_better,
       })),
       visitor_profile_metrics: [],
@@ -79,14 +80,15 @@ const TargetMetricsBuilderPage: React.FC = () => {
 
   useEffect(() => {
     if (currentMetricSetId && existingMetricSet && existingMetrics) {
-      const predefinedMetricsData = predefinedMetricsConfig.map(config => {
+      const predefinedMetricsData = initialPredefinedMetricsConfig.map(config => {
         const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier);
+        let targetValue = existing?.target_value ?? (specificDropdownMetrics.includes(config.metric_identifier) ? 50 : 0);
         return {
           metric_identifier: config.metric_identifier,
           label: config.label,
           category: config.category,
-          target_value: existing?.target_value ?? 0,
-          higher_is_better: existing?.higher_is_better ?? config.higher_is_better, // Fallback to config
+          target_value: targetValue,
+          higher_is_better: existing?.higher_is_better ?? config.higher_is_better,
         };
       });
 
@@ -95,7 +97,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
         .map(s => ({
           metric_identifier: s.metric_identifier,
           label: s.label,
-          category: VISITOR_PROFILE_CATEGORY, // Ensure this is set
+          category: VISITOR_PROFILE_CATEGORY, 
           target_value: s.target_value,
           measurement_type: s.measurement_type as typeof MEASUREMENT_TYPES[number] | undefined,
           higher_is_better: s.higher_is_better,
@@ -111,11 +113,11 @@ const TargetMetricsBuilderPage: React.FC = () => {
       form.reset({
         metric_set_id: undefined,
         metric_set_name: "",
-        predefined_metrics: predefinedMetricsConfig.map(config => ({
+        predefined_metrics: initialPredefinedMetricsConfig.map(config => ({
             metric_identifier: config.metric_identifier,
             label: config.label,
             category: config.category,
-            target_value: 0,
+            target_value: specificDropdownMetrics.includes(config.metric_identifier) ? 50 : 0, // Default dropdowns to middle value
             higher_is_better: config.higher_is_better,
         })),
         visitor_profile_metrics: [],
@@ -141,10 +143,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
         operatingMetricSetId = newSet.id;
         setCurrentMetricSetId(newSet.id); 
         form.setValue('metric_set_id', newSet.id); 
-        // After creating a new set, navigate to its edit page to avoid confusion
-        // and allow further metric additions without creating duplicates on form resubmit.
-        // Or, simply stay on the page, and the form state reflects the new set.
-        // For now, let's update the URL to reflect the new set ID
         navigate(`/target-metrics-builder/${newSet.id}`, { replace: true });
       }
 
@@ -160,7 +158,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['userCustomMetricSettings', finalMetricSetId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['targetMetricSet', finalMetricSetId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id] });
-      // navigate('/target-metric-sets'); // Navigate to list page after save
     },
     onError: (error) => {
       sonnerToast.error(`Failed to save metrics: ${error.message}`);
@@ -181,8 +178,8 @@ const TargetMetricsBuilderPage: React.FC = () => {
   }
   
   const groupedPredefinedMetrics: Record<PredefinedMetricCategory, PredefinedMetricConfig[]> = 
-    predefinedMetricsConfig.reduce((acc, metric) => {
-      const category = metric.category as PredefinedMetricCategory; // Ensure category is of correct type
+    initialPredefinedMetricsConfig.reduce((acc, metric) => {
+      const category = metric.category as PredefinedMetricCategory;
       if (!acc[category]) {
         acc[category] = [];
       }
@@ -240,7 +237,8 @@ const TargetMetricsBuilderPage: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 {form.getValues().predefined_metrics.map((metric, index) => {
-                  const config = predefinedMetricsConfig.find(c => c.metric_identifier === metric.metric_identifier);
+                  // Get the original config for description and other static properties
+                  const config = initialPredefinedMetricsConfig.find(c => c.metric_identifier === metric.metric_identifier);
                   if (config?.category !== category) return null;
 
                   return (
@@ -254,14 +252,32 @@ const TargetMetricsBuilderPage: React.FC = () => {
                             <FormLabel className="text-base">{metric.label}</FormLabel>
                             {config?.description && <FormDescription>{config.description}</FormDescription>}
                             <FormDescription>
-                              {/* Ensure higher_is_better comes from the form values, falling back to config */}
                               {(form.getValues().predefined_metrics[index]?.higher_is_better ?? config?.higher_is_better) ? "(Higher is better)" : "(Lower is better)"}
                             </FormDescription>
                           </div>
                           <div className="sm:w-2/5">
-                            <FormControl>
-                              <Input type="number" placeholder="Enter target value" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                            </FormControl>
+                            {specificDropdownMetrics.includes(metric.metric_identifier) ? (
+                              <Select
+                                onValueChange={(value) => field.onChange(parseFloat(value))}
+                                value={String(field.value)}
+                                defaultValue={String(field.value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select target" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {metricDropdownOptions[metric.metric_identifier].map(option => (
+                                    <SelectItem key={option.value} value={String(option.value)}>
+                                      {option.label} ({option.value})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <FormControl>
+                                <Input type="number" placeholder="Enter target value" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                              </FormControl>
+                            )}
                           </div>
                            <div className="sm:w-1/5 min-h-[20px] mt-1 sm:mt-0"> <FormMessage /></div>
                         </FormItem>
@@ -343,7 +359,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
                         </FormItem>
                       )}
                     />
-                    {/* Hidden fields for metric_identifier and category */}
                     <Controller
                         name={`visitor_profile_metrics.${index}.metric_identifier`}
                         control={form.control}
@@ -352,7 +367,7 @@ const TargetMetricsBuilderPage: React.FC = () => {
                      <Controller
                         name={`visitor_profile_metrics.${index}.category`}
                         control={form.control}
-                        defaultValue={VISITOR_PROFILE_CATEGORY} // Already there
+                        defaultValue={VISITOR_PROFILE_CATEGORY}
                         render={({ field }) => <input type="hidden" {...field} />}
                     />
                   </div>

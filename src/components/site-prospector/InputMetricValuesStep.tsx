@@ -31,6 +31,9 @@ import {
 } from "@/components/ui/select";
 import ImageUploadField from './ImageUploadField';
 
+// Import shared config and remove local definitions
+import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
+
 // Constants for special image metric identifiers
 const SITE_VISIT_SECTION_IMAGE_IDENTIFIER = 'site_visit_section_image_overall';
 const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall`;
@@ -86,26 +89,6 @@ interface InputMetricValuesStepProps {
   onMetricsSubmitted: (assessmentId: string) => void;
   onBack: () => void;
 }
-
-const metricDropdownOptions: Record<string, Array<{ label: string; value: number }>> = {
-  market_saturation_trade_area_overlap: [
-    { label: "No Overlap", value: 100 },
-    { label: "Some Overlap", value: 50 },
-    { label: "Major Overlap", value: 0 },
-  ],
-  market_saturation_heat_map_intersection: [
-    { label: "Cold Spot", value: 100 },
-    { label: "Warm Spot", value: 50 },
-    { label: "Hot Spot", value: 0 },
-  ],
-  demand_supply_balance: [
-    { label: "Positive Demand", value: 100 },
-    { label: "Equal Demand", value: 50 },
-    { label: "Negative Demand", value: 0 },
-  ],
-};
-
-const specificDropdownMetrics = Object.keys(metricDropdownOptions);
 
 const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   assessmentId,
@@ -226,7 +209,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     replaceMetrics(allMetricsToSet);
     setImageOnlyMetricIndices(currentImageOnlyIndices);
 
-    // Initialize site visit ratings (no individual images anymore)
     if (siteVisitCriteria) {
       const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
         const existingRating = existingSiteVisitRatingsData?.find(r => r.criterion_key === criterion.key);
@@ -234,8 +216,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           criterion_key: criterion.key,
           grade: existingRating?.rating_grade || '',
           notes: existingRating?.notes || '',
-          // image_url: null, // Removed
-          // image_file: null, // Removed
         };
       });
       replaceSiteVisitRatings(initialSiteVisitRatingsData);
@@ -314,7 +294,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     } catch (e) {
         console.error("Exception while deleting image:", e);
     }
-};
+  };
 
   const onSubmitCombinedData: SubmitHandler<MetricValuesFormData> = async (formData) => {
     console.log("Form data submitted:", formData);
@@ -399,7 +379,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         rating_grade: svr.grade as SiteVisitRatingGrade,
         rating_description: gradeDetail?.description || '',
         notes: svr.notes || null,
-        // image_url: null, // No individual image for ratings
       };
     }).filter(Boolean) as AssessmentSiteVisitRatingInsert[];
 
