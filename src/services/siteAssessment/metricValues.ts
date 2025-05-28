@@ -12,6 +12,8 @@ export const saveAssessmentMetricValues = async (
   const valuesToSave = metricValues.map(mv => ({
     ...mv,
     assessment_id: assessmentId,
+    // For image-only metrics, use 0 as placeholder value since entered_value cannot be null
+    entered_value: mv.entered_value !== null ? mv.entered_value : 0,
   }));
 
   const { data, error } = await supabase
