@@ -74,42 +74,53 @@ const SiteProspectorPage = () => {
   
   const deleteMutation = useMutation({
     mutationFn: async (assessmentIds: string[]) => {
-      console.log('Attempting to delete assessments:', assessmentIds);
-      if (!user?.id) throw new Error("User not authenticated");
+      console.log('=== MUTATION STARTED ===');
+      console.log('Assessment IDs to delete:', assessmentIds);
+      console.log('User ID:', user?.id);
       
-      const deletionPromises = assessmentIds.map(async (assessmentId) => {
-        console.log('Deleting assessment:', assessmentId);
-        const assessment = assessments.find(a => a.id === assessmentId);
-        console.log('Assessment to delete:', assessment);
-        
+      if (!user?.id) {
+        console.error('User not authenticated');
+        throw new Error("User not authenticated");
+      }
+      
+      const results = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const assessmentId of assessmentIds) {
         try {
+          console.log(`Attempting to delete assessment: ${assessmentId}`);
           await deleteSiteAssessment(assessmentId, user.id);
-          console.log('Assessment deleted successfully:', assessmentId);
-          return { id: assessmentId, success: true };
+          console.log(`Successfully deleted assessment: ${assessmentId}`);
+          results.push({ id: assessmentId, success: true });
+          successCount++;
         } catch (error) {
-          console.error('Error deleting assessment:', assessmentId, error);
-          return { id: assessmentId, success: false, error };
+          console.error(`Failed to delete assessment ${assessmentId}:`, error);
+          results.push({ id: assessmentId, success: false, error });
+          failureCount++;
         }
-      });
-
-      const results = await Promise.allSettled(deletionPromises);
-      const successCount = results.filter(result => 
-        result.status === 'fulfilled' && result.value.success
-      ).length;
-      const failureCount = results.length - successCount;
-
-      if (failureCount > 0) {
-        console.error(`${failureCount} deletions failed out of ${results.length}`);
-        throw new Error(`Failed to delete ${failureCount} out of ${results.length} assessments`);
       }
 
-      return { successCount, deletedIds: assessmentIds };
+      console.log(`Deletion complete - Success: ${successCount}, Failures: ${failureCount}`);
+
+      if (failureCount > 0) {
+        const errorMessage = `Failed to delete ${failureCount} out of ${results.length} assessments`;
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      return { successCount, deletedIds: assessmentIds, results };
     },
     onSuccess: ({ successCount, deletedIds }) => { 
-      console.log('Bulk delete mutation success:', { successCount, deletedIds });
+      console.log('=== MUTATION SUCCESS ===');
+      console.log('Success count:', successCount);
+      console.log('Deleted IDs:', deletedIds);
+      
       toast({ 
         title: `Successfully deleted ${successCount} assessment${successCount > 1 ? 's' : ''}` 
       });
+      
+      // Invalidate and refetch the assessments
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
       setClearSelectionsKey(prev => prev + 1); 
       
@@ -117,13 +128,11 @@ const SiteProspectorPage = () => {
       if (activeAssessmentId && deletedIds.includes(activeAssessmentId)) {
         console.log('Deleted assessment was active, canceling process');
         handleCancelAssessmentProcess(); 
-      } else {
-        console.log('Refetching assessments after deletion');
-        refetchAssessments(); 
       }
     },
     onError: (error) => {
-      console.error('Bulk delete mutation error:', error);
+      console.log('=== MUTATION ERROR ===');
+      console.error('Deletion error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error deleting assessments",
@@ -131,16 +140,28 @@ const SiteProspectorPage = () => {
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      console.log('=== MUTATION SETTLED ===');
+      console.log('Mutation is now complete (success or error)');
+    }
   });
   
   const handleDeleteCommit = (idsToDelete: string[]) => {
-    console.log('handleDeleteCommit called with:', idsToDelete);
+    console.log('=== handleDeleteCommit called ===');
+    console.log('IDs to delete:', idsToDelete);
+    console.log('Current mutation state - isPending:', deleteMutation.isPending);
+    
     if (idsToDelete.length === 0) {
-      console.log('No assessments to delete');
+      console.log('No assessments to delete - aborting');
       return;
     }
     
-    // Delete all assessments in a single mutation
+    if (deleteMutation.isPending) {
+      console.log('Mutation already pending - aborting to prevent double deletion');
+      return;
+    }
+    
+    console.log('Starting deletion mutation...');
     deleteMutation.mutate(idsToDelete);
   };
 
@@ -261,6 +282,14 @@ const SiteProspectorPage = () => {
     }
   };
 
+  // Debug the current deletion state
+  console.log('SiteProspectorPage deletion state:', {
+    isPending: deleteMutation.isPending,
+    isError: deleteMutation.isError,
+    error: deleteMutation.error,
+    clearSelectionsKey
+  });
+
   if (currentStep === 'newAddress') {
     return <NewAssessmentForm 
               onAssessmentCreated={handleAddressStepCompleted} 
@@ -272,7 +301,7 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={handleBackFromMetricSelection} // Use specific handler
+              onBack={handleBackFromMetricSelection}
             />;
   }
 
@@ -286,14 +315,11 @@ const SiteProspectorPage = () => {
   }
   
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
-    // Loading state is now handled within SiteAssessmentDetailsView
-    // The check for activeAssessmentId and selectedMetricSetId ensures they are present
     return (
       <SiteAssessmentDetailsView
         assessmentId={activeAssessmentId}
-        selectedMetricSetId={selectedMetricSetId} // Pass selectedMetricSetId
-        onEditGoToInputMetrics={() => { // Pass callback to go to inputMetrics
-            // activeAssessmentId and selectedMetricSetId are in scope
+        selectedMetricSetId={selectedMetricSetId}
+        onEditGoToInputMetrics={() => {
             setCurrentStep('inputMetrics');
         }}
         onBackToList={handleCancelAssessmentProcess}

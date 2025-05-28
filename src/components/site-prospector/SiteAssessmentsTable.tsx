@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -47,9 +48,8 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   forceClearSelectionsKey,
 }) => {
   const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
-  const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null);
-  const [idsToDelete, setIdsToDelete] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [idsToDelete, setIdsToDelete] = useState<string[]>([]);
   const [showAttachmentsDialog, setShowAttachmentsDialog] = useState(false);
   const [selectedAssessmentForAttachments, setSelectedAssessmentForAttachments] = useState<SiteAssessment | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys | null; direction: 'asc' | 'desc' }>({
@@ -88,6 +88,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   });
 
   useEffect(() => {
+    console.log('Force clear selections triggered:', forceClearSelectionsKey);
     setSelectedAssessmentIds([]);
   }, [forceClearSelectionsKey]);
 
@@ -97,12 +98,12 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     );
   }, [assessmentsData]);
 
-  // Clear selections and close dialog when deletion completes
+  // Clear selections when deletion completes successfully
   useEffect(() => {
+    console.log('Deletion state changed - isDeleting:', isDeleting, 'showDeleteDialog:', showDeleteDialog);
     if (!isDeleting && showDeleteDialog) {
-      console.log('Deletion completed, clearing state');
+      console.log('Deletion completed successfully, clearing state');
       setShowDeleteDialog(false);
-      setAssessmentToDelete(null);
       setIdsToDelete([]);
       setSelectedAssessmentIds([]);
     }
@@ -158,39 +159,48 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   };
 
   const openDeleteDialog = (item: SiteAssessment | string[]) => {
-    console.log('Opening delete dialog for:', item);
+    console.log('=== Opening delete dialog ===');
+    console.log('Item to delete:', item);
+    console.log('Current isDeleting state:', isDeleting);
+    
     if (Array.isArray(item)) {
       if (item.length === 0) {
         console.log('No assessments selected for deletion');
         return;
       }
+      console.log('Setting up bulk deletion for IDs:', item);
       setIdsToDelete(item);
-      setAssessmentToDelete(null);
     } else {
-      setAssessmentToDelete(item);
+      console.log('Setting up single deletion for assessment:', item.id);
       setIdsToDelete([item.id]);
     }
+    
+    console.log('Opening delete dialog');
     setShowDeleteDialog(true);
   };
 
   const confirmDelete = () => {
-    console.log('Confirming delete...');
-    const finalIdsToDelete = assessmentToDelete ? [assessmentToDelete.id] : idsToDelete;
-    console.log('Final IDs to delete:', finalIdsToDelete);
+    console.log('=== Confirming delete ===');
+    console.log('IDs to delete:', idsToDelete);
+    console.log('Current isDeleting state:', isDeleting);
     
-    if (finalIdsToDelete.length === 0) {
-      console.log('No assessments to delete');
+    if (idsToDelete.length === 0) {
+      console.log('No assessments to delete - aborting');
       return;
     }
     
-    // Don't clear state here - let the useEffect handle it when deletion completes
-    onDeleteCommit(finalIdsToDelete);
+    if (isDeleting) {
+      console.log('Already deleting - aborting to prevent double deletion');
+      return;
+    }
+    
+    console.log('Calling onDeleteCommit with IDs:', idsToDelete);
+    onDeleteCommit(idsToDelete);
   };
 
   const cancelDelete = () => {
-    console.log('Canceling delete');
+    console.log('=== Canceling delete ===');
     setShowDeleteDialog(false);
-    setAssessmentToDelete(null);
     setIdsToDelete([]);
   };
 
@@ -203,14 +213,14 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     refetchDocuments();
   };
 
-  useEffect(() => {
-    if (!isDeleting && showDeleteDialog) {
-      setShowDeleteDialog(false);
-      setAssessmentToDelete(null);
-      setIdsToDelete([]);
-      setSelectedAssessmentIds([]);
-    }
-  }, [isDeleting, showDeleteDialog]);
+  // Debug the delete dialog state
+  console.log('Delete dialog state:', {
+    showDeleteDialog,
+    idsToDelete,
+    isDeleting,
+    selectedAssessmentIds,
+    assessmentsCount: assessmentsData.length
+  });
 
   if (isLoading) {
     return (
@@ -241,7 +251,10 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => openDeleteDialog(selectedAssessmentIds)}
+            onClick={() => {
+              console.log('Delete selected button clicked with IDs:', selectedAssessmentIds);
+              openDeleteDialog(selectedAssessmentIds);
+            }}
             disabled={isDeleting}
           >
             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
@@ -259,34 +272,51 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
         onSelectRow={handleSelectRow}
         onViewDetails={onViewDetails}
         onEdit={onEdit}
-        onDelete={openDeleteDialog}
+        onDelete={(assessment) => {
+          console.log('Single delete clicked for assessment:', assessment.id);
+          openDeleteDialog(assessment);
+        }}
         onAttachmentsClick={handleAttachmentsClick}
         isDeleting={isDeleting}
-        assessmentToDelete={assessmentToDelete}
+        assessmentToDelete={null}
         documentCounts={documentCounts}
       />
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
-        if (!open && !isDeleting) {
-          cancelDelete();
-        }
-      }}>
+      <AlertDialog 
+        open={showDeleteDialog} 
+        onOpenChange={(open) => {
+          console.log('AlertDialog onOpenChange called with:', open);
+          if (!open && !isDeleting) {
+            console.log('Closing dialog via onOpenChange');
+            cancelDelete();
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
             <AlertDialogDescription>
-              {assessmentToDelete
-                ? `This will permanently delete the assessment "${assessmentToDelete.assessment_name || assessmentToDelete.id}" and all associated data (metric values, site visit ratings, and documents).`
-                : `This will permanently delete ${idsToDelete.length} selected assessment(s) and all associated data.`}
+              {idsToDelete.length === 1
+                ? `This will permanently delete 1 assessment and all associated data (metric values, site visit ratings, and documents).`
+                : `This will permanently delete ${idsToDelete.length} assessments and all associated data.`}
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelDelete} disabled={isDeleting}>
+            <AlertDialogCancel 
+              onClick={() => {
+                console.log('Cancel button clicked');
+                cancelDelete();
+              }} 
+              disabled={isDeleting}
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={() => {
+                console.log('Delete button clicked');
+                confirmDelete();
+              }}
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
