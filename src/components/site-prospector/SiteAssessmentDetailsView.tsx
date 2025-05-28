@@ -1,5 +1,4 @@
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
 import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
+import { getTargetMetricSetById } from '@/services/targetMetricsService'; // Added import
 import { TargetMetricSet } from '@/types/targetMetrics';
 import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig';
 import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -25,12 +25,17 @@ import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
-  targetMetricSet: TargetMetricSet | null;
-  onEdit: (assessmentId: string, targetMetricSetId: string) => void;
+  selectedMetricSetId: string; // Changed from targetMetricSet, must be non-null
+  onEditGoToInputMetrics: () => void; // Renamed for clarity
   onBackToList: () => void;
 }
 
-const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ assessmentId, targetMetricSet, onEdit, onBackToList }) => {
+const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
+  assessmentId,
+  selectedMetricSetId, // Using this prop now
+  onEditGoToInputMetrics,
+  onBackToList,
+}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -40,9 +45,19 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     enabled: !!assessmentId,
   });
 
+  // Fetch TargetMetricSet internally
+  const { data: targetMetricSet, isLoading: isLoadingTargetMetricSet, error: targetMetricSetError } = useQuery<TargetMetricSet | null, Error>({
+    queryKey: ['targetMetricSetForDetailsView', selectedMetricSetId, user?.id],
+    queryFn: async () => {
+      if (!user?.id || !selectedMetricSetId) return null;
+      return getTargetMetricSetById(selectedMetricSetId, user.id);
+    },
+    enabled: !!user?.id && !!selectedMetricSetId,
+  });
+
   const { data: userAccounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
     queryKey: ['userAdminAccounts', user?.id],
-    queryFn: () => fetchUserAccountsWithAdminRole(user!.id),
+    queryFn: () => user ? fetchUserAccountsWithAdminRole(user.id) : Promise.resolve([]),
     enabled: !!user,
   });
 
@@ -59,7 +74,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     onSuccess: () => {
       toast({ title: "Scores Updated", description: "The assessment scores have been recalculated and saved." });
       queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
-      queryClient.invalidateQueries({ queryKey: ['siteAssessmentsList', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // Corrected key for list
     },
     onError: (error: Error) => {
       toast({ title: "Score Update Failed", description: `Could not save updated scores: ${error.message}`, variant: "destructive" });
@@ -107,7 +122,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
   }, [targetMetricSet, metricValues]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (assessment && targetMetricSet && user) {
       const storedScore = assessment.site_signal_score;
       const storedCompletion = assessment.completion_percentage;
@@ -147,7 +162,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     accountSettings?.signal_bad_threshold
   );
 
-  if (isLoadingAssessment || isLoadingAccounts || !assessment || !targetMetricSet) {
+  if (isLoadingAssessment || isLoadingAccounts || isLoadingTargetMetricSet) { // Added isLoadingTargetMetricSet
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading assessment details...</p></div>;
   }
 
@@ -156,6 +171,27 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
       <AlertTitle>Error Loading Assessment</AlertTitle>
       <AlertDescription>{assessmentError.message}</AlertDescription>
     </Alert>;
+  }
+
+  if (targetMetricSetError) { // Added error handling for targetMetricSet
+     return <Alert variant="destructive" className="max-w-2xl mx-auto my-8">
+       <AlertTitle>Error Loading Target Metric Set</AlertTitle>
+       <AlertDescription>{targetMetricSetError.message}</AlertDescription>
+     </Alert>;
+  }
+  
+  if (!assessment || !targetMetricSet) { // Added check for targetMetricSet
+     return (
+        <div className="flex flex-col items-center justify-center h-screen">
+            <Alert variant="warning" className="max-w-2xl mx-auto my-8">
+                <AlertTitle>Incomplete Data</AlertTitle>
+                <AlertDescription>Could not load complete assessment details. The target metric set might be missing or invalid.</AlertDescription>
+            </Alert>
+            <Button variant="outline" onClick={onBackToList} className="mt-4">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+            </Button>
+        </div>
+     );
   }
 
   const getCategoryMetrics = (category: string): ProcessedMetric[] => {
@@ -223,7 +259,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
              <Button variant="outline" onClick={onBackToList}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
             </Button>
-            <Button onClick={() => onEdit(assessmentId, assessment.target_metric_set_id || '')}>
+            <Button onClick={onEditGoToInputMetrics}> {/* Uses renamed prop */}
               <Edit3 className="mr-2 h-4 w-4" /> Edit Assessment Data
             </Button>
           </div>
@@ -280,4 +316,3 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
 };
 
 export default SiteAssessmentDetailsView;
-

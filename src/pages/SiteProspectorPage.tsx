@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,6 @@ import SiteAssessmentsTable from '@/components/site-prospector/SiteAssessmentsTa
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/siteAssessmentService';
-import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
 
@@ -74,28 +72,18 @@ const SiteProspectorPage = () => {
     enabled: !!user?.id && currentStep === 'idle',
   });
   
-  const { data: fetchedTargetMetricSetForDetails, isLoading: isLoadingTargetMetricSetForDetails } = useQuery({
-    queryKey: ['targetMetricSetForDetailsView', selectedMetricSetId, user?.id],
-    queryFn: async () => {
-      if (!user?.id || !selectedMetricSetId) return null;
-      return getTargetMetricSetById(selectedMetricSetId, user.id);
-    },
-    enabled: !!user?.id && !!selectedMetricSetId && currentStep === 'assessmentDetails',
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (assessmentId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
       return deleteSiteAssessment(assessmentId, user.id);
     },
-    onSuccess: (_data, deletedAssessmentId) => { // _data is void, variables is assessmentId
+    onSuccess: (_data, deletedAssessmentId) => { 
       toast({ title: "Assessment deleted successfully." });
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
-      setClearSelectionsKey(prev => prev + 1); // Trigger selection clear in table
+      setClearSelectionsKey(prev => prev + 1); 
       
-      // Ensure we are back to idle state if current view was related to deleted item
       if (deletedAssessmentId === activeAssessmentId) {
-        handleCancelAssessmentProcess(); // This will also refetch
+        handleCancelAssessmentProcess(); 
       } else {
          refetchAssessments(); 
       }
@@ -106,7 +94,6 @@ const SiteProspectorPage = () => {
         description: error.message,
         variant: "destructive",
       });
-      // Dialog is in child, child will handle its visibility based on isDeleting prop.
     },
   });
   
@@ -213,9 +200,7 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={() => {
-                setCurrentStep('newAddress'); 
-              }}
+              onBack={handleBackFromMetricSelection} // Use specific handler
             />;
   }
 
@@ -229,15 +214,14 @@ const SiteProspectorPage = () => {
   }
   
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
-    if (isLoadingAssessments || isLoadingTargetMetricSetForDetails) {
-        return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading details...</p></div>;
-    }
-    
+    // Loading state is now handled within SiteAssessmentDetailsView
+    // The check for activeAssessmentId and selectedMetricSetId ensures they are present
     return (
       <SiteAssessmentDetailsView
         assessmentId={activeAssessmentId}
-        targetMetricSet={fetchedTargetMetricSetForDetails || null}
-        onEdit={() => {
+        selectedMetricSetId={selectedMetricSetId} // Pass selectedMetricSetId
+        onEditGoToInputMetrics={() => { // Pass callback to go to inputMetrics
+            // activeAssessmentId and selectedMetricSetId are in scope
             setCurrentStep('inputMetrics');
         }}
         onBackToList={handleCancelAssessmentProcess}
