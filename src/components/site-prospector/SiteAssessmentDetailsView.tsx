@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon } from 'lucide-react';
@@ -14,7 +15,13 @@ import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateC
 import { toast } from '@/components/ui/use-toast';
 import AddressMapDisplay from './AddressMapDisplay';
 import { getMetricLabelForValue, specificDropdownMetrics } from '@/config/metricDisplayConfig';
-import { getSignalStatus, SignalStatus } from '@/lib/assessmentDisplayUtils';
+import { getSignalStatus, SignalStatus } from '@/lib/assessmentDisplayUtils'; // Keep existing import
+
+// Add missing imports
+import OverallScoreDisplay from './OverallScoreDisplay';
+import MetricCategorySection, { ProcessedMetric } from './MetricCategorySection';
+import SiteVisitRatingsSection from './SiteVisitRatingsSection';
+
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
@@ -273,3 +280,4 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
 };
 
 export default SiteAssessmentDetailsView;
+
