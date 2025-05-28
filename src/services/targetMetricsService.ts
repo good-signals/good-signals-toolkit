@@ -118,21 +118,58 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
     return null;
   }
 
-  // Fetch associated custom metrics
-  const { data: customMetricsData, error: customMetricsError } = await supabase
+  // Fetch associated user custom metrics settings
+  const { data: userMetricsData, error: userMetricsError } = await supabase
     .from(USER_METRICS_TABLE_NAME)
     .select('*')
     .eq('metric_set_id', metricSetId);
 
-  if (customMetricsError) {
-    console.error('Error fetching user custom metric settings for set:', customMetricsError);
+  if (userMetricsError) {
+    console.error('Error fetching user custom metric settings for set:', userMetricsError);
   }
+
+  // Fetch account custom metrics to ensure all custom metrics are available
+  const { data: accountCustomMetrics, error: accountCustomMetricsError } = await supabase
+    .from('account_custom_metrics')
+    .select('*')
+    .eq('account_id', accountId);
+
+  if (accountCustomMetricsError) {
+    console.error('Error fetching account custom metrics:', accountCustomMetricsError);
+  }
+
+  // Convert account custom metrics to user metric settings format for any that don't have settings yet
+  const existingMetricIdentifiers = new Set((userMetricsData || []).map(m => m.metric_identifier));
+  const missingCustomMetrics = (accountCustomMetrics || []).filter(
+    customMetric => !existingMetricIdentifiers.has(customMetric.metric_identifier)
+  );
+
+  // Create placeholder settings for custom metrics that don't have settings yet
+  const placeholderSettings: UserCustomMetricSetting[] = missingCustomMetrics.map(customMetric => ({
+    id: undefined,
+    user_id: userId,
+    account_id: accountId,
+    metric_set_id: metricSetId,
+    metric_identifier: customMetric.metric_identifier,
+    category: customMetric.category,
+    label: customMetric.name,
+    target_value: customMetric.default_target_value || 0,
+    measurement_type: null,
+    higher_is_better: customMetric.higher_is_better,
+    created_at: undefined,
+    updated_at: undefined,
+  }));
+
+  const allMetricsSettings = [
+    ...(userMetricsData ? z.array(UserCustomMetricSettingSchema).parse(userMetricsData) : []),
+    ...placeholderSettings
+  ];
   
   const parsedMetricSet = TargetMetricSetSchema.parse(metricSetData);
   
   return {
     ...parsedMetricSet,
-    user_custom_metrics_settings: customMetricsData ? z.array(UserCustomMetricSettingSchema).parse(customMetricsData) : [],
+    user_custom_metrics_settings: allMetricsSettings,
   };
 }
 
