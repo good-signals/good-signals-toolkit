@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,11 @@ interface SelectTargetMetricSetStepProps {
   onBack: () => void; // To go back to the address step or cancel
 }
 
-const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({ assessmentId, onMetricSetSelected, onBack }) => {
+const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({
+  assessmentId,
+  onMetricSetSelected,
+  onBack,
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -33,18 +36,17 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({ a
     enabled: !!user?.id,
   });
 
-  const mutation = useMutation({
-    mutationFn: (metricSetIdToSave: string) => {
+  const updateAssessmentMutation = useMutation({
+    mutationFn: (targetMetricSetId: string) => {
       if (!user?.id) throw new Error('User not authenticated');
-      return updateSiteAssessment(assessmentId, { target_metric_set_id: metricSetIdToSave }, user.id);
+      return updateSiteAssessment(assessmentId, { target_metric_set_id: targetMetricSetId }, user.id);
     },
-    onSuccess: (_, metricSetIdToSave) => {
-      toast({ title: "Success", description: "Target metric set selected." });
-      queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] });
-      onMetricSetSelected(assessmentId, metricSetIdToSave);
+    onSuccess: (data) => {
+      toast({ title: "Success", description: "Target metric set has been selected successfully." });
+      onMetricSetSelected(data.target_metric_set_id!);
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: `Failed to select metric set: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to update assessment: ${error.message}`, variant: "destructive" });
     },
   });
 
@@ -53,7 +55,7 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({ a
       toast({ title: "Validation Error", description: "Please select a target metric set.", variant: "destructive" });
       return;
     }
-    mutation.mutate(selectedMetricSetId);
+    updateAssessmentMutation.mutate(selectedMetricSetId);
   };
 
   if (isLoadingMetricSets) {
@@ -109,7 +111,7 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({ a
               ))}
             </SelectContent>
           </Select>
-          {!selectedMetricSetId && mutation.isError && <p className="text-sm text-destructive mt-1">Please select a metric set.</p>}
+          {!selectedMetricSetId && updateAssessmentMutation.isError && <p className="text-sm text-destructive mt-1">Please select a metric set.</p>}
         </div>
         <p className="text-sm text-muted-foreground pt-4">
           The selected metric set will define the criteria for this site assessment.
@@ -117,11 +119,11 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({ a
         </p>
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack} disabled={mutation.isPending}>
+        <Button type="button" variant="outline" onClick={onBack} disabled={updateAssessmentMutation.isPending}>
           Back
         </Button>
-        <Button type="button" onClick={handleSubmit} disabled={mutation.isPending || !selectedMetricSetId}>
-          {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        <Button type="button" onClick={handleSubmit} disabled={updateAssessmentMutation.isPending || !selectedMetricSetId}>
+          {updateAssessmentMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Next: Input Metrics
         </Button>
       </CardFooter>
@@ -130,4 +132,3 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({ a
 };
 
 export default SelectTargetMetricSetStep;
-

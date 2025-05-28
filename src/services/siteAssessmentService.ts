@@ -1,3 +1,4 @@
+
 // Main service file that re-exports all functionality for backward compatibility
 export * from './siteAssessment/crudOperations';
 export * from './siteAssessment/siteVisitRatings';
@@ -15,12 +16,7 @@ import {
   getSiteAssessmentsFromDb,
   updateSiteStatusInDb
 } from './siteAssessment/crudOperations';
-import { upsertMetricValues, getMetricValuesForAssessment } from './siteAssessment/metricValues';
-import { upsertSiteVisitRatings, getSiteVisitRatingsForAssessment } from './siteAssessment/siteVisitRatings';
-import { updateAssessmentScoresInDb } from './siteAssessment/scoring';
-import { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary } from './siteAssessment/summary';
 
-// ... keep existing code (createSiteAssessment, updateSiteAssessment, deleteSiteAssessment, getSiteAssessmentsForUser, getAssessmentDetails functions) the same ...
 export const createSiteAssessment = async (
   assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'>,
   userId: string
@@ -30,10 +26,10 @@ export const createSiteAssessment = async (
 
 export const updateSiteAssessment = async (
   assessmentId: string,
-  targetMetricSetId: string,
+  updates: { target_metric_set_id?: string; site_status?: string },
   userId: string
 ): Promise<SiteAssessment> => {
-  return updateSiteAssessmentInDb(assessmentId, { target_metric_set_id: targetMetricSetId }, userId);
+  return updateSiteAssessmentInDb(assessmentId, updates, userId);
 };
 
 export const deleteSiteAssessment = async (
@@ -50,9 +46,13 @@ export const getSiteAssessmentsForUser = async (userId: string): Promise<SiteAss
 export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAssessment> => {
   const assessment = await getSiteAssessmentFromDb(assessmentId);
   
+  // Import the functions we need
+  const { getAssessmentMetricValues } = await import('./siteAssessment/metricValues');
+  const { getSiteVisitRatings } = await import('./siteAssessment/siteVisitRatings');
+  
   const [metricValues, siteVisitRatings] = await Promise.all([
-    getMetricValuesForAssessment(assessmentId),
-    getSiteVisitRatingsForAssessment(assessmentId)
+    getAssessmentMetricValues(assessmentId),
+    getSiteVisitRatings(assessmentId)
   ]);
 
   return {
@@ -66,14 +66,16 @@ export const saveMetricValuesForAssessment = async (
   assessmentId: string,
   metricValues: AssessmentMetricValueInsert[]
 ): Promise<void> => {
-  return upsertMetricValues(assessmentId, metricValues);
+  const { saveAssessmentMetricValues } = await import('./siteAssessment/metricValues');
+  return saveAssessmentMetricValues(assessmentId, metricValues);
 };
 
 export const saveSiteVisitRatingsForAssessment = async (
   assessmentId: string,
   siteVisitRatings: AssessmentSiteVisitRatingInsert[]
 ): Promise<void> => {
-  return upsertSiteVisitRatings(assessmentId, siteVisitRatings);
+  const { saveSiteVisitRatings } = await import('./siteAssessment/siteVisitRatings');
+  return saveSiteVisitRatings(assessmentId, siteVisitRatings);
 };
 
 export const updateAssessmentScores = async (
@@ -81,7 +83,8 @@ export const updateAssessmentScores = async (
   overallSiteSignalScore: number | null,
   completionPercentage: number | null
 ): Promise<void> => {
-  return updateAssessmentScoresInDb(assessmentId, overallSiteSignalScore, completionPercentage);
+  const { updateAssessmentScores: updateScores } = await import('./siteAssessment/scoring');
+  return updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
 };
 
 // New function to update site status
@@ -93,4 +96,4 @@ export const updateSiteStatus = async (
   return updateSiteStatusInDb(assessmentId, siteStatus, userId);
 };
 
-export { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary };
+export { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary } from './siteAssessment/summary';

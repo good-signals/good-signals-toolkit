@@ -12,10 +12,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, ArrowRight, ArrowLeft, Info, Save } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
-import { saveAssessmentMetricValues, getAssessmentMetricValues, getSiteVisitRatings, saveSiteVisitRatings } from '@/services/siteAssessmentService';
+import { saveAssessmentMetricValues, getAssessmentMetricValues, getSiteVisitRatings, saveSiteVisitRatings, updateSiteStatus, getAssessmentDetails } from '@/services/siteAssessmentService';
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
 import { AssessmentMetricValueInsert, siteVisitCriteria, SiteVisitCriterionKey, SiteVisitRatingGrade, AssessmentSiteVisitRatingInsert, AssessmentMetricValue } from '@/types/siteAssessmentTypes';
 import { supabase } from '@/integrations/supabase/client';
+import SiteStatusSelector from './SiteStatusSelector';
 import {
   Tooltip,
   TooltipContent,
@@ -79,6 +80,7 @@ const siteVisitRatingItemSchema = z.object({
 const formSchema = z.object({
   metrics: z.array(metricValueSchema),
   siteVisitRatings: z.array(siteVisitRatingItemSchema),
+  siteStatus: z.string().optional(),
 });
 
 type MetricValuesFormData = z.infer<typeof formSchema>;
@@ -99,6 +101,13 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Add query for current assessment details to get site status
+  const { data: currentAssessment } = useQuery({
+    queryKey: ['assessment', assessmentId],
+    queryFn: () => getAssessmentDetails(assessmentId),
+    enabled: !!assessmentId,
+  });
 
   const { data: metricSet, isLoading: isLoadingMetricSet, error: metricSetError } = useQuery<TargetMetricSet | null, Error>({
     queryKey: ['targetMetricSet', targetMetricSetId, user?.id],
@@ -123,7 +132,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   
   const { control, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = useForm<MetricValuesFormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: { metrics: [], siteVisitRatings: [] },
+    defaultValues: { metrics: [], siteVisitRatings: [], siteStatus: 'Prospect' },
   });
 
   const { fields: metricFields, replace: replaceMetrics, append: appendMetric, remove: removeMetric } = useFieldArray({
@@ -139,6 +148,20 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   // State to manage the indices of image-only metrics within the metrics array
   const [imageOnlyMetricIndices, setImageOnlyMetricIndices] = useState<Record<string, number>>({});
 
+  // Add mutation for updating site status
+  const updateSiteStatusMutation = useMutation({
+    mutationFn: ({ siteStatus }: { siteStatus: string }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return updateSiteStatus(assessmentId, siteStatus, user.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessment', assessmentId] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error Updating Status", description: `Failed to update site status: ${error.message}`, variant: "destructive" });
+    },
+  });
 
   // Initialize form data
   useEffect(() => {
@@ -221,7 +244,12 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       replaceSiteVisitRatings(initialSiteVisitRatingsData);
     }
 
-  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings]);
+    // Set the initial site status
+    if (currentAssessment?.site_status) {
+      setValue('siteStatus', currentAssessment.site_status);
+    }
+
+  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, setValue]);
 
   const metricsMutation = useMutation({
     mutationFn: (data: AssessmentMetricValueInsert[]) => {
@@ -471,261 +499,268 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         
         <form onSubmit={handleSubmit(onSubmitCombinedData)}>
           <CardContent className="space-y-8 pt-4">
-            {(metricSet && metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) || siteVisitRatingFields.length > 0 ? (
-              <>
-                {/* Metric Sections with Category Image Upload */}
-                {Object.entries(metricsByCategory).map(([category, categoryMetrics]) => {
-                  const categoryImageIdentifier = getCategorySpecificImageIdentifier(category);
-                  const imageMetricIndex = imageOnlyMetricIndices[categoryImageIdentifier];
-                  
-                  return (
-                    <div key={category} className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0">
-                      <h3 className="text-lg font-semibold text-primary">{category}</h3>
-                      
-                      {/* Individual Metrics within the category */}
-                      {categoryMetrics.map((metricField) => (
-                        <div key={metricField.id} className="p-4 border rounded-md shadow-sm bg-card">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                            <div>
-                              <Label htmlFor={`metrics.${metricField.originalIndex}.entered_value`} className="flex items-center">
-                                {metricField.label}
-                                <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-3 w-3 ml-1.5 text-muted-foreground cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-xs">
-                                    <p>Target: {metricField.target_value ?? 'N/A'} ({metricField.higher_is_better ? "Higher is better" : "Lower is better"})</p>
-                                    {metricField.measurement_type && <p>Type: {metricField.measurement_type}</p>}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </Label>
-                              
-                              {specificDropdownMetrics.includes(metricField.metric_identifier) ? (
-                                <Controller
-                                  name={`metrics.${metricField.originalIndex}.entered_value`}
-                                  control={control}
-                                  render={({ field: controllerField }) => (
-                                    <Select
-                                      value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
-                                      onValueChange={(value) => controllerField.onChange(parseFloat(value))}
-                                      disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                    >
-                                      <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
-                                        <SelectValue placeholder={`Select value for ${metricField.label}`} />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {metricDropdownOptions[metricField.metric_identifier].map(option => (
-                                          <SelectItem key={option.value} value={String(option.value)}>
-                                            {option.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  )}
-                                />
-                              ) : (
-                                <Controller
-                                  name={`metrics.${metricField.originalIndex}.entered_value`}
-                                  control={control}
-                                  render={({ field: controllerField }) => (
-                                    <Input
-                                      {...controllerField}
-                                      id={`metrics.${metricField.originalIndex}.entered_value`}
-                                      type="number"
-                                      step="any"
-                                      placeholder={`Enter value for ${metricField.label}`}
-                                      className="mt-1"
-                                      value={controllerField.value === null || controllerField.value === undefined ? '' : String(controllerField.value)}
-                                      onChange={e => controllerField.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
-                                      disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                    />
-                                  )}
-                                />
-                              )}
-                              {errors.metrics?.[metricField.originalIndex]?.entered_value && (
-                                <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message as string}</p>
-                              )}
-                            </div>
-                            <div>
-                              <Label htmlFor={`metrics.${metricField.originalIndex}.notes`}>Notes (Optional)</Label>
-                              <Controller
-                                name={`metrics.${metricField.originalIndex}.notes`}
-                                control={control}
-                                render={({ field: controllerField }) => (
-                                  <Textarea
-                                    {...controllerField}
-                                    id={`metrics.${metricField.originalIndex}.notes`}
-                                    placeholder="Any specific observations or context..."
-                                    className="mt-1"
-                                    value={controllerField.value ?? ''}
-                                    onChange={e => controllerField.onChange(e.target.value)}
-                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                  />
-                                )}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+            {/* Site Status Selector */}
+            <div className="p-4 border rounded-md shadow-sm bg-primary/5">
+              <Controller
+                name="siteStatus"
+                control={control}
+                render={({ field }) => (
+                  <SiteStatusSelector
+                    value={field.value || 'Prospect'}
+                    onValueChange={field.onChange}
+                    label="Site Status"
+                    showBadge={true}
+                  />
+                )}
+              />
+            </div>
 
-                      {/* Category Image Upload Field - MOVED TO THE END OF THE CATEGORY SECTION */}
-                      {imageMetricIndex !== undefined && metricFields[imageMetricIndex] && (
-                        <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mt-6"> {/* Added mt-6 for spacing */}
-                          <Label htmlFor={`metrics.${imageMetricIndex}.image`}>{`Optional Image for ${category} Section`}</Label>
+            {/* Metric Sections with Category Image Upload */}
+            {Object.entries(metricsByCategory).map(([category, categoryMetrics]) => {
+              const categoryImageIdentifier = getCategorySpecificImageIdentifier(category);
+              const imageMetricIndex = imageOnlyMetricIndices[categoryImageIdentifier];
+              
+              return (
+                <div key={category} className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0">
+                  <h3 className="text-lg font-semibold text-primary">{category}</h3>
+                  
+                  {/* Individual Metrics within the category */}
+                  {categoryMetrics.map((metricField) => (
+                    <div key={metricField.id} className="p-4 border rounded-md shadow-sm bg-card">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                        <div>
+                          <Label htmlFor={`metrics.${metricField.originalIndex}.entered_value`} className="flex items-center">
+                            {metricField.label}
+                            <Tooltip delayDuration={100}>
+                              <TooltipTrigger asChild>
+                                <Info className="h-3 w-3 ml-1.5 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p>Target: {metricField.target_value ?? 'N/A'} ({metricField.higher_is_better ? "Higher is better" : "Lower is better"})</p>
+                                {metricField.measurement_type && <p>Type: {metricField.measurement_type}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </Label>
+                          
+                          {specificDropdownMetrics.includes(metricField.metric_identifier) ? (
+                            <Controller
+                              name={`metrics.${metricField.originalIndex}.entered_value`}
+                              control={control}
+                              render={({ field: controllerField }) => (
+                                <Select
+                                  value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
+                                  onValueChange={(value) => controllerField.onChange(parseFloat(value))}
+                                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                                >
+                                  <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
+                                    <SelectValue placeholder={`Select value for ${metricField.label}`} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {metricDropdownOptions[metricField.metric_identifier].map(option => (
+                                      <SelectItem key={option.value} value={String(option.value)}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          ) : (
+                            <Controller
+                              name={`metrics.${metricField.originalIndex}.entered_value`}
+                              control={control}
+                              render={({ field: controllerField }) => (
+                                <Input
+                                  {...controllerField}
+                                  id={`metrics.${metricField.originalIndex}.entered_value`}
+                                  type="number"
+                                  step="any"
+                                  placeholder={`Enter value for ${metricField.label}`}
+                                  className="mt-1"
+                                  value={controllerField.value === null || controllerField.value === undefined ? '' : String(controllerField.value)}
+                                  onChange={e => controllerField.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                                />
+                              )}
+                            />
+                          )}
+                          {errors.metrics?.[metricField.originalIndex]?.entered_value && (
+                            <p className="text-sm text-destructive mt-1">{errors.metrics[metricField.originalIndex]?.entered_value?.message as string}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label htmlFor={`metrics.${metricField.originalIndex}.notes`}>Notes (Optional)</Label>
                           <Controller
-                            name={`metrics.${imageMetricIndex}.image_file` as any} // Cast as any due to dynamic name
+                            name={`metrics.${metricField.originalIndex}.notes`}
                             control={control}
-                            render={() => (
-                              <ImageUploadField
-                                id={`metrics.${imageMetricIndex}.image`}
-                                currentImageUrl={watch(`metrics.${imageMetricIndex}.image_url` as any)}
-                                onFileChange={(file) => {
-                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, file, { shouldValidate: true });
-                                  if (!file && watch(`metrics.${imageMetricIndex}.image_url` as any)) {
-                                    setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                  }
-                                }}
-                                onRemoveCurrentImage={() => {
-                                  setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                  setValue(`metrics.${imageMetricIndex}.image_file` as any, null, { shouldValidate: true });
-                                }}
+                            render={({ field: controllerField }) => (
+                              <Textarea
+                                {...controllerField}
+                                id={`metrics.${metricField.originalIndex}.notes`}
+                                placeholder="Any specific observations or context..."
+                                className="mt-1"
+                                value={controllerField.value ?? ''}
+                                onChange={e => controllerField.onChange(e.target.value)}
                                 disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                               />
                             )}
                           />
                         </div>
-                      )}
+                      </div>
                     </div>
-                  )
-                })}
-                 {/* Display message if no custom metrics but site visit ratings exist */}
-                {/* ... keep existing code ... */}
+                  ))}
 
-                {/* Site Visit Ratings Section */}
-                {siteVisitRatingFields.length > 0 && (
-                  <div className="space-y-6 border-t pt-6 mt-8">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
+                  {/* Category Image Upload Field - MOVED TO THE END OF THE CATEGORY SECTION */}
+                  {imageMetricIndex !== undefined && metricFields[imageMetricIndex] && (
+                    <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mt-6"> {/* Added mt-6 for spacing */}
+                      <Label htmlFor={`metrics.${imageMetricIndex}.image`}>{`Optional Image for ${category} Section`}</Label>
+                      <Controller
+                        name={`metrics.${imageMetricIndex}.image_file` as any} // Cast as any due to dynamic name
+                        control={control}
+                        render={() => (
+                          <ImageUploadField
+                            id={`metrics.${imageMetricIndex}.image`}
+                            currentImageUrl={watch(`metrics.${imageMetricIndex}.image_url` as any)}
+                            onFileChange={(file) => {
+                              setValue(`metrics.${imageMetricIndex}.image_file` as any, file, { shouldValidate: true });
+                              if (!file && watch(`metrics.${imageMetricIndex}.image_url` as any)) {
+                                setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                              }
+                            }}
+                            onRemoveCurrentImage={() => {
+                              setValue(`metrics.${imageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                              setValue(`metrics.${imageMetricIndex}.image_file` as any, null, { shouldValidate: true });
+                            }}
+                            disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                          />
+                        )}
+                      />
                     </div>
-                    
-                    {/* Individual Site Visit Criteria */}
-                    {siteVisitRatingFields.map((field, index) => {
-                      const criterionDetails = getCriterionDetails(field.criterion_key as SiteVisitCriterionKey);
-                      if (!criterionDetails) return null; 
+                  )}
+                </div>
+              )
+            })}
+             {/* Display message if no custom metrics but site visit ratings exist */}
+             {/* ... keep existing code ... */}
 
-                      return (
-                        <div key={field.id} className="p-4 border rounded-md shadow-sm bg-card">
-                          <h4 className="text-md font-semibold mb-1">{criterionDetails.label}</h4>
-                          <p className="text-sm text-muted-foreground mb-3">{criterionDetails.description}</p>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                            <div className="md:col-span-1">
-                              <Label htmlFor={`siteVisitRatings.${index}.grade`}>Grade</Label>
-                              <Controller
-                                name={`siteVisitRatings.${index}.grade`}
-                                control={control}
-                                render={({ field: controllerField }) => (
-                                  <Select
-                                    value={controllerField.value || ''} 
-                                    onValueChange={(value) => {
-                                      controllerField.onChange(value === 'none' ? '' : value);
-                                    }}
-                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                  >
-                                    <SelectTrigger id={`siteVisitRatings.${index}.grade`} className="mt-1">
-                                      <SelectValue placeholder="Select grade" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none"><em>No Grade</em></SelectItem>
-                                      {criterionDetails.grades.map(grade => (
-                                        <SelectItem key={grade.grade} value={grade.grade}>
-                                          {grade.grade} - {grade.description}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              />
-                            </div>
-                            <div className="md:col-span-2">
-                              <Label htmlFor={`siteVisitRatings.${index}.notes`}>Notes (Optional)</Label>
-                              <Controller
-                                name={`siteVisitRatings.${index}.notes`}
-                                control={control}
-                                render={({ field: controllerField }) => (
-                                  <Textarea
-                                    {...controllerField}
-                                    id={`siteVisitRatings.${index}.notes`}
-                                    placeholder="Optional notes..."
-                                    rows={2}
-                                    className="mt-1"
-                                    value={controllerField.value ?? ''}
-                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                  />
-                                )}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+             {/* Site Visit Ratings Section */}
+             {siteVisitRatingFields.length > 0 && (
+               <div className="space-y-6 border-t pt-6 mt-8">
+                 <div className="flex justify-between items-center">
+                     <h3 className="text-lg font-semibold text-primary">Site Visit Ratings</h3>
+                 </div>
+                 
+                 {/* Individual Site Visit Criteria */}
+                 {siteVisitRatingFields.map((field, index) => {
+                   const criterionDetails = getCriterionDetails(field.criterion_key as SiteVisitCriterionKey);
+                   if (!criterionDetails) return null; 
 
-                    {/* Site Visit Section Image Upload - MOVED TO THE END OF THE SITE VISIT SECTION */}
-                    {(() => {
-                        const siteVisitImageMetricIndex = imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER];
-                        if (siteVisitImageMetricIndex !== undefined && metricFields[siteVisitImageMetricIndex]) {
-                        return (
-                            <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mt-6"> {/* Added mt-6 for spacing */}
-                            <Label htmlFor={`metrics.${siteVisitImageMetricIndex}.image`}>Optional Image for Site Visit Section</Label>
-                            <Controller
-                                name={`metrics.${siteVisitImageMetricIndex}.image_file` as any}
-                                control={control}
-                                render={() => (
-                                <ImageUploadField
-                                    id={`metrics.${siteVisitImageMetricIndex}.image`}
-                                    currentImageUrl={watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)}
-                                    onFileChange={(file) => {
-                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, file, { shouldValidate: true });
-                                        if (!file && watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)) {
-                                            setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                        }
-                                    }}
-                                    onRemoveCurrentImage={() => {
-                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
-                                        setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, null, { shouldValidate: true });
-                                    }}
-                                    disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
-                                />
-                                )}
-                            />
-                            </div>
-                        );
-                        }
-                        return null;
-                    })()}
-                  </div>
-                )}
-              </>
-            ) : (
-              <CardDescription>
-                Neither custom metrics nor site visit criteria are available for this assessment. 
-                Please configure a Target Metric Set or check system settings.
-              </CardDescription>
-            )}
+                   return (
+                     <div key={field.id} className="p-4 border rounded-md shadow-sm bg-card">
+                       <h4 className="text-md font-semibold mb-1">{criterionDetails.label}</h4>
+                       <p className="text-sm text-muted-foreground mb-3">{criterionDetails.description}</p>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                         <div className="md:col-span-1">
+                           <Label htmlFor={`siteVisitRatings.${index}.grade`}>Grade</Label>
+                           <Controller
+                             name={`siteVisitRatings.${index}.grade`}
+                             control={control}
+                             render={({ field: controllerField }) => (
+                               <Select
+                                 value={controllerField.value || ''} 
+                                 onValueChange={(value) => {
+                                   controllerField.onChange(value === 'none' ? '' : value);
+                                 }}
+                                 disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                               >
+                                 <SelectTrigger id={`siteVisitRatings.${index}.grade`} className="mt-1">
+                                   <SelectValue placeholder="Select grade" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="none"><em>No Grade</em></SelectItem>
+                                   {criterionDetails.grades.map(grade => (
+                                     <SelectItem key={grade.grade} value={grade.grade}>
+                                       {grade.grade} - {grade.description}
+                                     </SelectItem>
+                                   ))}
+                                 </SelectContent>
+                               </Select>
+                             )}
+                           />
+                         </div>
+                         <div className="md:col-span-2">
+                           <Label htmlFor={`siteVisitRatings.${index}.notes`}>Notes (Optional)</Label>
+                           <Controller
+                             name={`siteVisitRatings.${index}.notes`}
+                             control={control}
+                             render={({ field: controllerField }) => (
+                               <Textarea
+                                 {...controllerField}
+                                 id={`siteVisitRatings.${index}.notes`}
+                                 placeholder="Optional notes..."
+                                 rows={2}
+                                 className="mt-1"
+                                 value={controllerField.value ?? ''}
+                                 disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                               />
+                             )}
+                           />
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })}
+
+                 {/* Site Visit Section Image Upload - MOVED TO THE END OF THE SITE VISIT SECTION */}
+                 {(() => {
+                     const siteVisitImageMetricIndex = imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER];
+                     if (siteVisitImageMetricIndex !== undefined && metricFields[siteVisitImageMetricIndex]) {
+                     return (
+                         <div className="p-4 border rounded-md shadow-sm bg-secondary/30 mt-6"> {/* Added mt-6 for spacing */}
+                         <Label htmlFor={`metrics.${siteVisitImageMetricIndex}.image`}>Optional Image for Site Visit Section</Label>
+                         <Controller
+                             name={`metrics.${siteVisitImageMetricIndex}.image_file` as any}
+                             control={control}
+                             render={() => (
+                             <ImageUploadField
+                                 id={`metrics.${siteVisitImageMetricIndex}.image`}
+                                 currentImageUrl={watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)}
+                                 onFileChange={(file) => {
+                                     setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, file, { shouldValidate: true });
+                                     if (!file && watch(`metrics.${siteVisitImageMetricIndex}.image_url` as any)) {
+                                         setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                     }
+                                 }}
+                                 onRemoveCurrentImage={() => {
+                                     setValue(`metrics.${siteVisitImageMetricIndex}.image_url` as any, null, { shouldValidate: true });
+                                     setValue(`metrics.${siteVisitImageMetricIndex}.image_file` as any, null, { shouldValidate: true });
+                                 }}
+                                 disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+                             />
+                             )}
+                         />
+                         </div>
+                     );
+                     }
+                     return null;
+                 })()}
+               </div>
+             )}
           </CardContent>
           <CardFooter className="flex justify-between bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-4 border-t sticky bottom-0">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onBack} 
-              disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
+              disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending || updateSiteStatusMutation.isPending}
             >
               <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending || !user}
+              disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending || updateSiteStatusMutation.isPending || !user}
             >
-              {(isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending) ? (
+              {(isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending || updateSiteStatusMutation.isPending) ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
