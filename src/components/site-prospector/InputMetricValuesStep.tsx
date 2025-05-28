@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,10 +34,11 @@ import ImageUploadField from './ImageUploadField';
 
 // Import shared config and remove local definitions
 import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
+import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
 
 // Constants for special image metric identifiers
 const SITE_VISIT_SECTION_IMAGE_IDENTIFIER = 'site_visit_section_image_overall';
-const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall`;
+const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall';
 
 // Session storage keys for form persistence
 const getFormDataSessionKey = (assessmentId: string) => `inputMetricValues_formData_${assessmentId}`;
@@ -552,6 +552,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     return acc;
   }, {} as Record<string, Array<{ id: string; originalIndex: number; metric_identifier: string; label: string; category: string; entered_value: number | null; notes?: string | null; image_url?: string | null; target_value?: number; higher_is_better?: boolean; measurement_type?: string | null }>>);
 
+  // Get sorted categories for proper ordering
+  const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
+
   const getCriterionDetails = (key: SiteVisitCriterionKey) => {
     return siteVisitCriteria.find(c => c.key === key);
   };
@@ -564,10 +567,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     return <p className="text-destructive text-center p-4">Error loading metric set: {metricSetError.message}</p>;
   }
   
-  const uniqueCategories = metricSet?.user_custom_metrics_settings
-    ? [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))]
-    : [];
-
   return (
     <TooltipProvider>
       <Card className="w-full max-w-3xl mx-auto">
@@ -598,8 +597,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
               />
             </div>
 
-            {/* Metric Sections with Category Image Upload */}
-            {Object.entries(metricsByCategory).map(([category, categoryMetrics]) => {
+            {/* Metric Sections with Category Image Upload - Now using sorted categories */}
+            {sortedCategories.map((category) => {
+              const categoryMetrics = metricsByCategory[category];
               const categoryImageIdentifier = getCategorySpecificImageIdentifier(category);
               const imageMetricIndex = imageOnlyMetricIndices[categoryImageIdentifier];
               
@@ -723,6 +723,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                 </div>
               )
             })}
+
              {/* Display message if no custom metrics but site visit ratings exist */}
              {/* ... keep existing code ... */}
 
