@@ -14,7 +14,7 @@ import {
 import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { TargetMetricSet } from '@/types/targetMetrics';
-import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig';
+import { nonEditableMetricIdentifiers, sortCategoriesByOrder } from '@/config/targetMetricsConfig';
 import { 
   AssessmentMetricValue, 
   AssessmentSiteVisitRatingInsert, 
@@ -372,8 +372,9 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   
   const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall`;
 
+  // Use the sortCategoriesByOrder function to ensure proper ordering
   const allCategories = targetMetricSet?.user_custom_metrics_settings 
-    ? [...new Set(targetMetricSet.user_custom_metrics_settings.map(m => m.category))] 
+    ? sortCategoriesByOrder([...new Set(targetMetricSet.user_custom_metrics_settings.map(m => m.category))]) 
     : [];
   
   const siteVisitSectionImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === 'site_visit_section_image_overall')?.image_url;
@@ -502,6 +503,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </Card>
       )}
 
+      {/* Render categories in the correct order */}
       {allCategories.map(category => {
         const metricsForCategory = getCategoryMetrics(category);
         const categoryImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url;

@@ -1,3 +1,4 @@
+
 import { PredefinedMetricCategory, UserCustomMetricSetting } from '@/types/targetMetrics';
 
 export interface PredefinedMetricConfig {
@@ -36,9 +37,9 @@ export const predefinedMetricsConfig: PredefinedMetricConfig[] = [
     description: "Intersection with market hot spots. (Cold Spot = 100, Warm = 50, Hot Spot = 0). Aim for cold spots (higher value)."
   },
   
-  // Demand & Supply
-  { metric_identifier: "demand_supply_balance", label: "Supply/Demand Balance", category: "Demand & Supply", higher_is_better: true, description: "Balance between supply and demand. Positive demand = 100%, Negative demand = 0%." },
-  { metric_identifier: "demand_supply_consumer_spending_index", label: "Consumer Spending Index", category: "Demand & Supply", higher_is_better: true, description: "Index representing consumer spending potential." },
+  // Demand & Spending
+  { metric_identifier: "demand_supply_balance", label: "Supply/Demand Balance", category: "Demand & Spending", higher_is_better: true, description: "Balance between supply and demand. Positive demand = 100%, Negative demand = 0%." },
+  { metric_identifier: "demand_supply_consumer_spending_index", label: "Consumer Spending Index", category: "Demand & Spending", higher_is_better: true, description: "Index representing consumer spending potential." },
 
   // Expenses
   { metric_identifier: "expenses_effective_wage", label: "Effective Wage ($/hr)", category: "Expenses", higher_is_better: false, description: "Average effective hourly wage." },
@@ -57,6 +58,38 @@ export const nonEditableMetricIdentifiers: string[] = [
   "market_saturation_heat_map_intersection",
   "demand_supply_balance",
 ];
+
+// Define the correct order for sections
+export const SECTION_ORDER = [
+  "Traffic",
+  "Trade Area", 
+  "Market Coverage & Saturation",
+  "Visitor Profile",
+  "Demand & Spending",
+  "Expenses",
+  "Financial Performance",
+  "Site Visit"
+];
+
+// Helper function to sort categories in the correct order
+export const sortCategoriesByOrder = (categories: string[]): string[] => {
+  return categories.sort((a, b) => {
+    const indexA = SECTION_ORDER.indexOf(a);
+    const indexB = SECTION_ORDER.indexOf(b);
+    
+    // If both categories are in the defined order, sort by their position
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    
+    // If only one is in the defined order, prioritize it
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    
+    // If neither is in the defined order, sort alphabetically
+    return a.localeCompare(b);
+  });
+};
 
 export function getDefaultMetricValue(metricIdentifier: string): UserCustomMetricSetting | undefined {
   const config = predefinedMetricsConfig.find(m => m.metric_identifier === metricIdentifier);

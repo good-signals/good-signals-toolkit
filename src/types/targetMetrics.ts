@@ -1,11 +1,10 @@
-
 import { z } from 'zod';
 
 export const PREDEFINED_METRIC_CATEGORIES = [
   "Traffic",
   "Trade Area",
   "Market Coverage & Saturation",
-  "Demand & Supply",
+  "Demand & Spending",
   "Expenses",
   "Financial Performance",
 ] as const;
