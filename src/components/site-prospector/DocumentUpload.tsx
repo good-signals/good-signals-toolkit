@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Upload, File, Trash2, Download, Loader2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -206,6 +207,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                       size="sm"
                       onClick={() => handleView(document)}
                       title="View"
+                      className="h-8 w-8 p-0"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -214,6 +216,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                       size="sm"
                       onClick={() => handleDownload(document)}
                       title="Download"
+                      className="h-8 w-8 p-0"
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -223,6 +226,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                       onClick={() => handleDelete(document.id, document.file_name)}
                       disabled={deletingIds.has(document.id)}
                       title="Delete"
+                      className="h-8 w-8 p-0"
                     >
                       {deletingIds.has(document.id) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
