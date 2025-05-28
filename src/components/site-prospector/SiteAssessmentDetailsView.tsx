@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
@@ -34,6 +35,7 @@ import MetricCategorySection, { ProcessedMetric } from './MetricCategorySection'
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 import EditableExecutiveSummary from './EditableExecutiveSummary';
 import DocumentUpload from './DocumentUpload';
+import { getAssessmentDocuments, AssessmentDocument } from '@/services/documentService';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
@@ -77,6 +79,24 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
       } catch (error) {
         console.error('Assessment query error:', error);
         throw error;
+      }
+    },
+    enabled: !!assessmentId,
+  });
+
+  // Fetch documents separately with error handling
+  const { data: documents, isLoading: isLoadingDocuments, error: documentsError, refetch: refetchDocuments } = useQuery<AssessmentDocument[]>({
+    queryKey: ['assessmentDocuments', assessmentId],
+    queryFn: async () => {
+      console.log('Fetching documents for assessment:', assessmentId);
+      try {
+        const result = await getAssessmentDocuments(assessmentId);
+        console.log('Documents fetched:', result);
+        return result;
+      } catch (error) {
+        console.error('Documents fetch error:', error);
+        // Return empty array instead of throwing to prevent blocking the main view
+        return [];
       }
     },
     enabled: !!assessmentId,
@@ -243,14 +263,21 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     accountSettings?.signal_bad_threshold
   );
 
+  const handleDocumentsChange = () => {
+    refetchDocuments();
+  };
+
   console.log('Component state:', { 
     isLoadingAssessment, 
     isLoadingAccounts, 
     isLoadingTargetMetricSet,
+    isLoadingDocuments,
     assessmentError: assessmentError?.message,
     targetMetricSetError: targetMetricSetError?.message,
+    documentsError: documentsError?.message,
     assessment: !!assessment,
-    targetMetricSet: !!targetMetricSet
+    targetMetricSet: !!targetMetricSet,
+    documentsCount: documents?.length || 0
   });
 
   if (isLoadingAssessment || isLoadingAccounts || isLoadingTargetMetricSet) {
@@ -471,6 +498,23 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         siteVisitRatings={siteVisitRatings}
         siteVisitSectionImage={siteVisitSectionImage}
       />
+
+      {/* Document Attachments Section */}
+      <DocumentUpload
+        assessmentId={assessmentId}
+        documents={documents || []}
+        onDocumentsChange={handleDocumentsChange}
+      />
+
+      {documentsError && (
+        <Alert variant="default" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Documents Loading Issue</AlertTitle>
+          <AlertDescription>
+            There was an issue loading the documents for this assessment. The document upload feature may not work properly.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };
