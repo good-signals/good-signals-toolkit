@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,6 +56,9 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     direction: 'desc',
   });
 
+  // Track previous isDeleting state to detect when deletion actually completes
+  const prevIsDeletingRef = useRef(isDeleting);
+
   // Query to get document counts for all assessments
   const { data: documentCounts = {} } = useQuery<Record<string, number>>({
     queryKey: ['assessmentDocumentCounts', assessmentsData.map(a => a.id)],
@@ -98,15 +100,28 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     );
   }, [assessmentsData]);
 
-  // Clear selections when deletion completes successfully
+  // Only clear dialog state when deletion actually transitions from pending to complete
   useEffect(() => {
-    console.log('Deletion state changed - isDeleting:', isDeleting, 'showDeleteDialog:', showDeleteDialog);
-    if (!isDeleting && showDeleteDialog) {
-      console.log('Deletion completed successfully, clearing state');
+    const prevIsDeleting = prevIsDeletingRef.current;
+    const currentIsDeleting = isDeleting;
+    
+    console.log('Deletion state transition:', { 
+      prevIsDeleting, 
+      currentIsDeleting, 
+      showDeleteDialog,
+      idsToDelete 
+    });
+
+    // Only clear state if we were deleting and now we're not (deletion completed)
+    if (prevIsDeleting && !currentIsDeleting && showDeleteDialog) {
+      console.log('Deletion actually completed, clearing dialog state');
       setShowDeleteDialog(false);
       setIdsToDelete([]);
       setSelectedAssessmentIds([]);
     }
+
+    // Update the ref for next time
+    prevIsDeletingRef.current = currentIsDeleting;
   }, [isDeleting, showDeleteDialog]);
 
   const requestSort = (key: SortableKeys) => {
