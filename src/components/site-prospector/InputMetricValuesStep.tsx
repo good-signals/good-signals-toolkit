@@ -20,6 +20,7 @@ import SiteVisitSection from './metric-input/SiteVisitSection';
 
 // Import shared config
 import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
+import { specificDropdownMetrics } from '@/config/metricDisplayConfig';
 
 // Constants for special image metric identifiers
 const SITE_VISIT_SECTION_IMAGE_IDENTIFIER = 'site_visit_section_image_overall';
@@ -504,6 +505,14 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
 
+  // Type the siteVisitRatingFields properly
+  const typedSiteVisitRatingFields = siteVisitRatingFields.map(field => ({
+    id: field.id,
+    criterion_key: (field as any).criterion_key || '',
+    grade: (field as any).grade || '',
+    notes: (field as any).notes || '',
+  }));
+
    {/* Display message if no custom metrics but site visit ratings exist */}
    if ((!metricSet?.user_custom_metrics_settings || metricSet?.user_custom_metrics_settings.length === 0) && siteVisitRatingFields.length > 0) {
     return (
@@ -538,7 +547,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
                {/* Site Visit Ratings Section */}
                <SiteVisitSection
-                 siteVisitRatingFields={siteVisitRatingFields}
+                 siteVisitRatingFields={typedSiteVisitRatingFields}
                  siteVisitImageMetricIndex={imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER]}
                  control={control}
                  watch={watch}
@@ -634,7 +643,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
              {/* Site Visit Ratings Section */}
              <SiteVisitSection
-               siteVisitRatingFields={siteVisitRatingFields}
+               siteVisitRatingFields={typedSiteVisitRatingFields}
                siteVisitImageMetricIndex={imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER]}
                control={control}
                watch={watch}
