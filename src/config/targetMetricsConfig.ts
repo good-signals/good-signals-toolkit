@@ -1,4 +1,3 @@
-
 import { PredefinedMetricCategory, UserCustomMetricSetting } from '@/types/targetMetrics';
 
 export interface PredefinedMetricConfig {
@@ -34,7 +33,7 @@ export const predefinedMetricsConfig: PredefinedMetricConfig[] = [
   { metric_identifier: "expenses_construction_cost_multiplier", label: "Construction Cost Multiplier", category: "Expenses", higher_is_better: false, description: "Multiplier for construction costs relative to a baseline." },
 
   // Financial Performance
-  { metric_identifier: "financial_occupancy_rate", label: "Occupancy Rate (%)", category: "Financial Performance", higher_is_better: true, description: "Percentage of units/space occupied. (Note: User specified 'less is better' which is unusual, typically higher is better for occupancy. Clarify if this means vacancy rate or cost of occupancy)"}, // User prompt said less is better, this might be an error in the prompt for 'occupancy rate'
+  { metric_identifier: "financial_occupancy_rate", label: "Occupancy Rate (%)", category: "Financial Performance", higher_is_better: false, description: "Percentage of units/space occupied. Lower occupancy rate is considered better (e.g. lower cost of occupancy or higher vacancy desired)." },
   { metric_identifier: "financial_initial_investment", label: "Initial Investment ($)", category: "Financial Performance", higher_is_better: false, description: "Total initial capital required." },
   { metric_identifier: "financial_top_line_revenue", label: "Top-Line Revenue ($)", category: "Financial Performance", higher_is_better: true, description: "Total revenue generated." },
   { metric_identifier: "financial_profitability", label: "Profitability ($ or %)", category: "Financial Performance", higher_is_better: true, description: "Measure of profit." },
@@ -55,4 +54,3 @@ export function getDefaultMetricValue(metricIdentifier: string): UserCustomMetri
   }
   return undefined;
 }
-
