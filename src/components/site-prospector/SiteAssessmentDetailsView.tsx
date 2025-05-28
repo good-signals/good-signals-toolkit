@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
-import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
+import { TargetMetricSet, UserCustomMetricSetting, nonEditableMetricsWithHardcodedScores } from '@/types/targetMetrics';
 import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
 import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,11 +60,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
       const metricValue = metricValues.find(mv => mv.metric_identifier === setting.metric_identifier);
       let score: number | null;
 
-      const specialHardcodedScoreMetrics = ['market_saturation_trade_area_overlap', 'market_saturation_heat_map_intersection', 'demand_supply_balance'];
-      if (specialHardcodedScoreMetrics.includes(setting.metric_identifier)) {
-        score = metricValue?.entered_value ?? null; // For these, the entered value is the score
+      if (nonEditableMetricsWithHardcodedScores.find(nem => nem.identifier === setting.metric_identifier)) {
+        const hardcodedScoreDef = nonEditableMetricsWithHardcodedScores.find(nem => nem.identifier === setting.metric_identifier);
+        score = metricValue?.entered_value === hardcodedScoreDef?.targetValue ? 100 : 
+                metricValue?.entered_value === (hardcodedScoreDef?.options?.[1]?.value) ? 50 : 
+                metricValue?.entered_value === (hardcodedScoreDef?.options?.[2]?.value) ? 0 : null;
       } else {
-        score = calculateMetricSignalScore({ // Corrected arguments
+        score = calculateMetricSignalScore({
           enteredValue: metricValue?.entered_value ?? null,
           targetValue: setting.target_value,
           higherIsBetter: setting.higher_is_better,
@@ -77,21 +79,21 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
         targetValue: setting.target_value,
         higherIsBetter: setting.higher_is_better,
         notes: metricValue?.notes ?? null,
-        imageUrl: metricValue?.image_url ?? null, // Assuming AssessmentMetricValue has image_url
+        imageUrl: metricValue?.image_url ?? null,
       });
     });
     
     const numMetricsWithValues = metricValues.filter(mv => mv.entered_value !== null && mv.entered_value !== undefined).length;
-    const completion = calculateCompletionPercentage(targetMetricSet.user_custom_metrics_settings?.length || 0, numMetricsWithValues); // Corrected arguments
+    const completion = calculateCompletionPercentage(targetMetricSet.user_custom_metrics_settings?.length || 0, numMetricsWithValues);
     
-    const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score)); // Corrected arguments
+    const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score));
 
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
-  }, [targetMetricSet, metricValues, siteVisitRatings]); // siteVisitRatings might be used if it affects overall score in future
+  }, [targetMetricSet, metricValues, siteVisitRatings]);
 
   React.useEffect(() => {
     if (assessment && targetMetricSet && user) {
-      const storedScore = assessment.site_signal_score; // Corrected property name
+      const storedScore = assessment.site_signal_score;
       const storedCompletion = assessment.completion_percentage;
 
       const isOverallScoreValid = typeof overallSiteSignalScore === 'number';
@@ -139,14 +141,18 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
       .filter(setting => setting.category === category)
       .map(setting => {
         const metricDetail = detailedMetricScores.get(setting.metric_identifier);
-        const enteredDisplayValue = specificDropdownMetrics.includes(setting.metric_identifier)
-          ? getMetricLabelForValue(setting.metric_identifier, metricDetail?.enteredValue ?? null) ?? (metricDetail?.enteredValue?.toString() ?? 'N/A')
-          : metricDetail?.enteredValue?.toString() ?? 'N/A';
+        const isNonEditableHardcoded = nonEditableMetricsWithHardcodedScores.find(nem => nem.identifier === setting.metric_identifier);
+
+        let enteredDisplayValue: string;
+        if (specificDropdownMetrics.includes(setting.metric_identifier) || isNonEditableHardcoded) {
+           enteredDisplayValue = getMetricLabelForValue(setting.metric_identifier, metricDetail?.enteredValue ?? null) ?? (metricDetail?.enteredValue?.toString() ?? 'N/A');
+        } else {
+           enteredDisplayValue = metricDetail?.enteredValue?.toString() ?? 'N/A';
+        }
         
-        const specialHardcodedScoreMetrics = ['market_saturation_trade_area_overlap', 'market_saturation_heat_map_intersection', 'demand_supply_balance'];
         let targetDisplayValue: string;
-        if (specialHardcodedScoreMetrics.includes(setting.metric_identifier)) {
-            targetDisplayValue = "Predefined"; // Target is predefined/fixed for these
+        if (isNonEditableHardcoded) {
+            targetDisplayValue = "Predefined"; 
         } else if (specificDropdownMetrics.includes(setting.metric_identifier)) {
             targetDisplayValue = getMetricLabelForValue(setting.metric_identifier, metricDetail?.targetValue ?? null) ?? (metricDetail?.targetValue?.toString() ?? 'N/A');
         } else {
@@ -179,17 +185,17 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
           <div>
             <CardTitle className="text-3xl font-bold text-primary flex items-center">
               <Eye className="h-8 w-8 mr-3" />
-              Assessment: {assessment.assessment_name || 'N/A'} {/* Corrected property name */}
+              Assessment: {assessment.assessment_name || 'N/A'}
             </CardTitle>
             <CardDescription className="mt-1">
-              Address: {assessment.address_line1 || 'Not specified'} {/* Corrected property name */}
+              Address: {assessment.address_line1 || 'Not specified'}
             </CardDescription>
           </div>
           <div className="flex space-x-3">
              <Button variant="outline" onClick={onBackToList}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
             </Button>
-            <Button onClick={() => onEdit(assessmentId, assessment.target_metric_set_id)}>
+            <Button onClick={() => onEdit(assessmentId, assessment.target_metric_set_id || '')}>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Assessment Data
             </Button>
           </div>
@@ -276,7 +282,6 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
                   {metricsForCategory.map(metric => (
                     <TableRow key={metric.label}>
                       <TableCell className="font-medium">{metric.label}</TableCell>
-                      {/* Display label for specific dropdown metrics, else the value */}
                       <TableCell className="text-center">{metric.enteredValue}</TableCell>
                       <TableCell className="text-center">{metric.targetValue}</TableCell>
                       <TableCell className="text-center">

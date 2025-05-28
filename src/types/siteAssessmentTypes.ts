@@ -5,6 +5,8 @@ export type SiteAssessment = Database["public"]["Tables"]["site_assessments"]["R
   completion_percentage?: number | null;
   executive_summary?: string | null;
   last_summary_generated_at?: string | null;
+  assessment_metric_values?: AssessmentMetricValue[]; // Added
+  site_visit_ratings?: AssessmentSiteVisitRatingInsert[]; // Added (using Insert as it was used in the component, can be changed to AssessmentSiteVisitRating if more appropriate)
 };
 export type SiteAssessmentInsert = Database["public"]["Tables"]["site_assessments"]["Insert"];
 export type SiteAssessmentUpdate = Database["public"]["Tables"]["site_assessments"]["Update"] & {

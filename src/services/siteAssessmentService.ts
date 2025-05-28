@@ -33,21 +33,33 @@ export const createSiteAssessment = async (assessmentData: Omit<SiteAssessmentIn
 export const getSiteAssessmentsForUser = async (userId: string): Promise<SiteAssessment[]> => {
   const { data, error } = await supabase
     .from('site_assessments')
-    .select('*')
+    .select(`
+      *,
+      assessment_metric_values(*),
+      assessment_site_visit_ratings(*)
+    `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching site assessments:', error);
+    console.error('Error fetching site assessments for user:', error);
     throw error;
   }
-  return data || [];
+  return (data || []).map(assessment => ({
+    ...assessment,
+    assessment_metric_values: assessment.assessment_metric_values || [],
+    site_visit_ratings: assessment.assessment_site_visit_ratings || []
+  })) as SiteAssessment[];
 };
 
 export const getSiteAssessmentById = async (assessmentId: string, userId: string): Promise<SiteAssessment | null> => {
   const { data, error } = await supabase
     .from('site_assessments')
-    .select('*')
+    .select(`
+      *,
+      assessment_metric_values(*),
+      assessment_site_visit_ratings(*)
+    `)
     .eq('id', assessmentId)
     .eq('user_id', userId) 
     .single();
@@ -59,7 +71,13 @@ export const getSiteAssessmentById = async (assessmentId: string, userId: string
     console.error('Error fetching site assessment by ID:', error);
     throw error;
   }
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    assessment_metric_values: data.assessment_metric_values || [],
+    site_visit_ratings: data.assessment_site_visit_ratings || []
+  } as SiteAssessment;
 };
 
 export const updateSiteAssessment = async (assessmentId: string, updates: SiteAssessmentUpdate, userId: string): Promise<SiteAssessment> => {
@@ -68,14 +86,22 @@ export const updateSiteAssessment = async (assessmentId: string, updates: SiteAs
     .update(updates)
     .eq('id', assessmentId)
     .eq('user_id', userId) // Ensure user owns this assessment
-    .select('*')
+    .select(`
+      *,
+      assessment_metric_values(*),
+      assessment_site_visit_ratings(*)
+    `)
     .single();
 
   if (error) {
     console.error('Error updating site assessment:', error);
     throw error;
   }
-  return data;
+  return {
+    ...data,
+    assessment_metric_values: data.assessment_metric_values || [],
+    site_visit_ratings: data.site_visit_ratings || []
+  } as SiteAssessment;
 };
 
 export const deleteSiteAssessment = async (assessmentId: string, userId: string): Promise<void> => {
@@ -149,4 +175,77 @@ export const getAssessmentMetricValues = async (assessmentId: string): Promise<A
     throw error;
   }
   return data || [];
+};
+
+export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAssessment> => {
+  // Fetch the main assessment
+  const { data: assessmentData, error: assessmentError } = await supabase
+    .from('site_assessments')
+    .select('*')
+    .eq('id', assessmentId)
+    .single();
+
+  if (assessmentError) {
+    console.error('Error fetching site assessment core data:', assessmentError);
+    throw assessmentError;
+  }
+  if (!assessmentData) {
+    throw new Error(`Site assessment with ID ${assessmentId} not found.`);
+  }
+
+  // Fetch related metric values
+  const { data: metricValues, error: metricsError } = await supabase
+    .from('assessment_metric_values')
+    .select('*')
+    .eq('assessment_id', assessmentId);
+
+  if (metricsError) {
+    console.error('Error fetching assessment metric values:', metricsError);
+    // Decide if this is a critical error or if we can proceed without metrics
+    // For now, let's proceed and return empty array or handle in UI
+  }
+
+  // Fetch related site visit ratings
+  const { data: siteVisitRatings, error: ratingsError } = await supabase
+    .from('assessment_site_visit_ratings')
+    .select('*')
+    .eq('assessment_id', assessmentId);
+  
+  if (ratingsError) {
+    console.error('Error fetching site visit ratings:', ratingsError);
+    // Decide if this is a critical error
+  }
+  
+  // Combine and return
+  return {
+    ...assessmentData,
+    assessment_metric_values: metricValues || [],
+    site_visit_ratings: siteVisitRatings || [],
+  };
+};
+
+export const updateAssessmentScores = async (
+  assessmentId: string, 
+  overallSiteSignalScore: number | null, 
+  completionPercentage: number | null
+): Promise<SiteAssessment> => {
+  const updates: SiteAssessmentUpdate = {
+    site_signal_score: overallSiteSignalScore,
+    completion_percentage: completionPercentage,
+    // We must include updated_at or other required fields if the table trigger doesn't handle it
+    // Assuming updated_at is handled by a trigger or default value
+  };
+
+  const { data, error } = await supabase
+    .from('site_assessments')
+    .update(updates)
+    .eq('id', assessmentId)
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('Error updating assessment scores:', error);
+    throw error;
+  }
+  return data;
 };
