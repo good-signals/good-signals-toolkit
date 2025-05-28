@@ -8,8 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
+import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService'; // Added
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
-import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig'; // Updated import
+import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig';
 import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
 import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +26,39 @@ interface SiteAssessmentDetailsViewProps {
   onBackToList: () => void;
 }
 
+const DEFAULT_GOOD_THRESHOLD = 0.75; // 75%
+const DEFAULT_BAD_THRESHOLD = 0.50;  // 50%
+
+interface SignalStatus {
+  text: string;
+  color: string;
+  iconColor: string;
+}
+
+const getSignalStatus = (
+  score: number | null,
+  accountGoodThreshold?: number | null,
+  accountBadThreshold?: number | null
+): SignalStatus => {
+  if (score === null || score === undefined) {
+    return { text: 'N/A', color: 'text-muted-foreground', iconColor: 'text-muted-foreground' };
+  }
+
+  // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
+  const scoreDecimal = score / 100;
+
+  const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
+  const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
+
+  if (scoreDecimal >= goodThreshold) {
+    return { text: 'Good', color: 'text-green-600', iconColor: 'text-green-500' };
+  }
+  if (scoreDecimal <= badThreshold) {
+    return { text: 'Bad', color: 'text-red-600', iconColor: 'text-red-500' };
+  }
+  return { text: 'Neutral', color: 'text-yellow-600', iconColor: 'text-yellow-500' };
+};
+
 const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ assessmentId, targetMetricSet, onEdit, onBackToList }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -34,6 +68,19 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     queryFn: () => getAssessmentDetails(assessmentId),
     enabled: !!assessmentId,
   });
+
+  const { data: userAccounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
+    queryKey: ['userAdminAccounts', user?.id],
+    queryFn: () => fetchUserAccountsWithAdminRole(user!.id),
+    enabled: !!user,
+  });
+
+  const accountSettings = useMemo(() => {
+    if (userAccounts && userAccounts.length > 0) {
+      return userAccounts[0]; // Assuming first admin account's settings are relevant
+    }
+    return null;
+  }, [userAccounts]);
 
   const updateScoresMutation = useMutation({
     mutationFn: (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => 
@@ -62,7 +109,6 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
       let score: number | null;
 
       if (nonEditableMetricIdentifiers.includes(setting.metric_identifier)) {
-        // For these specific metrics, the entered_value (100, 50, or 0) is the score.
         score = metricValue?.entered_value ?? null;
       } else {
         score = calculateMetricSignalScore({
@@ -88,7 +134,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score));
 
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
-  }, [targetMetricSet, metricValues, siteVisitRatings]); // Removed nonEditableMetricIdentifiers from deps as it's a constant
+  }, [targetMetricSet, metricValues]);
 
   React.useEffect(() => {
     if (assessment && targetMetricSet && user) {
@@ -124,7 +170,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     }
   }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, updateScoresMutation, user]);
 
-  if (isLoadingAssessment || !assessment || !targetMetricSet) {
+  const signalStatus = getSignalStatus(
+    overallSiteSignalScore,
+    accountSettings?.signal_good_threshold,
+    accountSettings?.signal_bad_threshold
+  );
+
+  if (isLoadingAssessment || isLoadingAccounts || !assessment || !targetMetricSet) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading assessment details...</p></div>;
   }
 
@@ -150,7 +202,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
         }
         
         let targetDisplayValue: string;
-        if (isNonEditableIdentifier) { // Updated check
+        if (isNonEditableIdentifier) { 
             targetDisplayValue = "Predefined"; 
         } else if (specificDropdownMetrics.includes(setting.metric_identifier)) {
             targetDisplayValue = getMetricLabelForValue(setting.metric_identifier, metricDetail?.targetValue ?? null) ?? (metricDetail?.targetValue?.toString() ?? 'N/A');
@@ -203,13 +255,16 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
           <div>
             <h3 className="text-lg font-semibold text-foreground/90 mb-2">Overall Site Signal Score</h3>
             <div className="flex items-center space-x-2">
-              <TrendingUp className={`h-10 w-10 ${ (overallSiteSignalScore ?? 0) >= 70 ? 'text-green-500' : (overallSiteSignalScore ?? 0) >= 40 ? 'text-yellow-500' : 'text-red-500'}`} />
-              <p className={`text-4xl font-bold ${(overallSiteSignalScore ?? 0) >= 70 ? 'text-green-600' : (overallSiteSignalScore ?? 0) >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {typeof overallSiteSignalScore === 'number' ? `${overallSiteSignalScore.toFixed(0)}%` : 'N/A'}
+              <TrendingUp className={`h-10 w-10 ${signalStatus.iconColor}`} />
+              <p className={`text-4xl font-bold ${signalStatus.color}`}>
+                {typeof overallSiteSignalScore === 'number' 
+                  ? `${overallSiteSignalScore.toFixed(0)}% - ${signalStatus.text}` 
+                  : signalStatus.text}
               </p>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              A measure of overall site suitability based on your targets.
+              A measure of overall site suitability based on your targets. 
+              ({isLoadingAccounts ? 'Loading thresholds...' : accountSettings ? 'Using custom thresholds.' : 'Using default thresholds.'})
             </p>
           </div>
           <div>
