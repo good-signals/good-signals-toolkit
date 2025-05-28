@@ -39,6 +39,10 @@ import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricD
 const SITE_VISIT_SECTION_IMAGE_IDENTIFIER = 'site_visit_section_image_overall';
 const getCategorySpecificImageIdentifier = (category: string) => `category_${category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_image_overall`;
 
+// Session storage keys for form persistence
+const getFormDataSessionKey = (assessmentId: string) => `inputMetricValues_formData_${assessmentId}`;
+const getImageDataSessionKey = (assessmentId: string) => `inputMetricValues_imageData_${assessmentId}`;
+
 // Define a type for the image-only metric objects we'll manage in the form state
 type ImageOnlyFormMetric = {
   id: string; // React Hook Form field ID
@@ -163,8 +167,60 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     },
   });
 
+  // Save form data to session storage whenever form data changes
+  useEffect(() => {
+    const subscription = watch((value) => {
+      try {
+        // Convert the form data to a serializable format (excluding File objects)
+        const serializableData = {
+          metrics: value.metrics?.map(metric => ({
+            ...metric,
+            image_file: null, // Don't persist files in session storage
+          })) || [],
+          siteVisitRatings: value.siteVisitRatings || [],
+          siteStatus: value.siteStatus || 'Prospect',
+        };
+        
+        sessionStorage.setItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
+      } catch (error) {
+        console.warn('Failed to save form data to session storage:', error);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [watch, assessmentId]);
+
+  // Clear session storage when component unmounts (assessment is completed)
+  useEffect(() => {
+    return () => {
+      // Only clear on unmount if we're not just navigating away
+      const cleanup = () => {
+        sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
+        sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+      };
+      
+      // Add a small delay to allow for navigation detection
+      setTimeout(cleanup, 100);
+    };
+  }, [assessmentId]);
+
+  // Load saved form data from session storage and merge with database data
+  const loadSavedFormData = () => {
+    try {
+      const savedDataJson = sessionStorage.getItem(getFormDataSessionKey(assessmentId));
+      if (savedDataJson) {
+        const savedData = JSON.parse(savedDataJson) as Partial<MetricValuesFormData>;
+        return savedData;
+      }
+    } catch (error) {
+      console.warn('Failed to load saved form data from session storage:', error);
+    }
+    return null;
+  };
+
   // Initialize form data
   useEffect(() => {
+    const savedFormData = loadSavedFormData();
     const allMetricsToSet: any[] = [];
     const currentImageOnlyIndices: Record<string, number> = {};
 
@@ -172,21 +228,32 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     if (metricSet?.user_custom_metrics_settings) {
       metricSet.user_custom_metrics_settings.forEach(metric => {
         const existingValue = existingMetricValuesData?.find(ev => ev.metric_identifier === metric.metric_identifier);
+        
+        // Check if we have saved form data for this metric
+        const savedMetricData = savedFormData?.metrics?.find(sm => sm.metric_identifier === metric.metric_identifier);
+        
         let defaultValue: number | null;
-        if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
+        if (savedMetricData?.entered_value !== undefined && savedMetricData?.entered_value !== null) {
+          // Use saved form data if available
+          defaultValue = savedMetricData.entered_value;
+        } else if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
+          // Fall back to database value
           defaultValue = existingValue.entered_value;
         } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
           defaultValue = 50;
         } else {
           defaultValue = metric.measurement_type === 'Index' ? 50 : 0;
         }
+
+        const notes = savedMetricData?.notes ?? existingValue?.notes ?? '';
+
         allMetricsToSet.push({
           metric_identifier: metric.metric_identifier,
           label: metric.label,
           category: metric.category,
           entered_value: defaultValue,
           measurement_type: metric.measurement_type,
-          notes: existingValue?.notes ?? '',
+          notes: notes,
           image_url: null, // Individual metrics no longer have images
           image_file: null,
         });
@@ -235,21 +302,24 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     if (siteVisitCriteria) {
       const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
         const existingRating = existingSiteVisitRatingsData?.find(r => r.criterion_key === criterion.key);
+        
+        // Check if we have saved form data for this rating
+        const savedRatingData = savedFormData?.siteVisitRatings?.find(sr => sr.criterion_key === criterion.key);
+        
         return {
           criterion_key: criterion.key,
-          grade: existingRating?.rating_grade || '',
-          notes: existingRating?.notes || '',
+          grade: savedRatingData?.grade ?? existingRating?.rating_grade ?? '',
+          notes: savedRatingData?.notes ?? existingRating?.notes ?? '',
         };
       });
       replaceSiteVisitRatings(initialSiteVisitRatingsData);
     }
 
-    // Set the initial site status
-    if (currentAssessment?.site_status) {
-      setValue('siteStatus', currentAssessment.site_status);
-    }
+    // Set the site status (prioritize saved data, then current assessment, then default)
+    const siteStatus = savedFormData?.siteStatus ?? currentAssessment?.site_status ?? 'Prospect';
+    setValue('siteStatus', siteStatus);
 
-  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, setValue]);
+  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, setValue, currentAssessment?.site_status]);
 
   const metricsMutation = useMutation({
     mutationFn: (data: AssessmentMetricValueInsert[]) => {
@@ -273,6 +343,11 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     onSuccess: () => {
       toast({ title: 'Success', description: 'Site visit ratings saved successfully.' });
       queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] });
+      
+      // Clear session storage on successful completion
+      sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
+      sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+      
       onMetricsSubmitted(assessmentId); 
     },
     onError: (error: Error) => {
@@ -434,6 +509,11 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         siteVisitRatingsMutation.mutate(ratingsToSave);
       } else {
         toast({ title: 'Site Visit Ratings', description: 'No new site visit ratings to save.' });
+        
+        // Clear session storage and proceed even if no ratings
+        sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
+        sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+        
         onMetricsSubmitted(assessmentId); // If no ratings, submit directly
       }
     }
@@ -494,6 +574,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           <CardTitle>Step 3: Input Data for "{metricSet?.name || 'Assessment'}"</CardTitle>
           <CardDescription>
             Enter metric values and site visit ratings. Upload one image per section if needed. Assessment ID: {assessmentId}
+            <br />
+            <span className="text-xs text-muted-foreground">Your progress is automatically saved as you type.</span>
           </CardDescription>
         </CardHeader>
         
