@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   getAssessmentDetails, 
@@ -324,13 +325,24 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     <div className="container mx-auto py-8 px-4 space-y-8">
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
-          <div>
+          <div className="flex-1">
             <CardTitle className="text-3xl font-bold text-primary flex items-center">
               <Eye className="h-8 w-8 mr-3" />
               Assessment: {assessment.assessment_name || 'N/A'}
             </CardTitle>
-            <CardDescription className="mt-1">
-              Address: {assessment.address_line1 || 'Not specified'}
+            <CardDescription className="mt-1 space-y-2">
+              <div>Address: {assessment.address_line1 || 'Not specified'}</div>
+              {targetMetricSet && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm text-muted-foreground">Target Metric Set:</span>
+                  <Badge variant="outline" className="text-sm">
+                    {targetMetricSet.name}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    ({targetMetricSet.user_custom_metrics_settings?.length || 0} metrics)
+                  </span>
+                </div>
+              )}
             </CardDescription>
           </div>
           <div className="flex items-center space-x-3">
