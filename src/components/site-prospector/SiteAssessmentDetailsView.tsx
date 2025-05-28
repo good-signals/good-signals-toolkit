@@ -1,23 +1,20 @@
 import React, { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, CheckCircle, Save, Map as MapIcon } from 'lucide-react';
+import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
 import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
-import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
+import { TargetMetricSet } from '@/types/targetMetrics';
 import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig';
-import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
-import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
+import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
 import { toast } from '@/components/ui/use-toast';
 import AddressMapDisplay from './AddressMapDisplay';
-import { getMetricLabelForValue, specificDropdownMetrics, metricDropdownOptions } from '@/config/metricDisplayConfig';
+import { getMetricLabelForValue, specificDropdownMetrics } from '@/config/metricDisplayConfig';
+import { getSignalStatus, SignalStatus } from '@/lib/assessmentDisplayUtils';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
@@ -25,39 +22,6 @@ interface SiteAssessmentDetailsViewProps {
   onEdit: (assessmentId: string, targetMetricSetId: string) => void;
   onBackToList: () => void;
 }
-
-const DEFAULT_GOOD_THRESHOLD = 0.75; // 75%
-const DEFAULT_BAD_THRESHOLD = 0.50;  // 50%
-
-interface SignalStatus {
-  text: string;
-  color: string; // Tailwind text color class e.g. 'text-green-600'
-  iconColor: string; // Tailwind text color class for icon
-}
-
-const getSignalStatus = (
-  score: number | null,
-  accountGoodThreshold?: number | null,
-  accountBadThreshold?: number | null
-): SignalStatus => {
-  if (score === null || score === undefined) {
-    return { text: 'N/A', color: 'text-muted-foreground', iconColor: 'text-muted-foreground' };
-  }
-
-  // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
-  const scoreDecimal = score / 100;
-
-  const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
-  const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
-
-  if (scoreDecimal >= goodThreshold) {
-    return { text: 'Good', color: 'text-green-600', iconColor: 'text-green-500' };
-  }
-  if (scoreDecimal <= badThreshold) {
-    return { text: 'Bad', color: 'text-red-600', iconColor: 'text-red-500' };
-  }
-  return { text: 'Neutral', color: 'text-yellow-600', iconColor: 'text-yellow-500' };
-};
 
 const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ assessmentId, targetMetricSet, onEdit, onBackToList }) => {
   const { user } = useAuth();
@@ -77,7 +41,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
 
   const accountSettings = useMemo(() => {
     if (userAccounts && userAccounts.length > 0) {
-      return userAccounts[0]; // Assuming first admin account's settings are relevant
+      return userAccounts[0];
     }
     return null;
   }, [userAccounts]);
@@ -170,7 +134,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     }
   }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, updateScoresMutation, user]);
 
-  const signalStatus = getSignalStatus(
+  const overallSignalStatus = getSignalStatus(
     overallSiteSignalScore,
     accountSettings?.signal_good_threshold,
     accountSettings?.signal_bad_threshold
@@ -187,7 +151,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     </Alert>;
   }
 
-  const getCategoryMetrics = (category: string) => {
+  const getCategoryMetrics = (category: string): ProcessedMetric[] => {
     return (targetMetricSet?.user_custom_metrics_settings || [])
       .filter(setting => setting.category === category)
       .map(setting => {
@@ -220,10 +184,9 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
           label: setting.label,
           enteredValue: enteredDisplayValue,
           targetValue: targetDisplayValue,
-          score: metricDetail?.score, // raw score
-          metricScoreStatus, // status object for coloring
+          score: metricDetail?.score,
+          metricScoreStatus, // Pass the status object directly
           notes: metricDetail?.notes,
-          // The imageUrl for the category is handled separately in the main render
         };
       });
   };
@@ -259,34 +222,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
           </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground/90 mb-2">Overall Site Signal Score</h3>
-            <div className="flex items-center space-x-2">
-              <TrendingUp className={`h-10 w-10 ${signalStatus.iconColor}`} />
-              <p className={`text-4xl font-bold ${signalStatus.color}`}>
-                {typeof overallSiteSignalScore === 'number' 
-                  ? `${overallSiteSignalScore.toFixed(0)}% - ${signalStatus.text}` 
-                  : signalStatus.text}
-              </p>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              A measure of overall site suitability based on your targets. 
-              ({isLoadingAccounts ? 'Loading thresholds...' : accountSettings ? 'Using custom thresholds.' : 'Using default thresholds.'})
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-foreground/90 mb-2">Assessment Completion</h3>
-            <div className="flex items-center space-x-2">
-              <CheckCircle className={`h-10 w-10 ${completionPercentage >= 100 ? 'text-green-500' : 'text-yellow-500'}`} />
-              <p className={`text-4xl font-bold ${completionPercentage >= 100 ? 'text-green-600' : 'text-yellow-600'}`}>
-                {completionPercentage.toFixed(0)}%
-              </p>
-            </div>
-             <Progress value={completionPercentage} className="w-full mt-2 h-3" />
-            <p className="text-sm text-muted-foreground mt-1">
-              Percentage of metrics with entered values.
-            </p>
-          </div>
+          <OverallScoreDisplay
+            overallSiteSignalScore={overallSiteSignalScore}
+            completionPercentage={completionPercentage}
+            signalStatus={overallSignalStatus}
+            isLoadingAccounts={isLoadingAccounts}
+            accountSettings={accountSettings}
+          />
         </CardContent>
       </Card>
 
@@ -309,107 +251,23 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
 
       {allCategories.map(category => {
         const metricsForCategory = getCategoryMetrics(category);
-        if (metricsForCategory.length === 0) return null;
         const categoryImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url;
-
+        
         return (
-          <Card key={category} className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl font-semibold flex items-center">
-                <Tag className="h-6 w-6 mr-2 text-primary" />
-                {category}
-              </CardTitle>
-              {categoryImage && (
-                <CardDescription>Optional image for this section:</CardDescription>
-              )}
-            </CardHeader>
-            <CardContent>
-              {categoryImage && (
-                <div className="mb-6">
-                  <img src={categoryImage} alt={`${category} section image`} className="rounded-md max-h-80 w-auto object-contain border" />
-                </div>
-              )}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[30%]">Metric</TableHead>
-                    <TableHead className="text-center">Entered Value</TableHead>
-                    <TableHead className="text-center">Target Value</TableHead>
-                    <TableHead className="text-center">Signal Score</TableHead>
-                    <TableHead className="w-[30%]">Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {metricsForCategory.map(metric => (
-                    <TableRow key={metric.label}>
-                      <TableCell className="font-medium">{metric.label}</TableCell>
-                      <TableCell className="text-center">{metric.enteredValue}</TableCell>
-                      <TableCell className="text-center">{metric.targetValue}</TableCell>
-                      <TableCell className="text-center">
-                        {typeof metric.score === 'number' 
-                          ? <Badge
-                              variant="outline"
-                              className={`${metric.metricScoreStatus.color} ${metric.metricScoreStatus.color.replace('text-', 'border-')}`}
-                            >
-                              {metric.score.toFixed(0)}%
-                            </Badge> 
-                          : <Badge variant="outline">{metric.metricScoreStatus.text}</Badge>}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{metric.notes || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <MetricCategorySection
+            key={category}
+            category={category}
+            metricsForCategory={metricsForCategory}
+            categoryImage={categoryImage}
+            accountSettings={accountSettings}
+          />
         );
       })}
       
-      {siteVisitRatings && siteVisitRatings.length > 0 && (
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold flex items-center">
-              <ListChecks className="h-6 w-6 mr-2 text-primary" />
-              Site Visit Ratings
-            </CardTitle>
-             {siteVisitSectionImage && (
-                <CardDescription>Optional image for this section:</CardDescription>
-              )}
-          </CardHeader>
-          <CardContent>
-            {siteVisitSectionImage && (
-                <div className="mb-6">
-                  <img src={siteVisitSectionImage} alt="Site Visit section image" className="rounded-md max-h-80 w-auto object-contain border" />
-                </div>
-            )}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[30%]">Criterion</TableHead>
-                  <TableHead className="text-center">Rating</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="w-[30%]">Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {siteVisitRatings.map((rating: AssessmentSiteVisitRatingInsert) => {
-                  const criterionDef = siteVisitCriteria.find(c => c.key === rating.criterion_key);
-                  return (
-                    <TableRow key={rating.criterion_key}>
-                      <TableCell className="font-medium">{criterionDef?.label || rating.criterion_key}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{rating.rating_grade || 'N/A'}</Badge>
-                      </TableCell>
-                       <TableCell className="text-sm text-muted-foreground">{rating.rating_description || criterionDef?.grades.find(g => g.grade === rating.rating_grade)?.description || '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{rating.notes || '-'}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      <SiteVisitRatingsSection
+        siteVisitRatings={siteVisitRatings}
+        siteVisitSectionImage={siteVisitSectionImage}
+      />
     </div>
   );
 };
