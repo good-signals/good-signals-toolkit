@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,9 @@ import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/site
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
+
+// Define the AssessmentStep type
+export type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'assessmentDetails';
 
 const SESSION_STORAGE_KEYS = {
   CURRENT_STEP: 'siteProspector_currentStep',
@@ -259,7 +263,6 @@ const SiteProspectorPage = () => {
         </Button>
       </div>
       
-      {/* Replace the old table section with the new SiteAssessmentsTable component */}
       <SiteAssessmentsTable
         assessmentsData={assessments}
         isLoading={isLoadingAssessments}
@@ -270,8 +273,6 @@ const SiteProspectorPage = () => {
         isDeleting={deleteMutation.isPending}
         forceClearSelectionsKey={clearSelectionsKey}
       />
-
-      {/* AlertDialog for delete confirmation is now inside SiteAssessmentsTable */}
     </div>
   );
 };
