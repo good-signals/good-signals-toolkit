@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Save, TrendingUp, CheckCircle } from 'lucide-react'; // Added TrendingUp, CheckCircle
+import { BarChart3, PlusCircle, Eye, Edit, Loader2, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Save, TrendingUp, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -29,10 +29,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/siteAssessmentService';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
-import { Badge } from '@/components/ui/badge'; // Added Badge for scores
+import { Badge } from '@/components/ui/badge';
 
 type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'inputSiteVisitRatings' | 'assessmentDetails';
-type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage'; // Added new sortable keys
+type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage';
 
 const SiteProspectorPage = () => {
   const [currentStep, setCurrentStep] = useState<AssessmentStep>('idle');
@@ -108,11 +108,10 @@ const SiteProspectorPage = () => {
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
     setActiveAssessmentId(assessmentId);
-    setCurrentStep('assessmentDetails'); // Go to details view after submitting metrics
+    setCurrentStep('assessmentDetails');
     queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
     queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId] });
-    // queryClient.invalidateQueries({ queryKey: ['siteVisitRatings', assessmentId] }); // This might not be needed here
-    queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId]}); // For details view
+    queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId]});
   };
 
   const handleCancelAssessmentProcess = () => {
@@ -123,21 +122,13 @@ const SiteProspectorPage = () => {
   };
   
   const handleBackFromMetricSelection = () => {
-    // This was previously going to newAddress or idle. 
-    // It makes more sense to go back to the main list (idle) if cancelling from metric selection.
-    // For consistency, let's use handleCancelAssessmentProcess for full cancellation.
-    setCurrentStep('newAddress'); // Go back to editing the address/name of current assessment.
-    // If no activeAssessmentId, this would mean cancelling creation, so 'idle'
-    // If (activeAssessmentId) setCurrentStep('newAddress'); else setCurrentStep('idle');
-    // The SelectTargetMetricSetStep's onBack is currently mapped to handleCancelAssessmentProcess
-    // This specific handler is fine as is if it's only for a step back within the flow.
+    setCurrentStep('newAddress');
   };
 
   const handleBackFromMetricInput = () => {
     if (activeAssessmentId) {
       setCurrentStep('selectMetrics');
     } else {
-      // This case should ideally not happen if activeAssessmentId is required for inputMetrics step
       setCurrentStep('idle'); 
     }
   };
@@ -160,16 +151,12 @@ const SiteProspectorPage = () => {
     setActiveAssessmentId(assessment.id);
     if (assessment.target_metric_set_id) {
       setSelectedMetricSetId(assessment.target_metric_set_id);
-      // If metric set exists, user might want to edit metric values or site visit ratings
-      // Taking them to 'inputMetrics' covers the metric values part.
       setCurrentStep('inputMetrics'); 
     } else {
-      // If no metric set, they must select one first.
       setSelectedMetricSetId(null);
       setCurrentStep('selectMetrics');
     }
   };
-
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -199,9 +186,7 @@ const SiteProspectorPage = () => {
   const confirmDelete = async () => {
     const idsToDelete = assessmentToDelete ? [assessmentToDelete.id] : assessmentsToDeleteList;
     if (idsToDelete.length === 0) return;
-    // The mutation will handle individual processing.
     idsToDelete.forEach(id => deleteMutation.mutate(id));
-    // Optimistic update handled by invalidateQueries in onSuccess
   };
 
 
@@ -230,11 +215,10 @@ const SiteProspectorPage = () => {
           return (valA < valB ? -1 : valA > valB ? 1 : 0) * (sortConfig.direction === 'asc' ? 1 : -1);
         }
         if (sortConfig.key === 'created_at') {
-            const dateA = new Date(valA as string).getTime(); // Cast as string if type is Date | string
+            const dateA = new Date(valA as string).getTime();
             const dateB = new Date(valB as string).getTime();
             return (dateA < dateB ? -1 : dateA > dateB ? 1 : 0) * (sortConfig.direction === 'asc' ? 1 : -1);
         }
-        // Fallback for other types if necessary, though current keys are covered.
         return 0;
       });
     }
@@ -254,8 +238,6 @@ const SiteProspectorPage = () => {
     return <NewAssessmentForm 
               onAssessmentCreated={handleAddressStepCompleted} 
               onCancel={handleCancelAssessmentProcess}
-              // Pass activeAssessmentId if editing existing address details
-              existingAssessmentId={activeAssessmentId} 
             />;
   }
 
@@ -263,7 +245,7 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={() => setCurrentStep('newAddress')} // Back to address/name editing
+              onBack={() => setCurrentStep('newAddress')} 
             />;
   }
 
@@ -272,26 +254,20 @@ const SiteProspectorPage = () => {
               assessmentId={activeAssessmentId}
               targetMetricSetId={selectedMetricSetId}
               onMetricsSubmitted={handleMetricValuesSubmitted}
-              onBack={handleBackFromMetricInput} // Back to metric set selection
+              onBack={handleBackFromMetricInput}
             />;
   }
   
-  // SiteVisitRatingsStep is not currently in the main flow from here.
-  // If it were, it would be:
-  // if (currentStep === 'inputSiteVisitRatings' && activeAssessmentId) { ... }
-
-
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
     return (
       <SiteAssessmentDetailsView
         assessmentId={activeAssessmentId}
         metricSetId={selectedMetricSetId}
-        onBack={handleCancelAssessmentProcess} // Back to the main list
+        onBack={handleCancelAssessmentProcess}
       />
     );
   }
   
-  // Fallback to idle state (display assessments table)
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="flex flex-col items-center text-center mb-8">
@@ -396,7 +372,7 @@ const SiteProspectorPage = () => {
                       </TableCell>
                       <TableCell className="text-center">
                         {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
-                           <Badge variant={assessment.site_signal_score >= 75 ? "success" : assessment.site_signal_score >= 50 ? "warning" : "destructive"}>
+                           <Badge variant={assessment.site_signal_score >= 75 ? "success" : assessment.site_signal_score >= 50 ? "secondary" : "destructive"}>
                             {assessment.site_signal_score}%
                            </Badge>
                         ) : (

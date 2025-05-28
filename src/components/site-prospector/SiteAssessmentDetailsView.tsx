@@ -1,30 +1,41 @@
 import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, CheckCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, CheckCircle, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { getSiteAssessmentById, getAssessmentMetricValues, getSiteVisitRatings } from '@/services/siteAssessmentService';
+import { 
+  getSiteAssessmentById, 
+  getAssessmentMetricValues, 
+  getSiteVisitRatings,
+  updateSiteAssessment 
+} from '@/services/siteAssessmentService';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
-import { SiteAssessment, AssessmentMetricValue, AssessmentSiteVisitRatingInsert, siteVisitCriteria } from '@/types/siteAssessmentTypes';
+import { SiteAssessment, AssessmentMetricValue, AssessmentSiteVisitRatingInsert, siteVisitCriteria, SiteAssessmentUpdate } from '@/types/siteAssessmentTypes';
 import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
+import { toast } from '@/components/ui/use-toast';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
   metricSetId: string;
   onBack: () => void;
+  // onEditMetrics: (assessmentId: string, metricSetId: string) => void; // Potentially for an edit button
+  // onEditSiteVisitRatings: (assessmentId: string) => void; // Potentially for an edit button
 }
 
 const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   assessmentId,
   metricSetId,
   onBack,
+  // onEditMetrics,
+  // onEditSiteVisitRatings,
 }) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError } = useQuery<SiteAssessment | null, Error>({
     queryKey: ['siteAssessment', assessmentId, user?.id],
@@ -67,11 +78,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         higherIsBetter: setting.higher_is_better,
       });
       return {
-        ...setting, // Includes label, category, target_value, higher_is_better
+        ...setting,
         entered_value: enteredMetricValue?.entered_value,
         notes: enteredMetricValue?.notes,
-        image_url: enteredMetricValue?.image_url, // if you want to display it
-        metric_id_from_assessment: enteredMetricValue?.id, // if needed
+        image_url: enteredMetricValue?.image_url,
+        metric_id_from_assessment: enteredMetricValue?.id,
         score,
       };
     });
@@ -88,6 +99,59 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     const metricsWithEnteredValues = metricsWithScores.filter(m => typeof m.entered_value === 'number').length;
     return calculateCompletionPercentage(totalMetricsInSet, metricsWithEnteredValues);
   }, [metricSet, metricsWithScores]);
+
+  const updateAssessmentScoresMutation = useMutation({
+    mutationFn: (scores: { site_signal_score: number | null; completion_percentage: number | null }) => {
+      if (!assessmentId || !user?.id) throw new Error('Missing assessment ID or user ID');
+      const updateData: SiteAssessmentUpdate = { 
+        site_signal_score: scores.site_signal_score,
+        completion_percentage: scores.completion_percentage,
+       };
+      return updateSiteAssessment(assessmentId, updateData, user.id);
+    },
+    onSuccess: (updatedAssessment) => {
+      toast({ title: "Scores Updated", description: "Overall Site Signal Score and Completion Percentage have been saved to the database." });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessment', assessmentId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); // To update the list view
+    },
+    onError: (error) => {
+      toast({ title: "Error Updating Scores", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleSaveScores = () => {
+    if (overallSiteSignalScore === null && completionPercentage === null) {
+      toast({ title: "No Scores to Save", description: "Calculated scores are not available.", variant: "default" });
+      return;
+    }
+    updateAssessmentScoresMutation.mutate({
+      site_signal_score: overallSiteSignalScore,
+      completion_percentage: completionPercentage,
+    });
+  };
+  
+  const calculatedScoresDifferFromStored = useMemo(() => {
+    if (!assessment) return false;
+    const storedScore = assessment.site_signal_score;
+    const storedCompletion = assessment.completion_percentage;
+    
+    // Check if calculated scores are valid numbers before comparing
+    const isOverallScoreValid = typeof overallSiteSignalScore === 'number';
+    const isCompletionValid = typeof completionPercentage === 'number';
+
+    const scoreChanged = isOverallScoreValid && overallSiteSignalScore !== storedScore;
+    const completionChanged = isCompletionValid && completionPercentage !== storedCompletion;
+    
+    // If a calculated score is null, but stored is a number, it means data might have been removed, counts as change.
+    // Or if a calculated score is a number, but stored is null, it's a new calculation.
+    const scoreNowNullButWasNumber = overallSiteSignalScore === null && typeof storedScore === 'number';
+    const completionNowNullButWasNumber = completionPercentage === null && typeof storedCompletion === 'number';
+    
+    const scoreNowNumberButWasNull = typeof overallSiteSignalScore === 'number' && storedScore === null;
+    const completionNowNumberButWasNull = typeof completionPercentage === 'number' && storedCompletion === null;
+
+    return scoreChanged || completionChanged || scoreNowNullButWasNumber || completionNowNullButWasNumber || scoreNowNumberButWasNull || completionNowNumberButWasNull;
+  }, [assessment, overallSiteSignalScore, completionPercentage]);
 
   if (isLoadingAssessment || isLoadingMetricSet || isLoadingMetricValues || isLoadingSiteVisitRatings) {
     return (
@@ -144,10 +208,24 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   return (
     <div className="container mx-auto py-10 px-4 space-y-8">
-      <div className="flex justify-start mb-6">
+      <div className="flex justify-between items-center mb-6">
         <Button onClick={onBack} variant="outline" size="lg">
           <ArrowLeft className="mr-2 h-5 w-5" /> Back to Prospector Home
         </Button>
+        {calculatedScoresDifferFromStored && (
+           <Button 
+            onClick={handleSaveScores} 
+            size="lg"
+            disabled={updateAssessmentScoresMutation.isPending}
+          >
+            {updateAssessmentScoresMutation.isPending ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-5 w-5" />
+            )}
+            Save Calculated Scores
+          </Button>
+        )}
       </div>
 
       <Card className="shadow-lg">
@@ -196,7 +274,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
                 <p className="text-muted-foreground">Not enough data to calculate score.</p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Stored Score: {assessment.site_signal_score !== null ? `${assessment.site_signal_score}%` : 'N/A (pending calculation)'}
+                Stored Score: {assessment.site_signal_score !== null ? `${assessment.site_signal_score}%` : 'N/A'}
               </p>
             </div>
             <div>
@@ -209,7 +287,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
                 <span className="text-xl font-bold">{completionPercentage}%</span>
               </div>
                <p className="text-xs text-muted-foreground mt-1">
-                Stored Percentage: {assessment.completion_percentage !== null ? `${assessment.completion_percentage}%` : 'N/A (pending calculation)'}
+                Stored Percentage: {assessment.completion_percentage !== null ? `${assessment.completion_percentage}%` : 'N/A'}
               </p>
             </div>
           </div>
@@ -255,7 +333,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
                           </TableCell>
                           <TableCell className="text-right">
                             {typeof metric.score === 'number' ? (
-                              <Badge variant={metric.score >= 75 ? "success" : metric.score >= 50 ? "warning" : "destructive"} className="text-sm">
+                              <Badge variant={metric.score >= 75 ? "success" : metric.score >= 50 ? "secondary" : "destructive"} className="text-sm">
                                 {metric.score}%
                               </Badge>
                             ) : (
