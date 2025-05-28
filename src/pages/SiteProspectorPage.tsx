@@ -36,10 +36,23 @@ import { Badge } from '@/components/ui/badge';
 type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'inputSiteVisitRatings' | 'assessmentDetails';
 type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage';
 
+const SESSION_STORAGE_KEYS = {
+  CURRENT_STEP: 'siteProspector_currentStep',
+  ACTIVE_ASSESSMENT_ID: 'siteProspector_activeAssessmentId',
+  SELECTED_METRIC_SET_ID: 'siteProspector_selectedMetricSetId',
+};
+
 const SiteProspectorPage = () => {
-  const [currentStep, setCurrentStep] = useState<AssessmentStep>('idle');
-  const [activeAssessmentId, setActiveAssessmentId] = useState<string | null>(null);
-  const [selectedMetricSetId, setSelectedMetricSetId] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<AssessmentStep>(() => {
+    const storedStep = sessionStorage.getItem(SESSION_STORAGE_KEYS.CURRENT_STEP);
+    return (storedStep as AssessmentStep) || 'idle';
+  });
+  const [activeAssessmentId, setActiveAssessmentId] = useState<string | null>(() => {
+    return sessionStorage.getItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID) || null;
+  });
+  const [selectedMetricSetId, setSelectedMetricSetId] = useState<string | null>(() => {
+    return sessionStorage.getItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID) || null;
+  });
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -53,6 +66,26 @@ const SiteProspectorPage = () => {
     direction: 'desc',
   });
 
+  // Effect to save state to session storage
+  useEffect(() => {
+    if (currentStep !== 'idle') {
+      sessionStorage.setItem(SESSION_STORAGE_KEYS.CURRENT_STEP, currentStep);
+      if (activeAssessmentId) {
+        sessionStorage.setItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID, activeAssessmentId);
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID);
+      }
+      if (selectedMetricSetId) {
+        sessionStorage.setItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID, selectedMetricSetId);
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID);
+      }
+    } else {
+      // Clear all when back to idle
+      Object.values(SESSION_STORAGE_KEYS).forEach(key => sessionStorage.removeItem(key));
+    }
+  }, [currentStep, activeAssessmentId, selectedMetricSetId]);
+
   const { 
     data: assessments = [], 
     isLoading: isLoadingAssessments, 
@@ -64,7 +97,7 @@ const SiteProspectorPage = () => {
       if (!user?.id) return Promise.resolve([]);
       return getSiteAssessmentsForUser(user.id);
     },
-    enabled: !!user?.id && currentStep === 'idle',
+    enabled: !!user?.id && currentStep === 'idle', // Only fetch when on the list view
   });
   
   const { data: fetchedTargetMetricSetForDetails, isLoading: isLoadingTargetMetricSetForDetails } = useQuery({
@@ -88,6 +121,12 @@ const SiteProspectorPage = () => {
       setShowDeleteDialog(false);
       setAssessmentToDelete(null);
       setAssessmentsToDeleteList([]);
+      // Ensure we are back to idle state if current view was related to deleted item
+      if (assessmentsToDeleteList.includes(activeAssessmentId ?? "") || assessmentToDelete?.id === activeAssessmentId) {
+        handleCancelAssessmentProcess();
+      } else {
+         refetchAssessments(); // refetch if not navigating away
+      }
     },
     onError: (error) => {
       toast({
@@ -98,6 +137,12 @@ const SiteProspectorPage = () => {
       setShowDeleteDialog(false);
     },
   });
+
+  const clearSessionStorageAssessmentState = () => {
+    sessionStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_STEP);
+    sessionStorage.removeItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID);
+    sessionStorage.removeItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID);
+  };
 
   const handleStartNewAssessment = () => {
     setActiveAssessmentId(null);
@@ -120,7 +165,8 @@ const SiteProspectorPage = () => {
   const handleMetricValuesSubmitted = (assessmentId: string) => {
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null); 
-    setCurrentStep('idle'); // Navigate back to the list view
+    setCurrentStep('idle');
+    clearSessionStorageAssessmentState();
     queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
     toast({
       title: "Assessment Updated",
@@ -132,30 +178,40 @@ const SiteProspectorPage = () => {
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null);
     setCurrentStep('idle');
+    clearSessionStorageAssessmentState();
     refetchAssessments(); 
   };
   
   const handleBackFromMetricSelection = () => {
+    // Potentially clear activeAssessmentId if it was only set for this flow and not from an edit of existing
+    // For now, simple back to newAddress
     setCurrentStep('newAddress');
+    // No need to clear selectedMetricSetId as it's not set yet
+    // ActiveAssessmentId might persist if we want to return to it; for now, it's fine.
   };
 
   const handleBackFromMetricInput = () => {
     if (activeAssessmentId) {
-      // If coming from an edit flow, go back to metric selection if assessment had no target metric set initially
-      // or directly to details if it did. For simplicity now, go to selectMetrics or idle.
-      // To better retain edit context, this might need more state.
-      // For now, if an assessment ID is active, assume we can go to select metrics.
       const assessmentBeingEdited = assessments.find(a => a.id === activeAssessmentId);
-      if (assessmentBeingEdited && assessmentBeingEdited.target_metric_set_id) {
-         setCurrentStep('selectMetrics'); // Or could be 'assessmentDetails' if that was the prior step of edit.
-      } else {
+      if (assessmentBeingEdited?.target_metric_set_id) {
+         // If it had a metric set, it was likely an edit from details or list
+         // Option 1: Go back to details view
+         // handleViewAssessment(assessmentBeingEdited); // This would set currentStep to 'assessmentDetails'
+         // Option 2: Go back to metric selection (if user wants to change metric set)
          setCurrentStep('selectMetrics');
+         // setSelectedMetricSetId is already set, activeAssessmentId is also set
+      } else {
+         // If it didn't have a metric set, it's part of new assessment flow
+         setCurrentStep('selectMetrics');
+         // setSelectedMetricSetId might be null here if they backed out before selecting one
       }
     } else {
+      // Should not happen if activeAssessmentId and selectedMetricSetId are required for 'inputMetrics'
       setCurrentStep('idle'); 
+      clearSessionStorageAssessmentState();
     }
   };
-
+  
   const handleViewAssessment = (assessment: SiteAssessment) => {
     if (!assessment.target_metric_set_id) {
       toast({
@@ -176,7 +232,8 @@ const SiteProspectorPage = () => {
       setSelectedMetricSetId(assessment.target_metric_set_id);
       setCurrentStep('inputMetrics'); 
     } else {
-      setSelectedMetricSetId(null);
+      // If no target_metric_set_id, it means we need to select one first.
+      setSelectedMetricSetId(null); // Clear any previously selected metric set ID
       setCurrentStep('selectMetrics');
     }
   };
@@ -209,7 +266,12 @@ const SiteProspectorPage = () => {
   const confirmDelete = async () => {
     const idsToDelete = assessmentToDelete ? [assessmentToDelete.id] : assessmentsToDeleteList;
     if (idsToDelete.length === 0) return;
+    
+    // Check if the currently viewed/edited assessment is among those to be deleted
+    const currentlyActiveIsDeleted = idsToDelete.includes(activeAssessmentId || "");
+  
     idsToDelete.forEach(id => deleteMutation.mutate(id));
+    // onSuccess of deleteMutation handles state clearing if currently active is deleted.
   };
 
   const requestSort = (key: SortableKeys) => {
@@ -267,7 +329,15 @@ const SiteProspectorPage = () => {
     return <SelectTargetMetricSetStep 
               assessmentId={activeAssessmentId}
               onMetricSetSelected={handleMetricSetSelected}
-              onBack={() => setCurrentStep('newAddress')} 
+              onBack={() => {
+                // Logic for back from metric selection
+                // If this assessmentId was newly created, going back might mean deleting it or going to newAddress
+                // If it was an edit, it depends on where edit was initiated from.
+                // For simplicity, currently leads to newAddress for new flow, or needs smarter logic for edit.
+                // Assuming this is primarily for new assessment flow for now.
+                // We might want to retain activeAssessmentId if it's an edit flow.
+                setCurrentStep('newAddress'); 
+              }}
             />;
   }
 
@@ -281,16 +351,21 @@ const SiteProspectorPage = () => {
   }
   
   if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
-    if (isLoadingTargetMetricSetForDetails) {
-        return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading metric set details...</p></div>;
+    if (isLoadingAssessments || isLoadingTargetMetricSetForDetails) { // Ensure assessments are loaded too if needed for context
+        return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading details...</p></div>;
     }
+    // Find the full assessment object if needed for the details view, or rely on fetchedAssessmentDetails if that's comprehensive
+    // const currentAssessmentForDetails = assessments.find(a => a.id === activeAssessmentId);
+    
     return (
       <SiteAssessmentDetailsView
         assessmentId={activeAssessmentId}
-        targetMetricSet={fetchedTargetMetricSetForDetails || null}
+        targetMetricSet={fetchedTargetMetricSetForDetails || null} // This should be the detailed fetch
         onEdit={(assessmentIdToEdit, metricSetIdToEdit) => {
-            setActiveAssessmentId(assessmentIdToEdit);
-            setSelectedMetricSetId(metricSetIdToEdit);
+            // No need to call setActiveAssessmentId or setSelectedMetricSetId if they are already set
+            // and this is just a transition.
+            // setActiveAssessmentId(assessmentIdToEdit); // already activeAssessmentId
+            // setSelectedMetricSetId(metricSetIdToEdit); // already selectedMetricSetId
             setCurrentStep('inputMetrics');
         }}
         onBackToList={handleCancelAssessmentProcess}
@@ -298,6 +373,7 @@ const SiteProspectorPage = () => {
     );
   }
   
+  // Default view: List of assessments (idle state)
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="flex flex-col items-center text-center mb-8">
