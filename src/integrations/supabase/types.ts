@@ -202,12 +202,14 @@ export type Database = {
           address_line2: string | null
           assessment_name: string | null
           city: string | null
+          completion_percentage: number | null
           country: string | null
           created_at: string
           id: string
           latitude: number | null
           longitude: number | null
           postal_code: string | null
+          site_signal_score: number | null
           state_province: string | null
           target_metric_set_id: string | null
           updated_at: string
@@ -219,12 +221,14 @@ export type Database = {
           address_line2?: string | null
           assessment_name?: string | null
           city?: string | null
+          completion_percentage?: number | null
           country?: string | null
           created_at?: string
           id?: string
           latitude?: number | null
           longitude?: number | null
           postal_code?: string | null
+          site_signal_score?: number | null
           state_province?: string | null
           target_metric_set_id?: string | null
           updated_at?: string
@@ -236,12 +240,14 @@ export type Database = {
           address_line2?: string | null
           assessment_name?: string | null
           city?: string | null
+          completion_percentage?: number | null
           country?: string | null
           created_at?: string
           id?: string
           latitude?: number | null
           longitude?: number | null
           postal_code?: string | null
+          site_signal_score?: number | null
           state_province?: string | null
           target_metric_set_id?: string | null
           updated_at?: string

@@ -118,11 +118,14 @@ const SiteProspectorPage = () => {
   };
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
-    setActiveAssessmentId(assessmentId);
-    setCurrentStep('assessmentDetails');
+    setActiveAssessmentId(null);
+    setSelectedMetricSetId(null); 
+    setCurrentStep('idle'); // Navigate back to the list view
     queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
-    queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId]});
-    queryClient.invalidateQueries({ queryKey: ['assessmentMetricValues', assessmentId]});
+    toast({
+      title: "Assessment Updated",
+      description: "Your site assessment has been successfully updated.",
+    });
   };
 
   const handleCancelAssessmentProcess = () => {
@@ -138,7 +141,16 @@ const SiteProspectorPage = () => {
 
   const handleBackFromMetricInput = () => {
     if (activeAssessmentId) {
-      setCurrentStep('selectMetrics');
+      // If coming from an edit flow, go back to metric selection if assessment had no target metric set initially
+      // or directly to details if it did. For simplicity now, go to selectMetrics or idle.
+      // To better retain edit context, this might need more state.
+      // For now, if an assessment ID is active, assume we can go to select metrics.
+      const assessmentBeingEdited = assessments.find(a => a.id === activeAssessmentId);
+      if (assessmentBeingEdited && assessmentBeingEdited.target_metric_set_id) {
+         setCurrentStep('selectMetrics'); // Or could be 'assessmentDetails' if that was the prior step of edit.
+      } else {
+         setCurrentStep('selectMetrics');
+      }
     } else {
       setCurrentStep('idle'); 
     }
