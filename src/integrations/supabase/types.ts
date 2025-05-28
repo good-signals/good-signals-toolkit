@@ -80,6 +80,50 @@ export type Database = {
         }
         Relationships: []
       }
+      assessment_documents: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+          mime_type: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size: number
+          id?: string
+          mime_type: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_documents_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "site_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_metric_values: {
         Row: {
           assessment_id: string

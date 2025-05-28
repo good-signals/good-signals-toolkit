@@ -33,6 +33,7 @@ import OverallScoreDisplay from './OverallScoreDisplay';
 import MetricCategorySection, { ProcessedMetric } from './MetricCategorySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 import EditableExecutiveSummary from './EditableExecutiveSummary';
+import DocumentUpload from './DocumentUpload';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
