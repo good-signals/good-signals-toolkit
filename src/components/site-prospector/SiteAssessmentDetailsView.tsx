@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, CheckCircle, Save } from 'lucide-react';
+import { Loader2, MapPin, Tag, ListChecks, Edit3, ArrowLeft, Eye, TrendingUp, CheckCircle, Save, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,6 +18,7 @@ import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics'
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
 import { toast } from '@/components/ui/use-toast';
+import AddressMapDisplay from './AddressMapDisplay';
 
 interface SiteAssessmentDetailsViewProps {
   assessmentId: string;
@@ -142,8 +143,6 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     const scoreChanged = isOverallScoreValid && overallSiteSignalScore !== storedScore;
     const completionChanged = isCompletionValid && completionPercentage !== storedCompletion;
     
-    // If a calculated score is null, but stored is a number, it means data might have been removed, counts as change.
-    // Or if a calculated score is a number, but stored is null, it's a new calculation.
     const scoreNowNullButWasNumber = overallSiteSignalScore === null && typeof storedScore === 'number';
     const completionNowNullButWasNumber = completionPercentage === null && typeof storedCompletion === 'number';
     
@@ -294,6 +293,24 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
         </CardContent>
       </Card>
+
+      {/* New Card for Map Display */}
+      {typeof assessment.latitude === 'number' && typeof assessment.longitude === 'number' && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl font-semibold flex items-center">
+              <MapIcon className="h-6 w-6 mr-2 text-primary" />
+              Site Location Map
+            </CardTitle>
+            <CardDescription>
+              Visual representation of the assessed site location.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AddressMapDisplay latitude={assessment.latitude} longitude={assessment.longitude} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="shadow-lg">
         <CardHeader>
