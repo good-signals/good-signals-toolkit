@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Target as TargetIcon, PlusCircle, Trash2, Save, Edit3, List, Info, Plus } from 'lucide-react';
@@ -281,16 +280,12 @@ const TargetMetricsBuilderPage: React.FC = () => {
     mutation.mutate(data);
   };
 
-  const handleAddCustomMetric = (category: string) => {
-    setSelectedCategory(category);
+  const handleAddCustomMetric = () => {
     setCustomMetricFormOpen(true);
   };
 
   const handleCustomMetricSubmit = (data: CreateCustomMetricFormData) => {
-    createCustomMetricMutation.mutate({
-      ...data,
-      category: selectedCategory,
-    });
+    createCustomMetricMutation.mutate(data);
   };
 
   if (authLoading || isLoadingMetricSet || isLoadingCustomMetrics || (currentMetricSetId && isLoadingMetrics)) {
@@ -334,9 +329,19 @@ const TargetMetricsBuilderPage: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/target-metric-sets"><List className="mr-2"/> View All Sets</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleAddCustomMetric}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Custom Metric
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/target-metric-sets"><List className="mr-2"/> View All Sets</Link>
+          </Button>
+        </div>
       </div>
 
       <Form {...form}>
@@ -369,21 +374,9 @@ const TargetMetricsBuilderPage: React.FC = () => {
             return (
               <Card key={category}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl">{category}</CardTitle>
-                      <CardDescription>Set your target values for {category.toLowerCase()} metrics.</CardDescription>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleAddCustomMetric(category)}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Custom Metric
-                    </Button>
+                  <div>
+                    <CardTitle className="text-xl">{category}</CardTitle>
+                    <CardDescription>Set your target values for {category.toLowerCase()} metrics.</CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -627,7 +620,6 @@ const TargetMetricsBuilderPage: React.FC = () => {
         open={customMetricFormOpen}
         onOpenChange={setCustomMetricFormOpen}
         onSubmit={handleCustomMetricSubmit}
-        defaultCategory={selectedCategory}
         isLoading={createCustomMetricMutation.isPending}
       />
     </div>
