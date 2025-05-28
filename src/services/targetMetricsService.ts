@@ -316,6 +316,14 @@ export async function saveUserCustomMetricSettings(
     console.error('Error saving user custom metric settings for set:', error);
     throw error;
   }
+
+  // Update the metric set's updated_at timestamp to trigger cache invalidation
+  await supabase
+    .from(METRIC_SETS_TABLE_NAME)
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', metricSetId);
+  
+  console.log('Updated metric set timestamp for cache invalidation');
   
   return z.array(UserCustomMetricSettingSchema).parse(data || []);
 }
@@ -346,4 +354,39 @@ export async function hasUserSetAnyMetrics(userId: string): Promise<boolean> {
 export async function saveUserStandardMetricsPreference(userId: string): Promise<void> {
   console.log(`User ${userId} has chosen to use standard metrics. Consider saving this preference.`);
   return;
+}
+
+// New function to trigger assessment recalculation
+export async function triggerAssessmentRecalculation(
+  metricSetId: string, 
+  userId: string
+): Promise<{ success: boolean; message: string; details?: any }> {
+  try {
+    // Import the recalculation service
+    const { recalculateAssessmentScoresForMetricSet } = await import('./assessmentRecalculationService');
+    
+    const result = await recalculateAssessmentScoresForMetricSet(metricSetId, userId);
+    
+    if (result.errors.length > 0) {
+      console.warn('Recalculation completed with errors:', result.errors);
+      return {
+        success: true,
+        message: `Updated ${result.updated} assessments with ${result.errors.length} errors`,
+        details: result
+      };
+    }
+    
+    return {
+      success: true,
+      message: `Successfully updated ${result.updated} assessments`,
+      details: result
+    };
+  } catch (error) {
+    console.error('Failed to trigger assessment recalculation:', error);
+    return {
+      success: false,
+      message: 'Failed to recalculate assessment scores',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' }
+    };
+  }
 }

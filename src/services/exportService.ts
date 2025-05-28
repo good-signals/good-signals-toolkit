@@ -140,9 +140,15 @@ const generateOverviewPage = async (
     yPos += 15;
     
     pdf.setFontSize(16);
-    const scoreColor = signalStatus === 'good' ? [0, 128, 0] : 
-                     signalStatus === 'bad' ? [255, 0, 0] : [255, 165, 0];
-    pdf.setTextColor(...scoreColor);
+    let scoreColor: [number, number, number];
+    if (signalStatus === 'good') {
+      scoreColor = [0, 128, 0];
+    } else if (signalStatus === 'bad') {
+      scoreColor = [255, 0, 0];
+    } else {
+      scoreColor = [255, 165, 0];
+    }
+    pdf.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
     pdf.text(`${Math.round(overallSiteSignalScore * 100)}%`, 20, yPos);
     pdf.setTextColor(0);
     yPos += 20;
@@ -222,9 +228,15 @@ const generateCategoryPage = async (
     
     if (metric.score !== null) {
       const scoreText = `${Math.round(metric.score * 100)}%`;
-      const scoreColor = metric.metricScoreStatus === 'good' ? [0, 128, 0] : 
-                        metric.metricScoreStatus === 'bad' ? [255, 0, 0] : [255, 165, 0];
-      pdf.setTextColor(...scoreColor);
+      let scoreColor: [number, number, number];
+      if (metric.metricScoreStatus === 'good') {
+        scoreColor = [0, 128, 0];
+      } else if (metric.metricScoreStatus === 'bad') {
+        scoreColor = [255, 0, 0];
+      } else {
+        scoreColor = [255, 165, 0];
+      }
+      pdf.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
       pdf.text(scoreText, 160, yPos + 5);
       pdf.setTextColor(0);
     }
