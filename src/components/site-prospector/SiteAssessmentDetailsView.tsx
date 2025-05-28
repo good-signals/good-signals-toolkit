@@ -8,7 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getAssessmentDetails, updateAssessmentScores } from '@/services/siteAssessmentService';
-import { TargetMetricSet, UserCustomMetricSetting, nonEditableMetricsWithHardcodedScores } from '@/types/targetMetrics';
+import { TargetMetricSet, UserCustomMetricSetting } from '@/types/targetMetrics';
+import { nonEditableMetricIdentifiers } from '@/config/targetMetricsConfig'; // Updated import
 import { AssessmentMetricValue, AssessmentSiteVisitRatingInsert, SiteAssessment, SiteVisitCriterionKey } from '@/types/siteAssessmentTypes';
 import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,11 +61,9 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
       const metricValue = metricValues.find(mv => mv.metric_identifier === setting.metric_identifier);
       let score: number | null;
 
-      if (nonEditableMetricsWithHardcodedScores.find(nem => nem.identifier === setting.metric_identifier)) {
-        const hardcodedScoreDef = nonEditableMetricsWithHardcodedScores.find(nem => nem.identifier === setting.metric_identifier);
-        score = metricValue?.entered_value === hardcodedScoreDef?.targetValue ? 100 : 
-                metricValue?.entered_value === (hardcodedScoreDef?.options?.[1]?.value) ? 50 : 
-                metricValue?.entered_value === (hardcodedScoreDef?.options?.[2]?.value) ? 0 : null;
+      if (nonEditableMetricIdentifiers.includes(setting.metric_identifier)) {
+        // For these specific metrics, the entered_value (100, 50, or 0) is the score.
+        score = metricValue?.entered_value ?? null;
       } else {
         score = calculateMetricSignalScore({
           enteredValue: metricValue?.entered_value ?? null,
@@ -89,7 +88,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
     const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score));
 
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
-  }, [targetMetricSet, metricValues, siteVisitRatings]);
+  }, [targetMetricSet, metricValues, siteVisitRatings]); // Removed nonEditableMetricIdentifiers from deps as it's a constant
 
   React.useEffect(() => {
     if (assessment && targetMetricSet && user) {
@@ -141,17 +140,17 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({ a
       .filter(setting => setting.category === category)
       .map(setting => {
         const metricDetail = detailedMetricScores.get(setting.metric_identifier);
-        const isNonEditableHardcoded = nonEditableMetricsWithHardcodedScores.find(nem => nem.identifier === setting.metric_identifier);
+        const isNonEditableIdentifier = nonEditableMetricIdentifiers.includes(setting.metric_identifier);
 
         let enteredDisplayValue: string;
-        if (specificDropdownMetrics.includes(setting.metric_identifier) || isNonEditableHardcoded) {
+        if (specificDropdownMetrics.includes(setting.metric_identifier) || isNonEditableIdentifier) {
            enteredDisplayValue = getMetricLabelForValue(setting.metric_identifier, metricDetail?.enteredValue ?? null) ?? (metricDetail?.enteredValue?.toString() ?? 'N/A');
         } else {
            enteredDisplayValue = metricDetail?.enteredValue?.toString() ?? 'N/A';
         }
         
         let targetDisplayValue: string;
-        if (isNonEditableHardcoded) {
+        if (isNonEditableIdentifier) { // Updated check
             targetDisplayValue = "Predefined"; 
         } else if (specificDropdownMetrics.includes(setting.metric_identifier)) {
             targetDisplayValue = getMetricLabelForValue(setting.metric_identifier, metricDetail?.targetValue ?? null) ?? (metricDetail?.targetValue?.toString() ?? 'N/A');

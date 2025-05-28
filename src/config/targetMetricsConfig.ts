@@ -25,14 +25,14 @@ export const predefinedMetricsConfig: PredefinedMetricConfig[] = [
     metric_identifier: "market_saturation_trade_area_overlap", 
     label: "Trade Area Overlap", 
     category: "Market Coverage & Saturation", 
-    higher_is_better: true, // Corrected: Higher value (e.g., 100 for No Overlap) is better.
+    higher_is_better: true,
     description: "Measures overlap with competitor trade areas. (No Overlap = 100, Some = 50, Major = 0). Aim for less overlap (higher value)." 
   },
   { 
     metric_identifier: "market_saturation_heat_map_intersection", 
     label: "Heat Map Intersection", 
     category: "Market Coverage & Saturation", 
-    higher_is_better: true, // Corrected: Higher value (e.g., 100 for Cold Spot) is better.
+    higher_is_better: true,
     description: "Intersection with market hot spots. (Cold Spot = 100, Warm = 50, Hot Spot = 0). Aim for cold spots (higher value)."
   },
   
@@ -50,6 +50,12 @@ export const predefinedMetricsConfig: PredefinedMetricConfig[] = [
   { metric_identifier: "financial_top_line_revenue", label: "Top-Line Revenue ($)", category: "Financial Performance", higher_is_better: true, description: "Total revenue generated." },
   { metric_identifier: "financial_profitability", label: "Profitability ($ or %)", category: "Financial Performance", higher_is_better: true, description: "Measure of profit." },
   { metric_identifier: "financial_payback_period_years", label: "Payback Period (years)", category: "Financial Performance", higher_is_better: false, description: "Time to recoup initial investment." },
+];
+
+export const nonEditableMetricIdentifiers: string[] = [
+  "market_saturation_trade_area_overlap",
+  "market_saturation_heat_map_intersection",
+  "demand_supply_balance",
 ];
 
 export function getDefaultMetricValue(metricIdentifier: string): UserCustomMetricSetting | undefined {

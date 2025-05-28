@@ -100,7 +100,7 @@ export const updateSiteAssessment = async (assessmentId: string, updates: SiteAs
   return {
     ...data,
     assessment_metric_values: data.assessment_metric_values || [],
-    site_visit_ratings: data.site_visit_ratings || []
+    site_visit_ratings: data.assessment_site_visit_ratings || [] // Corrected property name
   } as SiteAssessment;
 };
 
@@ -206,7 +206,7 @@ export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAs
   }
 
   // Fetch related site visit ratings
-  const { data: siteVisitRatings, error: ratingsError } = await supabase
+  const { data: siteVisitRatingsData, error: ratingsError } = await supabase
     .from('assessment_site_visit_ratings')
     .select('*')
     .eq('assessment_id', assessmentId);
@@ -220,7 +220,7 @@ export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAs
   return {
     ...assessmentData,
     assessment_metric_values: metricValues || [],
-    site_visit_ratings: siteVisitRatings || [],
+    site_visit_ratings: siteVisitRatingsData || [], // Ensure mapping to site_visit_ratings
   };
 };
 
@@ -236,16 +236,26 @@ export const updateAssessmentScores = async (
     // Assuming updated_at is handled by a trigger or default value
   };
 
-  const { data, error } = await supabase
+  // Fetch all related data after update to return complete SiteAssessment
+  const { data: updatedAssessment, error: updateError } = await supabase
     .from('site_assessments')
     .update(updates)
     .eq('id', assessmentId)
-    .select('*')
+    .select(`
+      *,
+      assessment_metric_values(*),
+      assessment_site_visit_ratings(*)
+    `)
     .single();
 
-  if (error) {
-    console.error('Error updating assessment scores:', error);
-    throw error;
+  if (updateError) {
+    console.error('Error updating assessment scores:', updateError);
+    throw updateError;
   }
-  return data;
+  
+  return {
+    ...updatedAssessment,
+    assessment_metric_values: updatedAssessment.assessment_metric_values || [],
+    site_visit_ratings: updatedAssessment.assessment_site_visit_ratings || [],
+  };
 };
