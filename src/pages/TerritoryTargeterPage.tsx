@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
 import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
-import { exportTerritoryAnalysisToCSV } from '@/services/territoryExportService';
+import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { useAuth } from '@/contexts/AuthContext';
 import { ManualScoreOverride } from '@/types/territoryTargeterTypes';
 
@@ -70,7 +69,7 @@ const TerritoryTargeterPageContent = () => {
     cancelAnalysis();
   };
 
-  const handleExport = () => {
+  const handleExportCSV = () => {
     if (!currentAnalysis) return;
 
     // Flatten all scores for CSV export
@@ -89,7 +88,30 @@ const TerritoryTargeterPageContent = () => {
       cbsaData,
       scores: allScores,
       analysis: currentAnalysis,
-      executiveSummary // Pass the executive summary to the export
+      executiveSummary
+    });
+  };
+
+  const handleExportExcel = () => {
+    if (!currentAnalysis) return;
+
+    // Flatten all scores for Excel export
+    const allScores: any[] = [];
+    currentAnalysis.criteriaColumns.forEach(column => {
+      column.scores.forEach(score => {
+        allScores.push({
+          ...score,
+          criteriaTitle: column.title,
+          criteriaId: column.id
+        });
+      });
+    });
+
+    exportTerritoryAnalysisToExcel({
+      cbsaData,
+      scores: allScores,
+      analysis: currentAnalysis,
+      executiveSummary
     });
   };
 
@@ -210,9 +232,13 @@ const TerritoryTargeterPageContent = () => {
             <Button onClick={handleClearAnalysis} variant="outline">
               Clear Analysis
             </Button>
-            <Button onClick={handleExport} variant="outline">
+            <Button onClick={handleExportCSV} variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Export to CSV
+              Export CSV
+            </Button>
+            <Button onClick={handleExportExcel} variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Export Excel
             </Button>
           </div>
         </>
