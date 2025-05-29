@@ -16,6 +16,9 @@ import {
   getSiteAssessmentsFromDb,
   updateSiteStatusInDb
 } from './siteAssessment/crudOperations';
+import { saveAssessmentMetricValues, getAssessmentMetricValues } from './siteAssessment/metricValues';
+import { saveSiteVisitRatings, getSiteVisitRatings } from './siteAssessment/siteVisitRatings';
+import { updateAssessmentScores as updateScores } from './siteAssessment/scoring';
 
 export const createSiteAssessment = async (
   assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'>,
@@ -46,10 +49,6 @@ export const getSiteAssessmentsForUser = async (userId: string): Promise<SiteAss
 export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAssessment> => {
   const assessment = await getSiteAssessmentFromDb(assessmentId);
   
-  // Import the functions we need
-  const { getAssessmentMetricValues } = await import('./siteAssessment/metricValues');
-  const { getSiteVisitRatings } = await import('./siteAssessment/siteVisitRatings');
-  
   const [metricValues, siteVisitRatings] = await Promise.all([
     getAssessmentMetricValues(assessmentId),
     getSiteVisitRatings(assessmentId)
@@ -66,7 +65,6 @@ export const saveMetricValuesForAssessment = async (
   assessmentId: string,
   metricValues: AssessmentMetricValueInsert[]
 ): Promise<void> => {
-  const { saveAssessmentMetricValues } = await import('./siteAssessment/metricValues');
   await saveAssessmentMetricValues(assessmentId, metricValues);
 };
 
@@ -74,7 +72,6 @@ export const saveSiteVisitRatingsForAssessment = async (
   assessmentId: string,
   siteVisitRatings: AssessmentSiteVisitRatingInsert[]
 ): Promise<void> => {
-  const { saveSiteVisitRatings } = await import('./siteAssessment/siteVisitRatings');
   await saveSiteVisitRatings(assessmentId, siteVisitRatings);
 };
 
@@ -83,7 +80,6 @@ export const updateAssessmentScores = async (
   overallSiteSignalScore: number | null,
   completionPercentage: number | null
 ): Promise<SiteAssessment> => {
-  const { updateAssessmentScores: updateScores } = await import('./siteAssessment/scoring');
   return await updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
 };
 
