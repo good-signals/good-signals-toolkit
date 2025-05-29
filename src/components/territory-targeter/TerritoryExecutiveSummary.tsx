@@ -23,13 +23,6 @@ const TerritoryExecutiveSummary: React.FC<TerritoryExecutiveSummaryProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Auto-open when summary is generated
-  React.useEffect(() => {
-    if (executiveSummary && !isOpen) {
-      setIsOpen(true);
-    }
-  }, [executiveSummary, isOpen]);
-
   return (
     <Card className="mb-6">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
