@@ -1,4 +1,3 @@
-
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -38,16 +37,19 @@ const getSimpleSignalStatus = (
     return 'neutral';
   }
 
+  // Convert percentage score (0-100) to decimal for threshold comparison
+  const scoreAsDecimal = score / 100;
+  
   const DEFAULT_GOOD_THRESHOLD = 0.75;
   const DEFAULT_BAD_THRESHOLD = 0.50;
   
   const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
   const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
 
-  if (score >= goodThreshold) {
+  if (scoreAsDecimal >= goodThreshold) {
     return 'good';
   }
-  if (score <= badThreshold) {
+  if (scoreAsDecimal <= badThreshold) {
     return 'bad';
   }
   return 'neutral';
@@ -211,7 +213,7 @@ const generateOverviewPage = async (
   pdf.text(`Created: ${format(new Date(assessment.created_at), 'MMM dd, yyyy')}`, 20, yPos);
   yPos += 20;
   
-  // Overall score - Fixed score display (removed *100 multiplication)
+  // Overall score - scores are stored as percentages (0-100), display as is
   if (overallSiteSignalScore !== null) {
     const signalStatus = getSimpleSignalStatus(
       overallSiteSignalScore,
@@ -233,15 +235,15 @@ const generateOverviewPage = async (
       scoreColor = [255, 165, 0];
     }
     pdf.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-    // Fixed: Display score as percentage correctly
-    pdf.text(`${Math.round(overallSiteSignalScore * 100)}%`, 20, yPos);
+    // Display score as percentage (score is already 0-100, just add % sign)
+    pdf.text(`${Math.round(overallSiteSignalScore)}%`, 20, yPos);
     pdf.setTextColor(0);
     yPos += 20;
   }
   
-  // Completion percentage - Fixed display
+  // Completion percentage - stored as percentage (0-100), display as is
   if (completionPercentage !== null) {
-    pdf.text(`Data Completion: ${Math.round(completionPercentage * 100)}%`, 20, yPos);
+    pdf.text(`Data Completion: ${Math.round(completionPercentage)}%`, 20, yPos);
     yPos += 20;
   }
   
@@ -374,8 +376,8 @@ const generateCategoryPage = async (
     pdf.text(metric.targetValue.toString().substring(0, 15), 120, yPos + 5);
     
     if (metric.score !== null) {
-      // Fixed: Display score as percentage correctly (score is already 0-1, just multiply by 100)
-      const scoreText = `${Math.round(metric.score * 100)}%`;
+      // Score is already stored as percentage (0-100), display as is
+      const scoreText = `${Math.round(metric.score)}%`;
       let scoreColor: [number, number, number];
       if (metric.metricScoreStatus === 'good') {
         scoreColor = [0, 128, 0];
