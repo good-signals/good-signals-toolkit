@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData, AIScoreResponse, TerritoryAnalysis, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { toast } from '@/hooks/use-toast';
+import { safeStorage } from '@/utils/safeStorage';
 
 const STORAGE_KEY = 'territoryTargeter_currentAnalysis';
 const ANALYSIS_STATE_KEY = 'territoryTargeter_analysisState';
@@ -17,23 +18,25 @@ interface AnalysisState {
 export const useTerritoryScoring = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<TerritoryAnalysis | null>(() => {
-    // Load saved analysis from localStorage on initialization
-    const saved = localStorage.getItem(STORAGE_KEY);
+    // Safely load saved analysis from localStorage
+    const saved = safeStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        console.log('Loaded saved analysis from localStorage:', parsed.id);
-        return {
-          ...parsed,
-          createdAt: new Date(parsed.createdAt),
-          criteriaColumns: parsed.criteriaColumns?.map((col: any) => ({
-            ...col,
-            createdAt: new Date(col.createdAt)
-          })) || []
-        };
+        const parsed = safeStorage.safeParse(saved, null);
+        if (parsed) {
+          console.log('Loaded saved analysis from localStorage:', parsed.id);
+          return {
+            ...parsed,
+            createdAt: new Date(parsed.createdAt),
+            criteriaColumns: parsed.criteriaColumns?.map((col: any) => ({
+              ...col,
+              createdAt: new Date(col.createdAt)
+            })) || []
+          };
+        }
       } catch (error) {
-        console.error('Failed to parse saved analysis:', error);
-        localStorage.removeItem(STORAGE_KEY);
+        console.error('Failed to load saved analysis:', error);
+        safeStorage.removeItem(STORAGE_KEY);
       }
     }
     return null;
@@ -47,45 +50,48 @@ export const useTerritoryScoring = () => {
 
   // Check for in-progress analysis on mount
   useEffect(() => {
-    const savedState = localStorage.getItem(ANALYSIS_STATE_KEY);
-    if (savedState) {
-      try {
-        const analysisState: AnalysisState = JSON.parse(savedState);
-        console.log('Found saved analysis state:', analysisState);
+    try {
+      const savedState = safeStorage.getItem(ANALYSIS_STATE_KEY);
+      if (savedState) {
+        const analysisState: AnalysisState = safeStorage.safeParse(savedState, null);
         
-        if (analysisState.status === 'running') {
-          // Check if analysis has been running too long (timeout after 12 minutes now)
-          const elapsed = Date.now() - analysisState.startTime;
-          if (elapsed > 12 * 60 * 1000) {
-            console.log('Analysis timed out, cleaning up stale state');
-            localStorage.removeItem(ANALYSIS_STATE_KEY);
+        if (analysisState) {
+          console.log('Found saved analysis state:', analysisState);
+          
+          if (analysisState.status === 'running') {
+            // Check if analysis has been running too long (timeout after 12 minutes now)
+            const elapsed = Date.now() - analysisState.startTime;
+            if (elapsed > 12 * 60 * 1000) {
+              console.log('Analysis timed out, cleaning up stale state');
+              safeStorage.removeItem(ANALYSIS_STATE_KEY);
+              
+              toast({
+                title: "Analysis Timed Out",
+                description: "Your previous analysis took too long and was cancelled. Please try again with a simpler prompt or use Fast Analysis mode.",
+                variant: "destructive",
+              });
+              return;
+            }
+            
+            // Resume tracking the analysis
+            console.log('Resuming analysis tracking for:', analysisState.id);
+            setIsLoading(true);
+            setAnalysisStartTime(analysisState.startTime);
             
             toast({
-              title: "Analysis Timed Out",
-              description: "Your previous analysis took too long and was cancelled. Please try again with a simpler prompt or use Fast Analysis mode.",
-              variant: "destructive",
+              title: "Analysis Resumed",
+              description: "Continuing your territory analysis in the background...",
             });
-            return;
+          } else if (analysisState.status === 'completed') {
+            // Clean up completed analysis state
+            console.log('Cleaning up completed analysis state');
+            safeStorage.removeItem(ANALYSIS_STATE_KEY);
           }
-          
-          // Resume tracking the analysis
-          console.log('Resuming analysis tracking for:', analysisState.id);
-          setIsLoading(true);
-          setAnalysisStartTime(analysisState.startTime);
-          
-          toast({
-            title: "Analysis Resumed",
-            description: "Continuing your territory analysis in the background...",
-          });
-        } else if (analysisState.status === 'completed') {
-          // Clean up completed analysis state
-          console.log('Cleaning up completed analysis state');
-          localStorage.removeItem(ANALYSIS_STATE_KEY);
         }
-      } catch (error) {
-        console.error('Failed to parse saved analysis state:', error);
-        localStorage.removeItem(ANALYSIS_STATE_KEY);
       }
+    } catch (error) {
+      console.error('Failed to parse saved analysis state:', error);
+      safeStorage.removeItem(ANALYSIS_STATE_KEY);
     }
   }, []);
 
@@ -93,9 +99,9 @@ export const useTerritoryScoring = () => {
   useEffect(() => {
     if (currentAnalysis) {
       console.log('Saving analysis to localStorage:', currentAnalysis.id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      safeStorage.removeItem(STORAGE_KEY);
     }
   }, [currentAnalysis]);
 
@@ -219,8 +225,9 @@ export const useTerritoryScoring = () => {
       status: 'running'
     };
     
-    localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(analysisState));
-    console.log('Saved analysis state to localStorage:', analysisId);
+    if (!safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(analysisState))) {
+      console.warn('Failed to save analysis state to localStorage');
+    }
 
     // Show initial feedback with estimated time
     toast({
@@ -319,12 +326,12 @@ export const useTerritoryScoring = () => {
       
       // Update analysis state to completed
       const completedState = { ...analysisState, status: 'completed' as const };
-      localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(completedState));
+      safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(completedState));
       console.log('Updated analysis state to completed');
       
       // Clean up analysis state after a short delay
       setTimeout(() => {
-        localStorage.removeItem(ANALYSIS_STATE_KEY);
+        safeStorage.removeItem(ANALYSIS_STATE_KEY);
         console.log('Cleaned up analysis state');
       }, 2000);
       
@@ -344,7 +351,7 @@ export const useTerritoryScoring = () => {
       
       // Update analysis state to failed
       const failedState = { ...analysisState, status: 'failed' as const };
-      localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(failedState));
+      safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(failedState));
       
       // Provide helpful error feedback
       let userFriendlyMessage = errorMessage;
@@ -509,8 +516,8 @@ export const useTerritoryScoring = () => {
   const clearAnalysis = () => {
     setCurrentAnalysis(null);
     setError(null);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(ANALYSIS_STATE_KEY);
+    safeStorage.removeItem(STORAGE_KEY);
+    safeStorage.removeItem(ANALYSIS_STATE_KEY);
     
     toast({
       title: "Analysis Cleared",

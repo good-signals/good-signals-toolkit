@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 import PromptInput from '@/components/territory-targeter/PromptInput';
 import CBSATable from '@/components/territory-targeter/CBSATable';
 import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
@@ -11,10 +12,13 @@ import { exportTerritoryAnalysisToCSV } from '@/services/territoryExportService'
 import { useAuth } from '@/contexts/AuthContext';
 import { CBSAData, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSelector';
+import { safeStorage } from '@/utils/safeStorage';
 
-const TerritoryTargeterPage = () => {
+const TerritoryTargeterPageContent = () => {
   const { user } = useAuth();
   const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
   const { 
     isLoading, 
     currentAnalysis, 
@@ -32,19 +36,21 @@ const TerritoryTargeterPage = () => {
 
   // Load saved statuses from localStorage on component mount
   useEffect(() => {
-    const savedStatuses = localStorage.getItem('cbsa-statuses');
-    if (savedStatuses) {
-      try {
-        const statusMap = JSON.parse(savedStatuses);
+    try {
+      const savedStatuses = safeStorage.getItem('cbsa-statuses');
+      if (savedStatuses) {
+        const statusMap = safeStorage.safeParse(savedStatuses, {});
         setCbsaData(prevData =>
           prevData.map(cbsa => ({
             ...cbsa,
             status: statusMap[cbsa.id] || undefined
           }))
         );
-      } catch (error) {
-        console.error('Failed to load saved CBSA statuses:', error);
       }
+    } catch (error) {
+      console.error('Failed to load saved CBSA statuses:', error);
+    } finally {
+      setIsInitialized(true);
     }
   }, []);
 
@@ -91,18 +97,18 @@ const TerritoryTargeterPage = () => {
     );
 
     // Save to localStorage
-    const savedStatuses = localStorage.getItem('cbsa-statuses');
-    let statusMap = {};
-    if (savedStatuses) {
-      try {
-        statusMap = JSON.parse(savedStatuses);
-      } catch (error) {
-        console.error('Failed to parse saved statuses:', error);
+    try {
+      const savedStatuses = safeStorage.getItem('cbsa-statuses');
+      let statusMap = {};
+      if (savedStatuses) {
+        statusMap = safeStorage.safeParse(savedStatuses, {});
       }
+      
+      statusMap[cbsaId] = status;
+      safeStorage.setItem('cbsa-statuses', JSON.stringify(statusMap));
+    } catch (error) {
+      console.error('Failed to save CBSA status:', error);
     }
-    
-    statusMap[cbsaId] = status;
-    localStorage.setItem('cbsa-statuses', JSON.stringify(statusMap));
   };
 
   const handleRefreshColumn = async (columnId: string, type: 'all' | 'na-only') => {
@@ -122,6 +128,20 @@ const TerritoryTargeterPage = () => {
         }, 0) / currentAnalysis.criteriaColumns.length
       )
     : 0;
+
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="text-center">
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-1/3 mx-auto mb-4"></div>
+            <div className="h-4 bg-muted rounded w-1/2 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -207,6 +227,14 @@ const TerritoryTargeterPage = () => {
         isRefreshing={isRefreshing}
       />
     </div>
+  );
+};
+
+const TerritoryTargeterPage = () => {
+  return (
+    <ErrorBoundary>
+      <TerritoryTargeterPageContent />
+    </ErrorBoundary>
   );
 };
 
