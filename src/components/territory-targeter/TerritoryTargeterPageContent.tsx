@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
@@ -237,7 +236,6 @@ const TerritoryTargeterPageContent: React.FC = () => {
           <PromptInput 
             isLoading={isProcessing}
             onSubmit={handlePromptSubmit}
-            analysisStartTime={isProcessing ? Date.now() : null}
           />
 
           {currentAnalysis && cbsaData.length > 0 && (
@@ -271,7 +269,6 @@ const TerritoryTargeterPageContent: React.FC = () => {
           {isProcessing && currentAnalysis && (
             <ProgressCounter 
               isActive={isProcessing}
-              analysisId={currentAnalysis.id}
             />
           )}
         </div>
