@@ -15,22 +15,38 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
   const [isLoading, setIsLoading] = useState(true);
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [staticMapLoaded, setStaticMapLoaded] = useState(false);
+
+  console.log('AddressMapDisplay state:', { 
+    isLoading, 
+    mapError, 
+    googleMapsLoaded, 
+    staticMapLoaded, 
+    hasStaticMapUrl: !!staticMapUrl 
+  });
 
   // Load Google Maps JavaScript API
   useEffect(() => {
     const loadGoogleMaps = () => {
+      console.log('Starting Google Maps load process...');
+      
       // Check if Google Maps is already loaded
       if (window.google && window.google.maps) {
+        console.log('Google Maps already loaded');
         setGoogleMapsLoaded(true);
+        setIsLoading(false);
         return;
       }
 
       // Check if script is already being loaded
       if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        console.log('Google Maps script already in DOM, waiting for load...');
         // Wait for it to load
         const checkLoaded = setInterval(() => {
           if (window.google && window.google.maps) {
+            console.log('Google Maps loaded via existing script');
             setGoogleMapsLoaded(true);
+            setIsLoading(false);
             clearInterval(checkLoaded);
           }
         }, 100);
@@ -48,6 +64,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       }
 
       // Create and load the script
+      console.log('Creating Google Maps script...');
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCYg8pkH1rO2z8p6YtsocdhG0s-FKInCnU'}&libraries=places`;
       script.async = true;
@@ -56,6 +73,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       script.onload = () => {
         console.log('Google Maps API loaded successfully');
         setGoogleMapsLoaded(true);
+        setIsLoading(false);
       };
       
       script.onerror = (error) => {
@@ -73,6 +91,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
   // Generate static map as fallback
   useEffect(() => {
     const generateStaticMap = async () => {
+      console.log('Generating static map...');
       try {
         const response = await fetch('https://thfphcgufrygruqoekvz.supabase.co/functions/v1/generate-map-image', {
           method: 'POST',
@@ -90,15 +109,28 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
 
         if (response.ok) {
           const data = await response.json();
+          console.log('Static map generated successfully:', data.imageUrl);
           setStaticMapUrl(data.imageUrl);
+          setStaticMapLoaded(true);
+          
+          // If Google Maps hasn't loaded yet, stop loading state
+          if (!googleMapsLoaded) {
+            setIsLoading(false);
+          }
+        } else {
+          console.error('Static map generation failed:', response.status, response.statusText);
+          setStaticMapLoaded(true);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Failed to generate static map:', error);
+        setStaticMapLoaded(true);
+        setIsLoading(false);
       }
     };
 
     generateStaticMap();
-  }, [latitude, longitude]);
+  }, [latitude, longitude, googleMapsLoaded]);
 
   // Initialize Google Maps when API is loaded
   useEffect(() => {
@@ -107,6 +139,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     }
 
     try {
+      console.log('Initializing Google Maps...');
       const mapCenter = { lat: latitude, lng: longitude };
 
       if (!mapRef.current) {
@@ -124,12 +157,15 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
           map: mapRef.current,
           title: 'Selected Location',
         });
+        
+        console.log('Google Maps initialized successfully');
       } else {
         // Update existing map
         mapRef.current.setCenter(mapCenter);
         if (markerRef.current) {
           markerRef.current.setPosition(mapCenter);
         }
+        console.log('Google Maps updated successfully');
       }
 
       setIsLoading(false);
@@ -140,8 +176,8 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     }
   }, [googleMapsLoaded, latitude, longitude, mapError]);
 
-  // Show loading state
-  if (isLoading && !mapError) {
+  // Show loading state only if both Google Maps and static map are still loading
+  if (isLoading && !googleMapsLoaded && !staticMapLoaded) {
     return (
       <div className="w-full h-[300px] rounded-md border flex items-center justify-center bg-gray-50">
         <div className="flex items-center space-x-2 text-gray-600">
@@ -152,37 +188,40 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     );
   }
 
-  // Show static map fallback if Google Maps failed to load
-  if (mapError || !googleMapsLoaded) {
-    return (
-      <div className="w-full h-[300px] rounded-md border bg-gray-50 overflow-hidden">
-        {staticMapUrl ? (
-          <img 
-            src={staticMapUrl} 
-            alt={`Map showing location at ${latitude}, ${longitude}`}
-            className="w-full h-full object-cover"
-            onError={() => {
-              console.error('Static map image failed to load');
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 p-4">
-            <MapPin className="h-8 w-8 mb-2" />
-            <p className="text-sm text-center mb-1">Location Map</p>
-            <p className="text-xs text-center text-gray-500">
-              Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
-            </p>
-            <p className="text-xs text-center text-gray-400 mt-2">
-              Interactive map unavailable
-            </p>
-          </div>
-        )}
-      </div>
-    );
+  // Show Google Maps if it loaded successfully
+  if (googleMapsLoaded && !mapError) {
+    console.log('Rendering Google Maps container');
+    return <div ref={mapContainerRef} className="w-full h-[300px] rounded-md border" />;
   }
 
-  // Render Google Maps container
-  return <div ref={mapContainerRef} className="w-full h-[300px] rounded-md border" />;
+  // Show static map fallback
+  console.log('Rendering static map fallback');
+  return (
+    <div className="w-full h-[300px] rounded-md border bg-gray-50 overflow-hidden">
+      {staticMapUrl ? (
+        <img 
+          src={staticMapUrl} 
+          alt={`Map showing location at ${latitude}, ${longitude}`}
+          className="w-full h-full object-cover"
+          onLoad={() => console.log('Static map image loaded successfully')}
+          onError={() => {
+            console.error('Static map image failed to load');
+          }}
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 p-4">
+          <MapPin className="h-8 w-8 mb-2" />
+          <p className="text-sm text-center mb-1">Location Map</p>
+          <p className="text-xs text-center text-gray-500">
+            Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+          </p>
+          <p className="text-xs text-center text-gray-400 mt-2">
+            Map temporarily unavailable
+          </p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default AddressMapDisplay;
