@@ -190,6 +190,29 @@ export const useTerritoryScoring = () => {
     return await processMarketsInChunks(prompt, cbsaData, analysisId, 'fast');
   };
 
+  const cancelAnalysis = () => {
+    console.log('Cancelling territory analysis...');
+    
+    // Abort the current request
+    if (analysisRequestRef.current) {
+      analysisRequestRef.current.abort();
+      analysisRequestRef.current = null;
+    }
+
+    // Clean up state
+    setIsLoading(false);
+    setAnalysisStartTime(null);
+    setError(null);
+    
+    // Clean up saved analysis state
+    safeStorage.removeItem(ANALYSIS_STATE_KEY);
+    
+    toast({
+      title: "Analysis Cancelled",
+      description: "Territory analysis has been cancelled. You can start a new analysis.",
+    });
+  };
+
   const runScoring = async (prompt: string, cbsaData: CBSAData[], mode: 'fast' | 'detailed' = 'detailed') => {
     console.log('Starting territory scoring analysis...');
     console.log('Prompt:', prompt);
@@ -250,7 +273,8 @@ export const useTerritoryScoring = () => {
               userPrompt: prompt,
               cbsaData: cbsaData,
               analysisMode: mode
-            }
+            },
+            signal: analysisRequestRef.current?.signal
           });
 
           if (error) {
@@ -265,6 +289,12 @@ export const useTerritoryScoring = () => {
         }
       } catch (primaryError) {
         console.error('Primary analysis failed:', primaryError);
+        
+        // Check if this was an abort error
+        if (primaryError instanceof Error && primaryError.name === 'AbortError') {
+          console.log('Analysis was cancelled by user');
+          return;
+        }
         
         // If we were doing detailed analysis, try fast mode as fallback
         if (mode === 'detailed') {
@@ -346,6 +376,12 @@ export const useTerritoryScoring = () => {
 
       return updatedAnalysis;
     } catch (err) {
+      // Check if this was an abort error
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Analysis was cancelled by user');
+        return;
+      }
+
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Territory scoring error:', errorMessage);
       setError(errorMessage);
@@ -590,6 +626,7 @@ export const useTerritoryScoring = () => {
     estimatedDuration,
     isRefreshing,
     runScoring,
+    cancelAnalysis,
     refreshColumn,
     applyManualOverride,
     updateIncludedColumns,

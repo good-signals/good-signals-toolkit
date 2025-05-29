@@ -41,6 +41,7 @@ const TerritoryTargeterPageContent = () => {
     estimatedDuration,
     isRefreshing,
     runScoring,
+    cancelAnalysis,
     refreshColumn,
     applyManualOverride,
     toggleColumnInSignalScore,
@@ -91,6 +92,10 @@ const TerritoryTargeterPageContent = () => {
     } catch (err) {
       console.error('Failed to run scoring:', err);
     }
+  };
+
+  const handleCancelAnalysis = () => {
+    cancelAnalysis();
   };
 
   const handleExport = () => {
@@ -260,6 +265,7 @@ const TerritoryTargeterPageContent = () => {
       {/* 1. Prompt Input */}
       <PromptInput 
         onSubmit={handlePromptSubmit}
+        onCancel={handleCancelAnalysis}
         isLoading={isLoading}
         analysisStartTime={analysisStartTime}
         analysisMode={analysisMode}

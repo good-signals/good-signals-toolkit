@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ProgressCounter from './ProgressCounter';
 import AnalysisModeSelector from './AnalysisModeSelector';
 
 interface PromptInputProps {
   onSubmit: (prompt: string, mode: 'fast' | 'detailed') => void;
+  onCancel?: () => void;
   isLoading: boolean;
   analysisStartTime?: number | null;
   analysisMode?: 'fast' | 'detailed';
@@ -20,7 +21,8 @@ interface PromptInputProps {
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({ 
-  onSubmit, 
+  onSubmit,
+  onCancel,
   isLoading, 
   analysisStartTime,
   analysisMode = 'detailed',
@@ -38,6 +40,12 @@ const PromptInput: React.FC<PromptInputProps> = ({
     if (prompt.trim() && !isLoading) {
       onSubmit(prompt.trim(), selectedMode);
       setPrompt(''); // Clear prompt after submission
+    }
+  };
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
     }
   };
 
@@ -106,21 +114,31 @@ const PromptInput: React.FC<PromptInputProps> = ({
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 items-start">
-                <Button 
-                  type="submit" 
-                  disabled={!prompt.trim() || isLoading || disabled}
-                  className="whitespace-nowrap"
-                >
-                  {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
-                  {isLoading 
-                    ? `Analyzing Markets (${selectedMode})...` 
-                    : hasExistingAnalysis
+                {!isLoading ? (
+                  <Button 
+                    type="submit" 
+                    disabled={!prompt.trim() || isLoading || disabled}
+                    className="whitespace-nowrap"
+                  >
+                    {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
+                    {hasExistingAnalysis
                       ? `Add Criteria (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
                       : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
-                  }
-                </Button>
+                    }
+                  </Button>
+                ) : (
+                  <Button 
+                    type="button"
+                    variant="destructive"
+                    onClick={handleCancel}
+                    className="whitespace-nowrap"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Cancel Analysis
+                  </Button>
+                )}
                 
-                {!hasExistingAnalysis && (
+                {!hasExistingAnalysis && !isLoading && (
                   <div className="text-sm text-muted-foreground">
                     <p className="mb-2">Example prompts:</p>
                     <ul className="space-y-1">
