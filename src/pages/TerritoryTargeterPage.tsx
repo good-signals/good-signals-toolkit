@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/common/ErrorBoundary';
 import PromptInput from '@/components/territory-targeter/PromptInput';
 import CBSATable from '@/components/territory-targeter/CBSATable';
 import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
+import TerritoryExecutiveSummary from '@/components/territory-targeter/TerritoryExecutiveSummary';
 import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
 import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { sampleCBSAData } from '@/data/sampleCBSAData';
@@ -14,29 +15,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CBSAData, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSelector';
 import { safeStorage } from '@/utils/safeStorage';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const TerritoryTargeterPageContent = () => {
   const { user } = useAuth();
   const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [executiveSummary, setExecutiveSummary] = useState<string>('');
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   
-  const { 
-    isLoading, 
-    currentAnalysis, 
-    error, 
-    analysisStartTime, 
-    analysisMode,
-    estimatedDuration,
-    isRefreshing,
-    runScoring, 
-    refreshColumn,
-    applyManualOverride,
-    toggleColumnInSignalScore,
-    deleteColumn,
-    clearAnalysis,
-    setAnalysisMode
-  } = useTerritoryScoring();
-
   // Load saved statuses from localStorage on component mount
   useEffect(() => {
     try {
@@ -130,6 +118,49 @@ const TerritoryTargeterPageContent = () => {
     deleteColumn(columnId);
   };
 
+  const handleGenerateExecutiveSummary = async () => {
+    if (!currentAnalysis || !user) return;
+
+    setIsGeneratingSummary(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-territory-summary', {
+        body: {
+          analysis: currentAnalysis,
+          cbsaData: cbsaData,
+          topMarketCount: 8
+        }
+      });
+
+      if (error) {
+        throw new Error(`Failed to generate executive summary: ${error.message}`);
+      }
+
+      if (!data || !data.executiveSummary) {
+        throw new Error('Executive summary generation did not return content.');
+      }
+
+      setExecutiveSummary(data.executiveSummary);
+      
+      toast({
+        title: "Executive Summary Generated",
+        description: "AI-powered executive summary has been created for your territory analysis.",
+      });
+
+    } catch (err) {
+      console.error('Failed to generate executive summary:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      
+      toast({
+        title: "Summary Generation Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
   // Calculate average market signal score across all criteria
   const averageMarketSignalScore = currentAnalysis 
     ? Math.round(
@@ -205,11 +236,20 @@ const TerritoryTargeterPageContent = () => {
         </Alert>
       )}
 
-      {/* 2. Executive Summary (only show after analysis) */}
+      {/* 2. AI Logic Summary and Executive Summary (only show after analysis) */}
       {currentAnalysis && currentAnalysis.criteriaColumns.length > 0 && (
         <>
           <ExecutiveSummary 
             criteriaColumns={currentAnalysis.criteriaColumns}
+          />
+
+          {/* Executive Summary */}
+          <TerritoryExecutiveSummary
+            analysis={currentAnalysis}
+            cbsaData={cbsaData}
+            onGenerateSummary={handleGenerateExecutiveSummary}
+            isGenerating={isGeneratingSummary}
+            executiveSummary={executiveSummary}
           />
 
           {/* 3. Column Management */}
