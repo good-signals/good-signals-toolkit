@@ -82,9 +82,9 @@ export const updateAssessmentScores = async (
   assessmentId: string,
   overallSiteSignalScore: number | null,
   completionPercentage: number | null
-): Promise<void> => {
+): Promise<SiteAssessment> => {
   const { updateAssessmentScores: updateScores } = await import('./siteAssessment/scoring');
-  await updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
+  return await updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
 };
 
 // New function to update site status
