@@ -9,6 +9,7 @@ export const useAnalysisProcessing = () => {
 
   // Process markets in chunks to avoid timeouts
   const processMarketsInChunks = async (prompt: string, cbsaData: CBSAData[], analysisId: string, mode: 'fast' | 'detailed') => {
+    console.log('=== CHUNK PROCESSING START ===');
     const chunkSize = mode === 'fast' ? 50 : 30;
     const chunks = [];
     
@@ -22,66 +23,118 @@ export const useAnalysisProcessing = () => {
     let combinedSummary = '';
     let suggestedTitle = '';
 
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
-      
-      // Check if request was aborted before processing each chunk
-      if (analysisRequestRef.current?.signal.aborted) {
-        throw new Error('Analysis was cancelled');
-      }
-      
-      const { data, error } = await supabase.functions.invoke('territory-scoring', {
-        body: {
-          userPrompt: prompt,
-          cbsaData: chunk,
-          analysisMode: mode,
-          isChunked: chunks.length > 1,
-          chunkIndex: i,
-          totalChunks: chunks.length
+    // Set a timeout for the entire chunked operation
+    const timeoutDuration = mode === 'fast' ? 10 * 60 * 1000 : 15 * 60 * 1000; // 10 or 15 minutes
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Analysis timed out after ${timeoutDuration / 60000} minutes. Try using Fast Analysis mode or simplifying your prompt.`));
+      }, timeoutDuration);
+    });
+
+    try {
+      const processingPromise = (async () => {
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
+          
+          // Check if request was aborted before processing each chunk
+          if (analysisRequestRef.current?.signal.aborted) {
+            console.log('Analysis was cancelled during chunk processing');
+            throw new Error('Analysis was cancelled');
+          }
+          
+          try {
+            const { data, error } = await supabase.functions.invoke('territory-scoring', {
+              body: {
+                userPrompt: prompt,
+                cbsaData: chunk,
+                analysisMode: mode,
+                isChunked: chunks.length > 1,
+                chunkIndex: i,
+                totalChunks: chunks.length
+              }
+            });
+
+            if (error) {
+              console.error(`Chunk ${i + 1} error:`, error);
+              throw new Error(`Chunk ${i + 1} failed: ${error.message}`);
+            }
+
+            if (!data.success) {
+              console.error(`Chunk ${i + 1} returned failure:`, data.error);
+              throw new Error(`Chunk ${i + 1} returned error: ${data.error}`);
+            }
+
+            console.log(`Chunk ${i + 1} completed successfully with ${data.data.scores.length} scores`);
+            allScores = [...allScores, ...data.data.scores];
+            
+            if (i === 0) {
+              combinedSummary = data.data.prompt_summary;
+              suggestedTitle = data.data.suggested_title;
+            }
+
+            if (chunks.length > 1) {
+              toast({
+                title: "Processing Markets",
+                description: `Completed ${i + 1} of ${chunks.length} chunks (${allScores.length}/${cbsaData.length} markets scored)`,
+              });
+            }
+          } catch (chunkError) {
+            console.error(`Chunk ${i + 1} processing failed:`, chunkError);
+            
+            // If it's a cancellation, re-throw it
+            if (chunkError instanceof Error && (chunkError.message.includes('cancelled') || chunkError.message.includes('abort'))) {
+              throw chunkError;
+            }
+            
+            // For other errors, provide more context
+            const errorMessage = chunkError instanceof Error ? chunkError.message : 'Unknown error';
+            throw new Error(`Failed to process chunk ${i + 1}/${chunks.length}: ${errorMessage}`);
+          }
         }
-      });
 
-      if (error) {
-        throw new Error(`Chunk ${i + 1} failed: ${error.message}`);
-      }
+        return {
+          suggested_title: suggestedTitle,
+          prompt_summary: combinedSummary,
+          scores: allScores
+        };
+      })();
 
-      if (!data.success) {
-        throw new Error(`Chunk ${i + 1} returned error: ${data.error}`);
-      }
+      // Race between processing and timeout
+      const result = await Promise.race([processingPromise, timeoutPromise]);
+      console.log('=== CHUNK PROCESSING SUCCESS ===');
+      return result as AIScoreResponse;
 
-      allScores = [...allScores, ...data.data.scores];
+    } catch (error) {
+      console.error('=== CHUNK PROCESSING ERROR ===');
+      console.error('Error:', error);
       
-      if (i === 0) {
-        combinedSummary = data.data.prompt_summary;
-        suggestedTitle = data.data.suggested_title;
+      if (error instanceof Error && error.message.includes('timed out')) {
+        console.log('Chunk processing timed out');
       }
-
-      if (chunks.length > 1) {
-        toast({
-          title: "Processing Markets",
-          description: `Completed ${i + 1} of ${chunks.length} chunks (${allScores.length}/${cbsaData.length} markets scored)`,
-        });
-      }
+      
+      throw error;
     }
-
-    return {
-      suggested_title: suggestedTitle,
-      prompt_summary: combinedSummary,
-      scores: allScores
-    };
   };
 
   // Retry with simpler analysis if detailed fails
   const retryWithSimpleAnalysis = async (prompt: string, cbsaData: CBSAData[], analysisId: string) => {
-    console.log('Retrying with fast analysis mode after timeout...');
+    console.log('=== RETRY WITH FAST ANALYSIS ===');
+    console.log('Retrying with fast analysis mode after failure...');
     
     toast({
       title: "Switching to Fast Analysis",
-      description: "Detailed analysis timed out. Trying with faster mode...",
+      description: "Detailed analysis failed. Trying with faster mode...",
     });
 
-    return await processMarketsInChunks(prompt, cbsaData, analysisId, 'fast');
+    try {
+      const result = await processMarketsInChunks(prompt, cbsaData, analysisId, 'fast');
+      console.log('Fast analysis retry successful');
+      return result;
+    } catch (retryError) {
+      console.error('Fast analysis retry also failed:', retryError);
+      throw new Error(`Both detailed and fast analysis failed. ${retryError instanceof Error ? retryError.message : 'Please try again with a simpler prompt.'}`);
+    }
   };
 
   const cancelAnalysis = () => {
@@ -91,6 +144,7 @@ export const useAnalysisProcessing = () => {
     if (analysisRequestRef.current) {
       analysisRequestRef.current.abort();
       analysisRequestRef.current = null;
+      console.log('Analysis request aborted');
     }
   };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
@@ -41,6 +40,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
   const [cbsaData, setCBSADataLocal] = useState<CBSAData[]>([]);
   const [isRestoringData, setIsRestoringData] = useState(false);
+  const [lastSubmissionTime, setLastSubmissionTime] = useState<number>(0);
 
   // Initialize CBSA data from stored data or fallback to sample data
   useEffect(() => {
@@ -73,13 +73,66 @@ const TerritoryTargeterPageContent: React.FC = () => {
   }, [currentAnalysis, cbsaData, storedCBSAData, executiveSummary]);
 
   const handlePromptSubmit = async (newPrompt: string, mode: 'fast' | 'detailed') => {
-    if (isProcessing) return;
+    console.log('=== PROMPT SUBMIT START ===');
+    console.log('Prompt:', newPrompt);
+    console.log('Mode:', mode);
+    console.log('Is Processing:', isProcessing);
+    console.log('CBSA Data Length:', cbsaData.length);
+    console.log('Current Analysis ID:', currentAnalysis?.id);
+
+    // Prevent rapid successive submissions
+    const now = Date.now();
+    if (now - lastSubmissionTime < 2000) {
+      console.log('Preventing rapid submission - last submission was too recent');
+      toast({
+        title: "Please Wait",
+        description: "Please wait before submitting another analysis.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLastSubmissionTime(now);
+
+    if (isProcessing) {
+      console.log('Analysis already in progress, ignoring new submission');
+      toast({
+        title: "Analysis In Progress",
+        description: "Please wait for the current analysis to complete before starting a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newPrompt.trim()) {
+      console.log('Empty prompt provided');
+      toast({
+        title: "Invalid Prompt",
+        description: "Please provide a valid scoring criteria.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (cbsaData.length === 0) {
+      console.log('No CBSA data available');
+      toast({
+        title: "No Market Data",
+        description: "No market data available for analysis.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
+      console.log('Starting territory scoring analysis...');
+      
       // Use the existing useTerritoryScoring hook to run the analysis
       const updatedAnalysis = await runScoring(newPrompt, cbsaData, mode);
       
+      console.log('Territory scoring completed. Result:', updatedAnalysis ? 'Success' : 'Failed/Cancelled');
+      
       if (updatedAnalysis) {
+        console.log('Analysis successful - storing CBSA data and showing success message');
         // Store the CBSA data if we have an analysis
         setCBSAData(cbsaData);
         
@@ -87,17 +140,48 @@ const TerritoryTargeterPageContent: React.FC = () => {
           title: "Analysis Complete",
           description: "Your territory analysis has been completed successfully.",
         });
+      } else {
+        console.log('Analysis returned undefined - likely cancelled or failed silently');
+        // Don't show error here as runScoring should handle its own error messages
+        // But log it for debugging
+        console.warn('runScoring returned undefined - this could indicate a cancellation or silent failure');
       }
 
     } catch (err) {
-      console.error('Failed to run territory analysis:', err);
+      console.error('=== ANALYSIS ERROR ===');
+      console.error('Error type:', err?.constructor?.name);
+      console.error('Error message:', err instanceof Error ? err.message : String(err));
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack available');
+      
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+
+      // Provide specific error handling based on error type
+      let userFriendlyMessage = errorMessage;
+      let suggestions = '';
+
+      if (errorMessage.includes('timeout') || errorMessage.includes('took too long')) {
+        userFriendlyMessage = 'The analysis timed out. This can happen with complex criteria.';
+        suggestions = 'Try using Fast Analysis mode or simplifying your prompt.';
+      } else if (errorMessage.includes('abort') || errorMessage.includes('cancelled')) {
+        userFriendlyMessage = 'The analysis was cancelled.';
+        suggestions = 'You can start a new analysis when ready.';
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        userFriendlyMessage = 'Network error occurred during analysis.';
+        suggestions = 'Please check your internet connection and try again.';
+      } else if (errorMessage.includes('JSON') || errorMessage.includes('parse')) {
+        userFriendlyMessage = 'The AI response was malformed.';
+        suggestions = 'Try again with a simpler prompt or use Fast Analysis mode.';
+      }
+
+      const fullMessage = suggestions ? `${userFriendlyMessage} ${suggestions}` : userFriendlyMessage;
 
       toast({
         title: "Analysis Failed",
-        description: errorMessage,
+        description: fullMessage,
         variant: "destructive",
       });
+    } finally {
+      console.log('=== PROMPT SUBMIT END ===');
     }
   };
 

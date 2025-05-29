@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Plus, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp, X, AlertCircle } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ProgressCounter from './ProgressCounter';
 import AnalysisModeSelector from './AnalysisModeSelector';
@@ -34,27 +34,53 @@ const PromptInput: React.FC<PromptInputProps> = ({
   const [prompt, setPrompt] = useState('');
   const [selectedMode, setSelectedMode] = useState<'fast' | 'detailed'>(analysisMode);
   const [isOpen, setIsOpen] = useState(!hasExistingAnalysis); // Open by default if no existing analysis
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (prompt.trim() && !isLoading) {
-      onSubmit(prompt.trim(), selectedMode);
-      setPrompt(''); // Clear prompt after submission
+    
+    if (!prompt.trim()) {
+      console.log('Empty prompt submitted');
+      return;
+    }
+    
+    if (isLoading || isSubmitting) {
+      console.log('Submission blocked - already processing');
+      return;
+    }
+
+    console.log('PromptInput: Submitting prompt:', prompt.substring(0, 100) + '...');
+    console.log('PromptInput: Selected mode:', selectedMode);
+    
+    try {
+      setIsSubmitting(true);
+      await onSubmit(prompt.trim(), selectedMode);
+      setPrompt(''); // Clear prompt after successful submission
+    } catch (error) {
+      console.error('PromptInput: Submit error:', error);
+      // Error handling is done in the parent component
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
+    console.log('PromptInput: Cancel requested');
     if (onCancel) {
       onCancel();
     }
   };
 
   const handleModeChange = (mode: 'fast' | 'detailed') => {
+    console.log('PromptInput: Mode changed to:', mode);
     setSelectedMode(mode);
     if (onModeChange) {
       onModeChange(mode);
     }
   };
+
+  const isProcessing = isLoading || isSubmitting;
+  const canSubmit = prompt.trim() && !isProcessing && !disabled;
 
   const examplePrompts = [
     "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand",
@@ -84,7 +110,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
         <CollapsibleContent>
           <CardContent className="space-y-4">
             {/* Analysis Mode Selector */}
-            {!isLoading && (
+            {!isProcessing && (
               <AnalysisModeSelector
                 selectedMode={selectedMode}
                 onModeChange={handleModeChange}
@@ -109,15 +135,21 @@ const PromptInput: React.FC<PromptInputProps> = ({
                     : "Enter your scoring criteria here... (e.g., 'Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand')"
                   }
                   className="min-h-[100px]"
-                  disabled={disabled || isLoading}
+                  disabled={disabled || isProcessing}
                 />
+                {isProcessing && (
+                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Analysis in progress - please wait for completion before adding new criteria</span>
+                  </div>
+                )}
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 items-start">
-                {!isLoading ? (
+                {!isProcessing ? (
                   <Button 
                     type="submit" 
-                    disabled={!prompt.trim() || isLoading || disabled}
+                    disabled={!canSubmit}
                     className="whitespace-nowrap"
                   >
                     {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
@@ -132,13 +164,14 @@ const PromptInput: React.FC<PromptInputProps> = ({
                     variant="destructive"
                     onClick={handleCancel}
                     className="whitespace-nowrap"
+                    disabled={isSubmitting}
                   >
                     <X className="mr-2 h-4 w-4" />
                     Cancel Analysis
                   </Button>
                 )}
                 
-                {!hasExistingAnalysis && !isLoading && (
+                {!hasExistingAnalysis && !isProcessing && (
                   <div className="text-sm text-muted-foreground">
                     <p className="mb-2">Example prompts:</p>
                     <ul className="space-y-1">
@@ -155,7 +188,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
 
             {/* Progress Counter */}
             <ProgressCounter 
-              isActive={isLoading} 
+              isActive={isProcessing} 
               duration={estimatedDuration}
               startTime={analysisStartTime}
               analysisMode={selectedMode}
