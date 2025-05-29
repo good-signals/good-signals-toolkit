@@ -251,7 +251,7 @@ export const useTerritoryScoring = () => {
         updatedAnalysis = {
           ...currentAnalysis,
           criteriaColumns: [...currentAnalysis.criteriaColumns, newColumn],
-          includedColumns: [...currentAnalysis.includedColumns, newColumn.id]
+          includedColumns: [...(currentAnalysis.includedColumns || []), newColumn.id]
         };
       } else {
         console.log('Creating new analysis');
@@ -265,7 +265,10 @@ export const useTerritoryScoring = () => {
         };
       }
 
-      console.log('Setting current analysis:', updatedAnalysis.id);
+      console.log('Setting current analysis with updated data:', updatedAnalysis.id);
+      console.log('Updated analysis has', updatedAnalysis.criteriaColumns.length, 'columns');
+      
+      // Force update the analysis state
       setCurrentAnalysis(updatedAnalysis);
       
       // Update analysis state to completed
@@ -288,6 +291,13 @@ export const useTerritoryScoring = () => {
       });
 
       console.log('=== RUN SCORING SUCCESS ===');
+      
+      // Force a re-render by updating the state again after a brief delay
+      setTimeout(() => {
+        console.log('Forcing final state update for UI refresh');
+        setCurrentAnalysis(updatedAnalysis);
+      }, 100);
+      
       return updatedAnalysis;
     } catch (err) {
       console.error('=== RUN SCORING ERROR ===');
@@ -377,11 +387,17 @@ export const useTerritoryScoring = () => {
 
   const deleteColumn = (columnId: string) => {
     if (!currentAnalysis) return;
+    console.log('Deleting column:', columnId, 'from analysis:', currentAnalysis.id);
+    
     const updatedAnalysis = deleteColumnOperation(columnId, currentAnalysis);
+    console.log('Delete operation result:', updatedAnalysis ? 'Updated analysis' : 'Clear all');
+    
     if (updatedAnalysis === null) {
       // All columns were deleted, clear entire analysis
+      console.log('All columns deleted, clearing analysis');
       clearAnalysis();
     } else if (updatedAnalysis) {
+      console.log('Setting updated analysis with', updatedAnalysis.criteriaColumns.length, 'remaining columns');
       setCurrentAnalysis(updatedAnalysis);
     }
   };

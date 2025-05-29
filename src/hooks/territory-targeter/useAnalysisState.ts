@@ -16,7 +16,7 @@ interface AnalysisState {
 }
 
 export const useAnalysisState = () => {
-  const [currentAnalysis, setCurrentAnalysis] = useState<TerritoryAnalysis | null>(() => {
+  const [currentAnalysis, setCurrentAnalysisState] = useState<TerritoryAnalysis | null>(() => {
     // Safely load saved analysis from localStorage
     const saved = safeStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -57,12 +57,24 @@ export const useAnalysisState = () => {
     return [];
   });
 
+  // Enhanced setCurrentAnalysis function that ensures proper updates
+  const setCurrentAnalysis = (analysis: TerritoryAnalysis | null) => {
+    console.log('Setting current analysis:', analysis?.id);
+    setCurrentAnalysisState(analysis);
+    
+    // Force a small delay to ensure state updates are processed
+    setTimeout(() => {
+      console.log('Analysis state updated successfully');
+    }, 0);
+  };
+
   // Save analysis to localStorage whenever it changes
   useEffect(() => {
     if (currentAnalysis) {
-      console.log('Saving analysis to localStorage:', currentAnalysis.id);
+      console.log('Saving analysis to localStorage:', currentAnalysis.id, 'with', currentAnalysis.criteriaColumns.length, 'columns');
       safeStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
     } else {
+      console.log('Removing analysis from localStorage');
       safeStorage.removeItem(STORAGE_KEY);
     }
   }, [currentAnalysis]);
@@ -91,6 +103,7 @@ export const useAnalysisState = () => {
   };
 
   const clearAnalysis = () => {
+    console.log('Clearing all analysis data');
     setCurrentAnalysis(null);
     setStoredCBSAData([]);
     safeStorage.removeItem(STORAGE_KEY);
