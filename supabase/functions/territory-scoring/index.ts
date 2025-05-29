@@ -6,13 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simplified JSON extraction for OpenAI (more reliable than Perplexity)
+// Enhanced JSON extraction for OpenAI responses
 function extractJSON(text: string): any {
   console.log('Attempting to extract JSON from OpenAI response...');
   console.log('Response length:', text.length);
   
+  // Clean the text first - remove any leading/trailing whitespace and non-printable characters
+  const cleanedText = text.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+  
   // Try to find JSON in markdown code blocks first
-  const markdownJsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```/i);
+  const markdownJsonMatch = cleanedText.match(/```json\s*\n?([\s\S]*?)\n?```/i);
   if (markdownJsonMatch) {
     console.log('Found JSON in markdown code block');
     try {
@@ -24,7 +27,7 @@ function extractJSON(text: string): any {
   }
 
   // Try to find any code block
-  const codeBlockMatch = text.match(/```\s*\n?([\s\S]*?)\n?```/);
+  const codeBlockMatch = cleanedText.match(/```\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
     console.log('Found JSON in generic code block');
     try {
@@ -36,20 +39,59 @@ function extractJSON(text: string): any {
   }
 
   // Look for JSON object starting with { and ending with }
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     console.log('Found JSON object in response');
     try {
-      return JSON.parse(jsonMatch[0]);
+      // Clean up common JSON issues
+      let jsonStr = jsonMatch[0];
+      
+      // Fix common JSON issues
+      jsonStr = jsonStr
+        // Fix unescaped quotes in strings
+        .replace(/(?<!\\)"/g, (match, offset, string) => {
+          // Check if this quote is inside a string value
+          const beforeQuote = string.substring(0, offset);
+          const openQuotes = (beforeQuote.match(/(?<!\\)"/g) || []).length;
+          return openQuotes % 2 === 1 ? '\\"' : '"';
+        })
+        // Fix trailing commas
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Fix missing commas between objects
+        .replace(/}\s*{/g, '},{')
+        // Fix newlines in strings
+        .replace(/\n/g, '\\n')
+        // Fix tab characters
+        .replace(/\t/g, '\\t');
+      
+      return JSON.parse(jsonStr);
     } catch (e) {
       console.log('Failed to parse JSON object:', e.message);
+      
+      // Try to extract just the data we need manually
+      try {
+        const titleMatch = cleanedText.match(/"suggested_title":\s*"([^"]+)"/);
+        const summaryMatch = cleanedText.match(/"prompt_summary":\s*"([^"]+)"/);
+        const scoresMatch = cleanedText.match(/"scores":\s*\[([\s\S]*?)\]/);
+        
+        if (titleMatch && summaryMatch && scoresMatch) {
+          console.log('Attempting manual JSON reconstruction');
+          return {
+            suggested_title: titleMatch[1],
+            prompt_summary: summaryMatch[1],
+            scores: []
+          };
+        }
+      } catch (manualError) {
+        console.log('Manual extraction also failed:', manualError.message);
+      }
     }
   }
 
   // Try to parse the entire text as JSON (last resort)
   try {
     console.log('Attempting to parse entire response as JSON');
-    return JSON.parse(text.trim());
+    return JSON.parse(cleanedText);
   } catch (e) {
     console.log('Failed to parse entire response as JSON:', e.message);
   }
@@ -57,33 +99,38 @@ function extractJSON(text: string): any {
   throw new Error('No valid JSON found in OpenAI response');
 }
 
-// Validate the parsed response structure
+// Enhanced validation with better error messages
 function validateResponse(data: any): boolean {
+  console.log('Validating response structure...');
+  
   if (!data || typeof data !== 'object') {
-    console.log('Response is not an object');
+    console.log('Response is not an object:', typeof data);
     return false;
   }
 
   if (!data.suggested_title || typeof data.suggested_title !== 'string') {
-    console.log('Missing or invalid suggested_title');
+    console.log('Missing or invalid suggested_title:', data.suggested_title);
     return false;
   }
 
   if (!data.prompt_summary || typeof data.prompt_summary !== 'string') {
-    console.log('Missing or invalid prompt_summary');
+    console.log('Missing or invalid prompt_summary:', data.prompt_summary);
     return false;
   }
 
   if (!Array.isArray(data.scores)) {
-    console.log('Missing or invalid scores array');
+    console.log('Missing or invalid scores array:', data.scores);
     return false;
   }
 
-  // Validate a few scores to ensure proper structure
+  // Validate score structure
   let validScores = 0;
   for (let i = 0; i < Math.min(3, data.scores.length); i++) {
     const score = data.scores[i];
-    if (score.market && typeof score.score === 'number' && score.reasoning) {
+    if (score && 
+        typeof score.market === 'string' && 
+        typeof score.score === 'number' && 
+        typeof score.reasoning === 'string') {
       validScores++;
     } else {
       console.log(`Invalid score structure at index ${i}:`, score);
@@ -121,59 +168,58 @@ serve(async (req) => {
       console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}`);
     }
 
-    // Enhanced system prompt optimized for OpenAI
+    // Enhanced system prompt optimized for OpenAI with stricter JSON requirements
     const getSystemPrompt = (mode: string, isChunked: boolean) => {
       const basePrompt = `You are part of the Territory Targeter tool inside the Good Signals platform. Your job is to help users assess and score U.S. markets based on criteria they provide in natural language.
 
-CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, explanations, or text outside the JSON object. Ensure your JSON is complete and properly formatted.`;
+CRITICAL JSON REQUIREMENTS:
+- You MUST respond with ONLY valid JSON
+- No markdown, explanations, or text outside the JSON object
+- Ensure all strings are properly escaped
+- No trailing commas
+- No line breaks inside string values
+- Test your JSON before responding`;
 
       const speedOptimizations = mode === 'fast' 
-        ? `
-SPEED MODE: Provide quick, efficient scoring with concise reasoning. Focus on the most obvious and direct factors related to the user's criteria. Keep reasoning brief (1-2 sentences max).`
-        : `
-DETAILED MODE: Provide comprehensive analysis with thorough research-based scoring. Include multiple factors and data sources in your reasoning. When possible, include specific sources or data points you reference.`;
+        ? `\nSPEED MODE: Provide quick, efficient scoring with concise reasoning. Focus on the most obvious factors. Keep reasoning brief (1-2 sentences max).`
+        : `\nDETAILED MODE: Provide comprehensive analysis with thorough research-based scoring. Include multiple factors in your reasoning.`;
 
       const chunkingInstructions = isChunked
-        ? `
-CHUNKED PROCESSING: You are processing a subset of markets. Maintain consistent scoring standards across all chunks. Use the same title and summary approach for all chunks of this analysis.`
+        ? `\nCHUNKED PROCESSING: You are processing a subset of markets. Maintain consistent scoring standards across all chunks.`
         : '';
 
       return `${basePrompt}${speedOptimizations}${chunkingInstructions}
 
 Your task:
-1. Interpret the user's criteria prompt (e.g., "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand").
-2. Generate a short, catchy title for this analysis (e.g., "Gen Z Sneaker Culture" or "Taco Affinity").
-3. Score the provided U.S. markets (by CBSA) from 0–100, where 100 = strongest fit and 0 = weakest.
-4. For each market, provide ${mode === 'fast' ? 'brief' : 'detailed'} explanation of the score${mode === 'detailed' ? ' and include sources when possible' : ''}.
-5. Add a ${mode === 'fast' ? 'concise' : 'comprehensive'} paragraph to the executive summary section explaining your logic, the data you considered, and any key assumptions.
-6. Use a professional but clear and approachable tone (no jargon, plain English).
+1. Interpret the user's criteria prompt
+2. Generate a short, catchy title for this analysis (2-4 words max)
+3. Score the provided U.S. markets (by CBSA) from 0–100, where 100 = strongest fit
+4. For each market, provide ${mode === 'fast' ? 'brief' : 'detailed'} explanation of the score
+5. Add a ${mode === 'fast' ? 'concise' : 'comprehensive'} paragraph explaining your logic
 
-Return EXACTLY this JSON structure with NO additional text or formatting:
+Return EXACTLY this JSON structure with NO additional text:
 
 {
   "suggested_title": "Taco Affinity",
-  "prompt_summary": "[${mode === 'fast' ? 'Concise' : 'Detailed'} explanation of how you approached the user's prompt]",
+  "prompt_summary": "[Explanation of how you approached the user's criteria]",
   "scores": [
     {
       "market": "Los Angeles-Long Beach-Anaheim, CA",
       "score": 87,
-      "reasoning": "${mode === 'fast' ? 'Strong Gen Z population and vibrant sneaker culture.' : 'Strong Gen Z population (32% under 25), vibrant sneaker culture with major retailers like Flight Club and Stadium Goods, and high social media engagement rates.'}",
-      "sources": ${mode === 'detailed' ? '["U.S. Census Bureau", "Social Media Analytics Report 2024"]' : '[]'}
+      "reasoning": "${mode === 'fast' ? 'Strong taco culture and demographics.' : 'Strong taco culture with high Hispanic population and numerous authentic restaurants.'}",
+      "sources": []
     }
   ]
 }
 
 Guidelines:
-- Keep the suggested_title short, memorable, and relevant to the criteria (2-4 words max)
-- ${mode === 'fast' ? 'Prioritize speed over exhaustive research' : 'Use comprehensive research and multiple data sources'}
-- ${mode === 'detailed' ? 'Include specific sources in the sources array when you reference data' : 'Keep sources array empty for fast mode'}
-- If data is missing, give a conservative score and explain.
-- Do not make specific business recommendations—only assess signal strength.
-- Stay consistent in your scoring logic${isChunked ? ' across all chunks' : ''}.
-- ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Include sources in your reasoning where possible and list them in the sources array'}.
-- ENSURE your JSON response is complete and properly terminated.
+- Keep suggested_title short and memorable (2-4 words max)
+- ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Provide detailed reasoning with specific factors'}
+- Stay consistent in scoring logic${isChunked ? ' across all chunks' : ''}
+- If data is missing, give a conservative score and explain
+- ENSURE your JSON response is complete and properly formatted
 
-Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Population: ${cbsa.population.toLocaleString()})`).join(', ')}`;
+Markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Pop: ${cbsa.population.toLocaleString()})`).join(', ')}`;
     };
 
     console.log('Sending request to OpenAI API...');
@@ -182,7 +228,8 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     const modelConfig = {
       model: 'gpt-4o-mini',
       temperature: analysisMode === 'fast' ? 0.3 : 0.1,
-      max_tokens: analysisMode === 'fast' ? 4000 : 8000
+      max_tokens: analysisMode === 'fast' ? 4000 : 8000,
+      response_format: { type: "json_object" } // Force JSON response
     };
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -238,8 +285,7 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
       
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError.message);
-      console.error('Raw AI content (first 500 chars):', aiContent.substring(0, 500));
-      console.error('Raw AI content (last 500 chars):', aiContent.substring(Math.max(0, aiContent.length - 500)));
+      console.error('Raw AI content:', aiContent);
       
       throw new Error(`Failed to parse AI response: ${parseError.message}. Please try again or use Fast Analysis mode for better reliability.`);
     }
