@@ -1,10 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { SiteAssessment, SiteAssessmentUpdate } from '@/types/siteAssessmentTypes';
+import { SiteAssessment } from '@/types/siteAssessmentTypes';
 
 export const updateAssessmentScores = async (
-  assessmentId: string, 
-  overallSiteSignalScore: number | null, 
+  assessmentId: string,
+  overallSiteSignalScore: number | null,
   completionPercentage: number | null
 ): Promise<SiteAssessment> => {
   console.log('Updating assessment scores:', {
@@ -13,52 +13,35 @@ export const updateAssessmentScores = async (
     completionPercentage
   });
 
-  // Ensure scores are stored as percentages (0-100) in the database
-  const normalizedScore = overallSiteSignalScore !== null && overallSiteSignalScore !== undefined
-    ? Math.round(Math.max(0, Math.min(overallSiteSignalScore, 100)))
-    : null;
-  
-  const normalizedCompletion = completionPercentage !== null && completionPercentage !== undefined
-    ? Math.round(Math.max(0, Math.min(completionPercentage, 100)))
-    : null;
+  // Convert scores to percentages (0-100) for consistent database storage
+  const scoreAsPercentage = overallSiteSignalScore !== null ? overallSiteSignalScore * 100 : null;
+  const completionAsPercentage = completionPercentage !== null ? completionPercentage * 100 : null;
 
-  const updates: SiteAssessmentUpdate = {
-    site_signal_score: normalizedScore,
-    completion_percentage: normalizedCompletion,
-  };
+  const { data, error } = await supabase
+    .from('site_assessments')
+    .update({
+      site_signal_score: scoreAsPercentage,
+      completion_percentage: completionAsPercentage,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', assessmentId)
+    .select('*')
+    .single();
 
-  console.log('Normalized scores for database:', {
-    normalizedScore,
-    normalizedCompletion
+  if (error) {
+    console.error('Error updating assessment scores:', error);
+    throw new Error(`Failed to update assessment scores: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error('No data returned after updating assessment scores');
+  }
+
+  console.log('Assessment scores updated successfully:', {
+    id: data.id,
+    newScore: data.site_signal_score,
+    newCompletion: data.completion_percentage
   });
 
-  try {
-    // Fetch all related data after update to return complete SiteAssessment
-    const { data: updatedAssessment, error: updateError } = await supabase
-      .from('site_assessments')
-      .update(updates)
-      .eq('id', assessmentId)
-      .select(`
-        *,
-        assessment_metric_values(*),
-        assessment_site_visit_ratings(*)
-      `)
-      .single();
-
-    if (updateError) {
-      console.error('Error updating assessment scores:', updateError);
-      throw updateError;
-    }
-    
-    console.log('Successfully updated assessment scores:', updatedAssessment);
-    
-    return {
-      ...updatedAssessment,
-      assessment_metric_values: updatedAssessment.assessment_metric_values || [],
-      site_visit_ratings: updatedAssessment.assessment_site_visit_ratings || [],
-    };
-  } catch (error) {
-    console.error('Failed to update assessment scores:', error);
-    throw error;
-  }
+  return data;
 };
