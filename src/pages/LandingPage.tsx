@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 import { Button } from '@/components/ui/button'; // Import Button
-import { ChevronRight, Zap, Target, Map } from 'lucide-react';
+import { Zap, Target, Map } from 'lucide-react';
 
 const LandingPage = () => {
   return (
@@ -14,12 +14,8 @@ const LandingPage = () => {
         <p className="text-xl md:text-2xl text-foreground/80 mb-10 max-w-3xl mx-auto">
           Unlock hyperlocal market insights and accelerate your site selection with our powerful toolkit. Find your next high-potential location, faster.
         </p>
-        <div className="space-x-4">
-          <Button asChild size="lg" className="text-lg px-8 py-6">
-            <Link to="/toolkit-hub">Explore Toolkit <ChevronRight className="ml-2 h-5 w-5" /></Link>
-          </Button>
-          {/* Add Sign In / Sign Up Button/Link */}
-          <Button asChild size="lg" variant="outline" className="text-lg px-8 py-6">
+        <div className="flex justify-center">
+          <Button asChild size="lg" variant="default" className="text-lg px-8 py-6">
             <Link to="/auth">Sign In / Sign Up</Link>
           </Button>
         </div>
