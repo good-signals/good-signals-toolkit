@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Target } from 'lucide-react';
+import { Target } from 'lucide-react';
+import ProgressCounter from './ProgressCounter';
 
 interface PromptInputProps {
   onSubmit: (prompt: string) => void;
@@ -36,7 +37,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ onSubmit, isLoading, disabled
           Territory Scoring Criteria
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="scoring-prompt" className="block text-sm font-medium mb-2">
@@ -58,14 +59,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ onSubmit, isLoading, disabled
               disabled={!prompt.trim() || isLoading || disabled}
               className="whitespace-nowrap"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing Markets...
-                </>
-              ) : (
-                'Score Markets'
-              )}
+              {isLoading ? 'Analyzing Markets...' : 'Score Markets'}
             </Button>
             
             <div className="text-sm text-muted-foreground">
@@ -80,6 +74,12 @@ const PromptInput: React.FC<PromptInputProps> = ({ onSubmit, isLoading, disabled
             </div>
           </div>
         </form>
+
+        {/* Progress Counter */}
+        <ProgressCounter 
+          isActive={isLoading} 
+          duration={30}
+        />
       </CardContent>
     </Card>
   );
