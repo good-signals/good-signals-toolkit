@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
@@ -28,6 +29,13 @@ const TerritoryTargeterPageContent: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [cbsaData, setCBSAData] = useState<CBSAData[]>([]);
   const [prompt, setPrompt] = useState('');
+
+  // Debug logging for analysis state
+  useEffect(() => {
+    console.log('Territory Targeter - Current Analysis:', currentAnalysis);
+    console.log('Territory Targeter - CBSA Data Length:', cbsaData.length);
+    console.log('Territory Targeter - Executive Summary:', executiveSummary);
+  }, [currentAnalysis, cbsaData, executiveSummary]);
 
   const handlePromptSubmit = async (newPrompt: string, mode: 'fast' | 'detailed') => {
     if (isProcessing) return;
@@ -218,7 +226,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <TerritoryHeader />
         
@@ -238,7 +246,8 @@ const TerritoryTargeterPageContent: React.FC = () => {
             onSubmit={handlePromptSubmit}
           />
 
-          {currentAnalysis && cbsaData.length > 0 && (
+          {/* Show analysis results even if data is partially missing */}
+          {currentAnalysis && (
             <TerritoryResultsSection
               currentAnalysis={currentAnalysis}
               cbsaData={cbsaData}
@@ -266,7 +275,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
             />
           )}
 
-          {isProcessing && currentAnalysis && (
+          {isProcessing && (
             <ProgressCounter 
               isActive={isProcessing}
             />
