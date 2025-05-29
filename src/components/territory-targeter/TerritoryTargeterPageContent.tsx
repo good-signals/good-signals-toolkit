@@ -17,7 +17,6 @@ import TerritoryResultsSection from './TerritoryResultsSection';
 import CBSATable from './CBSATable';
 import TerritoryNotices from './TerritoryNotices';
 import SignalSettingsNotice from './SignalSettingsNotice';
-import ProgressCounter from './ProgressCounter';
 
 const TerritoryTargeterPageContent: React.FC = () => {
   const { user } = useUser();
@@ -33,7 +32,11 @@ const TerritoryTargeterPageContent: React.FC = () => {
     runScoring,
     refreshColumn,
     applyManualOverride,
-    refreshingColumnId
+    refreshingColumnId,
+    analysisStartTime,
+    analysisMode,
+    estimatedDuration,
+    cancelAnalysis
   } = useTerritoryScoring();
 
   const [cbsaData, setCBSADataLocal] = useState<CBSAData[]>([]);
@@ -218,7 +221,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-2 py-8 max-w-none">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <TerritoryHeader />
         
         <div className="mx-auto space-y-6">
@@ -235,6 +238,11 @@ const TerritoryTargeterPageContent: React.FC = () => {
           <PromptInput 
             isLoading={isProcessing}
             onSubmit={handlePromptSubmit}
+            onCancel={cancelAnalysis}
+            analysisStartTime={analysisStartTime}
+            analysisMode={analysisMode}
+            estimatedDuration={estimatedDuration}
+            hasExistingAnalysis={!!currentAnalysis}
           />
 
           {/* Show analysis results even if data is partially missing */}
@@ -265,12 +273,6 @@ const TerritoryTargeterPageContent: React.FC = () => {
               onStatusChange={handleStatusChange}
               onRefreshColumn={handleRefreshColumn}
               refreshingColumnId={refreshingColumnId}
-            />
-          )}
-
-          {(isProcessing || isRestoringData) && (
-            <ProgressCounter 
-              isActive={isProcessing || isRestoringData}
             />
           )}
         </div>
