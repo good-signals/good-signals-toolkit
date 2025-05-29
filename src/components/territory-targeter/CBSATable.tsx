@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
@@ -16,6 +15,8 @@ interface CBSATableProps {
   onStatusChange?: (cbsaId: string, status: CBSAStatus) => void;
   onManualScoreOverride?: (override: ManualScoreOverride) => void;
   onRefreshColumn?: (columnId: string, type: 'all' | 'na-only') => void;
+  onToggleColumn?: (columnId: string, included: boolean) => void;
+  onDeleteColumn?: (columnId: string) => void;
   isRefreshing?: boolean;
 }
 
@@ -28,6 +29,8 @@ const CBSATable: React.FC<CBSATableProps> = ({
   onStatusChange,
   onManualScoreOverride,
   onRefreshColumn,
+  onToggleColumn,
+  onDeleteColumn,
   isRefreshing = false
 }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
@@ -169,6 +172,18 @@ const CBSATable: React.FC<CBSATableProps> = ({
     }
   };
 
+  const handleToggleColumn = (columnId: string, included: boolean) => {
+    if (onToggleColumn) {
+      onToggleColumn(columnId, included);
+    }
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    if (onDeleteColumn) {
+      onDeleteColumn(columnId);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Table */}
@@ -180,6 +195,8 @@ const CBSATable: React.FC<CBSATableProps> = ({
             sortConfig={sortConfig} 
             onSort={handleSort}
             onRefreshColumn={handleRefreshColumn}
+            onToggleColumn={handleToggleColumn}
+            onDeleteColumn={handleDeleteColumn}
             isRefreshing={isRefreshing}
           />
           <TableBody>

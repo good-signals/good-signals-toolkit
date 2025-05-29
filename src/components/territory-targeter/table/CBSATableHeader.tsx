@@ -17,6 +17,8 @@ interface CBSATableHeaderProps {
   sortConfig: SortConfig;
   onSort: (key: SortConfig['key']) => void;
   onRefreshColumn?: (columnId: string, type: 'all' | 'na-only') => void;
+  onToggleColumn?: (columnId: string, included: boolean) => void;
+  onDeleteColumn?: (columnId: string) => void;
   isRefreshing?: boolean;
 }
 
@@ -26,6 +28,8 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
   sortConfig,
   onSort,
   onRefreshColumn,
+  onToggleColumn,
+  onDeleteColumn,
   isRefreshing = false
 }) => {
   const getSortIcon = (key: SortConfig['key']) => {
@@ -118,15 +122,16 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
                   {column.title}
                   {getSortIcon(`criteria_${column.id}`)}
                 </Button>
-                {onRefreshColumn && (
-                  <ColumnRefreshOptions
-                    columnId={column.id}
-                    columnTitle={column.title}
-                    hasNAValues={columnHasNA}
-                    onRefreshColumn={onRefreshColumn}
-                    disabled={isRefreshing}
-                  />
-                )}
+                <ColumnRefreshOptions
+                  columnId={column.id}
+                  columnTitle={column.title}
+                  hasNAValues={columnHasNA}
+                  isIncludedInSignalScore={column.isIncludedInSignalScore !== false}
+                  onRefreshColumn={onRefreshColumn}
+                  onToggleColumn={onToggleColumn}
+                  onDeleteColumn={onDeleteColumn}
+                  disabled={isRefreshing}
+                />
               </div>
             </TableHead>
           );
