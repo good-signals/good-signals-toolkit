@@ -18,11 +18,17 @@ import { safeStorage } from '@/utils/safeStorage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+const EXECUTIVE_SUMMARY_STORAGE_KEY = 'territoryTargeter_executiveSummary';
+
 const TerritoryTargeterPageContent = () => {
   const { user } = useAuth();
   const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [executiveSummary, setExecutiveSummary] = useState<string>('');
+  const [executiveSummary, setExecutiveSummary] = useState<string>(() => {
+    // Load saved executive summary from localStorage
+    const saved = safeStorage.getItem(EXECUTIVE_SUMMARY_STORAGE_KEY);
+    return saved || '';
+  });
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   
   // Use the territory scoring hook
@@ -42,6 +48,22 @@ const TerritoryTargeterPageContent = () => {
     clearAnalysis,
     setAnalysisMode
   } = useTerritoryScoring();
+  
+  // Save executive summary to localStorage whenever it changes
+  useEffect(() => {
+    if (executiveSummary) {
+      safeStorage.setItem(EXECUTIVE_SUMMARY_STORAGE_KEY, executiveSummary);
+    } else {
+      safeStorage.removeItem(EXECUTIVE_SUMMARY_STORAGE_KEY);
+    }
+  }, [executiveSummary]);
+
+  // Clear executive summary when analysis is cleared
+  useEffect(() => {
+    if (!currentAnalysis) {
+      setExecutiveSummary('');
+    }
+  }, [currentAnalysis]);
   
   // Load saved statuses from localStorage on component mount
   useEffect(() => {
@@ -95,6 +117,7 @@ const TerritoryTargeterPageContent = () => {
 
   const handleClearAnalysis = () => {
     clearAnalysis();
+    setExecutiveSummary(''); // Clear executive summary when clearing analysis
   };
 
   const handleStatusChange = (cbsaId: string, status: CBSAStatus) => {
