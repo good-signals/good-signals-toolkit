@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData, AIScoreResponse, TerritoryAnalysis, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
@@ -132,6 +133,11 @@ export const useTerritoryScoring = () => {
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
+      
+      // Check if request was aborted before processing each chunk
+      if (analysisRequestRef.current?.signal.aborted) {
+        throw new Error('Analysis was cancelled');
+      }
       
       const { data, error } = await supabase.functions.invoke('territory-scoring', {
         body: {
@@ -273,8 +279,7 @@ export const useTerritoryScoring = () => {
               userPrompt: prompt,
               cbsaData: cbsaData,
               analysisMode: mode
-            },
-            signal: analysisRequestRef.current?.signal
+            }
           });
 
           if (error) {
@@ -291,7 +296,7 @@ export const useTerritoryScoring = () => {
         console.error('Primary analysis failed:', primaryError);
         
         // Check if this was an abort error
-        if (primaryError instanceof Error && primaryError.name === 'AbortError') {
+        if (primaryError instanceof Error && (primaryError.name === 'AbortError' || primaryError.message === 'Analysis was cancelled')) {
           console.log('Analysis was cancelled by user');
           return;
         }
@@ -377,7 +382,7 @@ export const useTerritoryScoring = () => {
       return updatedAnalysis;
     } catch (err) {
       // Check if this was an abort error
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (err instanceof Error && (err.name === 'AbortError' || err.message === 'Analysis was cancelled')) {
         console.log('Analysis was cancelled by user');
         return;
       }
