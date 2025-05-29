@@ -43,5 +43,5 @@ export const updateAssessmentScores = async (
     newCompletion: data.completion_percentage
   });
 
-  return data;
+  return data as SiteAssessment;
 };
