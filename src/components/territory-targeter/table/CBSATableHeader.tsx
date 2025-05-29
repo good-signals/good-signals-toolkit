@@ -62,6 +62,16 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
             {getSortIcon('region')}
           </Button>
         </TableHead>
+        <TableHead className="w-[120px]">
+          <Button 
+            variant="ghost" 
+            onClick={() => onSort('status')}
+            className="h-auto p-0 font-medium"
+          >
+            Status
+            {getSortIcon('status')}
+          </Button>
+        </TableHead>
         <TableHead className="w-[120px] text-right">
           <Button 
             variant="ghost" 
@@ -80,16 +90,6 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
           >
             Growth
             {getSortIcon('populationGrowth')}
-          </Button>
-        </TableHead>
-        <TableHead className="w-[120px]">
-          <Button 
-            variant="ghost" 
-            onClick={() => onSort('status')}
-            className="h-auto p-0 font-medium"
-          >
-            Status
-            {getSortIcon('status')}
           </Button>
         </TableHead>
         {hasScores && (

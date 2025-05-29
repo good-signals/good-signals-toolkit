@@ -39,16 +39,16 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
       <TableCell className="font-medium">{row.name}</TableCell>
       <TableCell>{row.state}</TableCell>
       <TableCell>{row.region}</TableCell>
-      <TableCell className="text-right">{row.population.toLocaleString()}</TableCell>
-      <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
-        {formatPopulationGrowth(row.populationGrowth)}
-      </TableCell>
       <TableCell>
         <CBSAStatusSelector
           value={row.status}
           onValueChange={(status) => onStatusChange(row.id, status)}
           cbsaId={row.id}
         />
+      </TableCell>
+      <TableCell className="text-right">{row.population.toLocaleString()}</TableCell>
+      <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
+        {formatPopulationGrowth(row.populationGrowth)}
       </TableCell>
       {hasScores && (
         <>
