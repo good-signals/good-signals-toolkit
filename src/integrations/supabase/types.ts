@@ -405,6 +405,44 @@ export type Database = {
           },
         ]
       }
+      treasure_map_settings: {
+        Row: {
+          account_id: string
+          created_at: string
+          embed_code: string | null
+          id: string
+          map_type: string
+          map_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          embed_code?: string | null
+          id?: string
+          map_type: string
+          map_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          embed_code?: string | null
+          id?: string
+          map_type?: string
+          map_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasure_map_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_custom_metrics_settings: {
         Row: {
           account_id: string

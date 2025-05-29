@@ -1,3 +1,4 @@
+
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -11,6 +12,7 @@ import ToolkitHub from "./pages/ToolkitHub";
 import SiteProspectorPage from "./pages/SiteProspectorPage";
 import TerritoryTargeterPage from "./pages/TerritoryTargeterPage";
 import SiteTreasureMapPage from "./pages/SiteTreasureMapPage";
+import TreasureMapSettingsPage from "./pages/TreasureMapSettingsPage";
 import AuthPage from "./pages/AuthPage"; 
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
@@ -66,6 +68,10 @@ const AppContent = () => {
           <Route 
             path="toolkit/site-treasure-map" 
             element={<ProtectedRoute><SiteTreasureMapPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="treasure-map-settings" 
+            element={<ProtectedRoute><TreasureMapSettingsPage /></ProtectedRoute>} 
           />
           <Route 
             path="profile-settings" 
