@@ -4,6 +4,7 @@ import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CBSAScore } from '@/types/territoryTargeterTypes';
 import CBSATableHeader, { SortConfig } from './table/CBSATableHeader';
 import CBSATableRow from './table/CBSATableRow';
+import { CBSAStatus } from './table/CBSAStatusSelector';
 
 interface CBSATableProps {
   cbsaData: CBSAData[];
@@ -11,6 +12,7 @@ interface CBSATableProps {
   marketSignalScore: number;
   accountGoodThreshold?: number | null;
   accountBadThreshold?: number | null;
+  onStatusChange?: (cbsaId: string, status: CBSAStatus) => void;
 }
 
 const CBSATable: React.FC<CBSATableProps> = ({
@@ -18,7 +20,8 @@ const CBSATable: React.FC<CBSATableProps> = ({
   scores,
   marketSignalScore,
   accountGoodThreshold,
-  accountBadThreshold
+  accountBadThreshold,
+  onStatusChange
 }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const hasScores = scores.length > 0;
@@ -49,6 +52,12 @@ const CBSATable: React.FC<CBSATableProps> = ({
         bValue = bValue || 0;
       }
 
+      // Handle status sorting
+      if (sortConfig.key === 'status') {
+        aValue = aValue || '';
+        bValue = bValue || '';
+      }
+
       if (typeof aValue === 'string') {
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
@@ -75,6 +84,12 @@ const CBSATable: React.FC<CBSATableProps> = ({
     });
   };
 
+  const handleStatusChange = (cbsaId: string, status: CBSAStatus) => {
+    if (onStatusChange) {
+      onStatusChange(cbsaId, status);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Table */}
@@ -93,6 +108,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
                 hasScores={hasScores}
                 accountGoodThreshold={accountGoodThreshold}
                 accountBadThreshold={accountBadThreshold}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </TableBody>

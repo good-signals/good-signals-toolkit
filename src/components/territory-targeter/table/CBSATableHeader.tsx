@@ -5,7 +5,7 @@ import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 export type SortConfig = {
-  key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'score' | 'reasoning';
+  key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'score' | 'reasoning' | 'status';
   direction: 'asc' | 'desc';
 } | null;
 
@@ -80,6 +80,16 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
           >
             Growth
             {getSortIcon('populationGrowth')}
+          </Button>
+        </TableHead>
+        <TableHead className="w-[120px]">
+          <Button 
+            variant="ghost" 
+            onClick={() => onSort('status')}
+            className="h-auto p-0 font-medium"
+          >
+            Status
+            {getSortIcon('status')}
           </Button>
         </TableHead>
         {hasScores && (

@@ -3,6 +3,7 @@ import React from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { getSignalStatus } from '@/lib/assessmentDisplayUtils';
 import { formatPopulationGrowth, getGrowthColor, getScorePillClasses } from '@/lib/cbsaTableUtils';
+import CBSAStatusSelector, { CBSAStatus } from './CBSAStatusSelector';
 
 interface CBSATableRowData {
   id: string;
@@ -13,6 +14,7 @@ interface CBSATableRowData {
   populationGrowth: number;
   score: number | null;
   reasoning: string | null;
+  status?: CBSAStatus;
 }
 
 interface CBSATableRowProps {
@@ -20,13 +22,15 @@ interface CBSATableRowProps {
   hasScores: boolean;
   accountGoodThreshold?: number | null;
   accountBadThreshold?: number | null;
+  onStatusChange: (cbsaId: string, status: CBSAStatus) => void;
 }
 
 const CBSATableRow: React.FC<CBSATableRowProps> = ({
   row,
   hasScores,
   accountGoodThreshold,
-  accountBadThreshold
+  accountBadThreshold,
+  onStatusChange
 }) => {
   const signalStatus = getSignalStatus(row.score, accountGoodThreshold, accountBadThreshold);
   
@@ -38,6 +42,13 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
       <TableCell className="text-right">{row.population.toLocaleString()}</TableCell>
       <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
         {formatPopulationGrowth(row.populationGrowth)}
+      </TableCell>
+      <TableCell>
+        <CBSAStatusSelector
+          value={row.status}
+          onValueChange={(status) => onStatusChange(row.id, status)}
+          cbsaId={row.id}
+        />
       </TableCell>
       {hasScores && (
         <>

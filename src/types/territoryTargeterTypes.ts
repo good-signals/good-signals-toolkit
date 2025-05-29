@@ -1,4 +1,3 @@
-
 export interface CBSAData {
   id: string;
   name: string;
@@ -7,6 +6,7 @@ export interface CBSAData {
   population: number;
   populationGrowth: number; // Growth rate as decimal (e.g., 0.0606 for 6.06%)
   rank: number;
+  status?: 'Active' | 'Pipeline' | 'Priority' | 'Hold' | 'Avoid';
 }
 
 export interface CBSAScore {

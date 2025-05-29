@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -10,11 +10,31 @@ import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { sampleCBSAData } from '@/data/sampleCBSAData';
 import { exportTerritoryAnalysisToCSV } from '@/services/territoryExportService';
 import { useAuth } from '@/contexts/AuthContext';
+import { CBSAData } from '@/types/territoryTargeterTypes';
+import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSelector';
 
 const TerritoryTargeterPage = () => {
   const { user } = useAuth();
-  const [cbsaData] = useState(sampleCBSAData);
+  const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
   const { isLoading, currentAnalysis, error, runScoring, clearAnalysis } = useTerritoryScoring();
+
+  // Load saved statuses from localStorage on component mount
+  useEffect(() => {
+    const savedStatuses = localStorage.getItem('cbsa-statuses');
+    if (savedStatuses) {
+      try {
+        const statusMap = JSON.parse(savedStatuses);
+        setCbsaData(prevData =>
+          prevData.map(cbsa => ({
+            ...cbsa,
+            status: statusMap[cbsa.id] || undefined
+          }))
+        );
+      } catch (error) {
+        console.error('Failed to load saved CBSA statuses:', error);
+      }
+    }
+  }, []);
 
   const handlePromptSubmit = async (prompt: string) => {
     try {
@@ -36,6 +56,29 @@ const TerritoryTargeterPage = () => {
 
   const handleClearAnalysis = () => {
     clearAnalysis();
+  };
+
+  const handleStatusChange = (cbsaId: string, status: CBSAStatus) => {
+    // Update the local state
+    setCbsaData(prevData => 
+      prevData.map(cbsa => 
+        cbsa.id === cbsaId ? { ...cbsa, status } : cbsa
+      )
+    );
+
+    // Save to localStorage
+    const savedStatuses = localStorage.getItem('cbsa-statuses');
+    let statusMap = {};
+    if (savedStatuses) {
+      try {
+        statusMap = JSON.parse(savedStatuses);
+      } catch (error) {
+        console.error('Failed to parse saved statuses:', error);
+      }
+    }
+    
+    statusMap[cbsaId] = status;
+    localStorage.setItem('cbsa-statuses', JSON.stringify(statusMap));
   };
 
   return (
@@ -113,6 +156,7 @@ const TerritoryTargeterPage = () => {
         marketSignalScore={currentAnalysis?.marketSignalScore || 0}
         accountGoodThreshold={0.75}
         accountBadThreshold={0.50}
+        onStatusChange={handleStatusChange}
       />
     </div>
   );
