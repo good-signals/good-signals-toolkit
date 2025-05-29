@@ -1,13 +1,40 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData, AIScoreResponse, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
 import { toast } from '@/hooks/use-toast';
 
+const STORAGE_KEY = 'territoryTargeter_currentAnalysis';
+
 export const useTerritoryScoring = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [currentAnalysis, setCurrentAnalysis] = useState<TerritoryAnalysis | null>(null);
+  const [currentAnalysis, setCurrentAnalysis] = useState<TerritoryAnalysis | null>(() => {
+    // Load saved analysis from localStorage on initialization
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          createdAt: new Date(parsed.createdAt)
+        };
+      } catch (error) {
+        console.error('Failed to parse saved analysis:', error);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
+
+  // Save analysis to localStorage whenever it changes
+  useEffect(() => {
+    if (currentAnalysis) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [currentAnalysis]);
 
   const runScoring = async (prompt: string, cbsaData: CBSAData[]) => {
     setIsLoading(true);
@@ -70,12 +97,13 @@ export const useTerritoryScoring = () => {
       setCurrentAnalysis(analysis);
       
       console.log('Analysis completed successfully');
+      console.log('Suggested title:', aiResponse.suggested_title);
       console.log('Market signal score:', analysis.marketSignalScore);
       console.log('Number of scored markets:', aiResponse.scores.length);
       
       toast({
         title: "Territory Analysis Complete",
-        description: `Successfully scored ${aiResponse.scores.length} markets with an average signal score of ${analysis.marketSignalScore}%.`,
+        description: `Successfully scored ${aiResponse.scores.length} markets for "${aiResponse.suggested_title}" with an average signal score of ${analysis.marketSignalScore}%.`,
       });
 
       return analysis;
@@ -112,12 +140,17 @@ export const useTerritoryScoring = () => {
     setCurrentAnalysis(updatedAnalysis);
   };
 
+  const clearAnalysis = () => {
+    setCurrentAnalysis(null);
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
   return {
     isLoading,
     currentAnalysis,
     error,
     runScoring,
     updateIncludedColumns,
-    clearAnalysis: () => setCurrentAnalysis(null)
+    clearAnalysis
   };
 };

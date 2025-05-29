@@ -61,6 +61,11 @@ function validateResponse(data: any): boolean {
     return false;
   }
 
+  if (!data.suggested_title || typeof data.suggested_title !== 'string') {
+    console.log('Missing or invalid suggested_title');
+    return false;
+  }
+
   if (!data.prompt_summary || typeof data.prompt_summary !== 'string') {
     console.log('Missing or invalid prompt_summary');
     return false;
@@ -110,14 +115,16 @@ CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, ex
 
 Your task:
 1. Interpret the user's criteria prompt (e.g., "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand").
-2. Score the top 100 U.S. markets (by CBSA) from 0–100, where 100 = strongest fit and 0 = weakest.
-3. For each market, provide a brief explanation of the score.
-4. Add a plainspoken paragraph to the executive summary section explaining your logic, the data you considered, and any key assumptions.
-5. Use a professional but clear and approachable tone (no jargon, plain English).
+2. Generate a short, catchy title for this analysis (e.g., "Gen Z Sneaker Culture" or "Taco Affinity").
+3. Score the top 100 U.S. markets (by CBSA) from 0–100, where 100 = strongest fit and 0 = weakest.
+4. For each market, provide a brief explanation of the score.
+5. Add a plainspoken paragraph to the executive summary section explaining your logic, the data you considered, and any key assumptions.
+6. Use a professional but clear and approachable tone (no jargon, plain English).
 
 Return EXACTLY this JSON structure with NO additional text or formatting:
 
 {
+  "suggested_title": "Taco Affinity",
   "prompt_summary": "[One-paragraph explanation of how you approached the user's prompt]",
   "scores": [
     {
@@ -134,6 +141,7 @@ Return EXACTLY this JSON structure with NO additional text or formatting:
 }
 
 Guidelines:
+- Keep the suggested_title short, memorable, and relevant to the criteria (2-4 words max)
 - If data is missing, give a conservative score and explain.
 - Do not make specific business recommendations—only assess signal strength.
 - Stay consistent in your scoring logic.

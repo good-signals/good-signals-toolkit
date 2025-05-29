@@ -6,15 +6,16 @@ import { FileText } from 'lucide-react';
 interface ExecutiveSummaryProps {
   summary: string;
   prompt: string;
+  suggestedTitle?: string;
 }
 
-const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ summary, prompt }) => {
+const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ summary, prompt, suggestedTitle }) => {
   return (
     <Card className="mb-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Executive Summary
+          {suggestedTitle ? `${suggestedTitle} Analysis` : 'Executive Summary'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

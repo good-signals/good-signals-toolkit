@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const TerritoryTargeterPage = () => {
   const { user } = useAuth();
   const [cbsaData] = useState(sampleCBSAData);
-  const { isLoading, currentAnalysis, error, runScoring } = useTerritoryScoring();
+  const { isLoading, currentAnalysis, error, runScoring, clearAnalysis } = useTerritoryScoring();
 
   const handlePromptSubmit = async (prompt: string) => {
     try {
@@ -32,6 +32,10 @@ const TerritoryTargeterPage = () => {
       scores: currentAnalysis.results.scores,
       analysis: currentAnalysis
     });
+  };
+
+  const handleClearAnalysis = () => {
+    clearAnalysis();
   };
 
   return (
@@ -86,10 +90,14 @@ const TerritoryTargeterPage = () => {
           <ExecutiveSummary 
             summary={currentAnalysis.results.prompt_summary}
             prompt={currentAnalysis.prompt}
+            suggestedTitle={currentAnalysis.results.suggested_title}
           />
 
-          {/* Export Button */}
-          <div className="flex justify-end mb-6">
+          {/* Export and Clear Buttons */}
+          <div className="flex justify-end gap-2 mb-6">
+            <Button onClick={handleClearAnalysis} variant="outline">
+              Clear Analysis
+            </Button>
             <Button onClick={handleExport} variant="outline">
               <Download className="mr-2 h-4 w-4" />
               Export to CSV

@@ -11,7 +11,7 @@ interface ProgressCounterProps {
 
 const ProgressCounter: React.FC<ProgressCounterProps> = ({ 
   isActive, 
-  duration = 30,
+  duration = 75, // Updated to 75 seconds (middle of 60-90 range)
   onComplete 
 }) => {
   const [progress, setProgress] = useState(0);
@@ -90,7 +90,7 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
       <div className="text-xs text-muted-foreground">
         {isCompleted 
           ? 'Market scores have been generated and added to the table below.'
-          : 'Perplexity AI is researching and scoring each market based on your criteria. This typically takes 15-30 seconds.'
+          : 'Perplexity AI is researching and scoring each market based on your criteria. This typically takes 60-90 seconds.'
         }
       </div>
     </div>

@@ -2,7 +2,6 @@
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CBSAScore } from '@/types/territoryTargeterTypes';
-import MarketSignalSummary from './table/MarketSignalSummary';
 import CBSATableHeader, { SortConfig } from './table/CBSATableHeader';
 import CBSATableRow from './table/CBSATableRow';
 
@@ -78,15 +77,6 @@ const CBSATable: React.FC<CBSATableProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Market Signal Score Summary - Only show when scores are available */}
-      {hasScores && (
-        <MarketSignalSummary 
-          marketSignalScore={marketSignalScore} 
-          accountGoodThreshold={accountGoodThreshold}
-          accountBadThreshold={accountBadThreshold}
-        />
-      )}
-
       {/* Table */}
       <div className="overflow-x-auto">
         <Table>

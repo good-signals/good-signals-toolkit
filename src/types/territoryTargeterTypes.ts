@@ -16,6 +16,7 @@ export interface CBSAScore {
 }
 
 export interface AIScoreResponse {
+  suggested_title: string;
   prompt_summary: string;
   scores: CBSAScore[];
 }
