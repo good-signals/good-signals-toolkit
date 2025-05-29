@@ -21,6 +21,8 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
   const [isResumed, setIsResumed] = useState(false);
 
   useEffect(() => {
+    console.log('ProgressCounter: isActive changed to', isActive, 'startTime:', startTime);
+    
     if (!isActive) {
       setProgress(0);
       setTimeElapsed(0);
@@ -33,11 +35,16 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     if (startTime) {
       initialElapsed = Math.floor((Date.now() - startTime) / 1000);
       setTimeElapsed(initialElapsed);
-      setIsResumed(true);
+      console.log('ProgressCounter: Resuming with initial elapsed time:', initialElapsed);
+      
+      if (initialElapsed > 0) {
+        setIsResumed(true);
+      }
       
       // Calculate initial progress
       const initialProgress = Math.min((initialElapsed / duration) * 100, 95);
       setProgress(initialProgress);
+      console.log('ProgressCounter: Initial progress:', initialProgress);
     }
 
     const interval = setInterval(() => {
@@ -60,6 +67,7 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
   // Complete the progress when isActive becomes false (scoring finished)
   useEffect(() => {
     if (!isActive && progress > 0) {
+      console.log('ProgressCounter: Analysis completed, setting progress to 100%');
       setProgress(100);
       // Reset after a short delay to show completion
       const resetTimeout = setTimeout(() => {

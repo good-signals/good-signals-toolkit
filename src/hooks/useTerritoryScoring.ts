@@ -23,6 +23,7 @@ export const useTerritoryScoring = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        console.log('Loaded saved analysis from localStorage:', parsed.id);
         return {
           ...parsed,
           createdAt: new Date(parsed.createdAt)
@@ -36,7 +37,7 @@ export const useTerritoryScoring = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const analysisRequestRef = useRef<AbortController | null>(null);
 
   // Check for in-progress analysis on mount
   useEffect(() => {
@@ -44,17 +45,36 @@ export const useTerritoryScoring = () => {
     if (savedState) {
       try {
         const analysisState: AnalysisState = JSON.parse(savedState);
+        console.log('Found saved analysis state:', analysisState);
+        
         if (analysisState.status === 'running') {
+          // Check if analysis has been running too long (timeout after 5 minutes)
+          const elapsed = Date.now() - analysisState.startTime;
+          if (elapsed > 5 * 60 * 1000) {
+            console.log('Analysis timed out, cleaning up stale state');
+            localStorage.removeItem(ANALYSIS_STATE_KEY);
+            
+            toast({
+              title: "Analysis Timed Out",
+              description: "Your previous analysis took too long and was cancelled. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
           // Resume tracking the analysis
           console.log('Resuming analysis tracking for:', analysisState.id);
           setIsLoading(true);
           setAnalysisStartTime(analysisState.startTime);
-          startPolling(analysisState);
           
           toast({
             title: "Analysis Resumed",
             description: "Continuing your territory analysis in the background...",
           });
+        } else if (analysisState.status === 'completed') {
+          // Clean up completed analysis state
+          console.log('Cleaning up completed analysis state');
+          localStorage.removeItem(ANALYSIS_STATE_KEY);
         }
       } catch (error) {
         console.error('Failed to parse saved analysis state:', error);
@@ -66,61 +86,32 @@ export const useTerritoryScoring = () => {
   // Save analysis to localStorage whenever it changes
   useEffect(() => {
     if (currentAnalysis) {
+      console.log('Saving analysis to localStorage:', currentAnalysis.id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, [currentAnalysis]);
 
-  const startPolling = (analysisState: AnalysisState) => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        // Check if analysis has been running too long (timeout after 5 minutes)
-        const elapsed = Date.now() - analysisState.startTime;
-        if (elapsed > 5 * 60 * 1000) {
-          throw new Error('Analysis timed out after 5 minutes');
-        }
-
-        // In a real implementation, you might check a database or status endpoint
-        // For now, we'll simulate checking if the analysis is complete
-        // This would be replaced with actual status checking logic
-        
-      } catch (error) {
-        console.error('Polling error:', error);
-        stopPolling();
-        setIsLoading(false);
-        setError('Analysis monitoring failed');
-        
-        // Clean up stale analysis state
-        localStorage.removeItem(ANALYSIS_STATE_KEY);
-        
-        toast({
-          title: "Analysis Monitoring Failed",
-          description: "Please try running the analysis again.",
-          variant: "destructive",
-        });
-      }
-    }, 5000); // Poll every 5 seconds
-  };
-
-  const stopPolling = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-  };
-
   const runScoring = async (prompt: string, cbsaData: CBSAData[]) => {
+    console.log('Starting territory scoring analysis...');
+    console.log('Prompt:', prompt);
+    console.log('Markets to analyze:', cbsaData.length);
+    
     setIsLoading(true);
     setError(null);
+    
+    // Cancel any existing request
+    if (analysisRequestRef.current) {
+      analysisRequestRef.current.abort();
+    }
     
     const analysisId = crypto.randomUUID();
     const startTime = Date.now();
     setAnalysisStartTime(startTime);
+
+    // Create new abort controller for this request
+    analysisRequestRef.current = new AbortController();
 
     // Save analysis state to localStorage for persistence
     const analysisState: AnalysisState = {
@@ -132,18 +123,21 @@ export const useTerritoryScoring = () => {
     };
     
     localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(analysisState));
+    console.log('Saved analysis state to localStorage:', analysisId);
 
     try {
-      console.log('Starting territory scoring analysis...');
-      console.log('Prompt:', prompt);
-      console.log('Markets to analyze:', cbsaData.length);
-      
       const { data, error } = await supabase.functions.invoke('territory-scoring', {
         body: {
           userPrompt: prompt,
           cbsaData: cbsaData
         }
       });
+
+      // Check if request was aborted
+      if (analysisRequestRef.current?.signal.aborted) {
+        console.log('Analysis request was aborted');
+        return;
+      }
 
       if (error) {
         console.error('Supabase function error:', error);
@@ -169,6 +163,10 @@ export const useTerritoryScoring = () => {
       }
 
       const aiResponse: AIScoreResponse = data.data;
+      console.log('Received AI response:', {
+        title: aiResponse.suggested_title,
+        scoresCount: aiResponse.scores?.length || 0
+      });
       
       // Validate response data
       if (!aiResponse.scores || aiResponse.scores.length === 0) {
@@ -187,15 +185,18 @@ export const useTerritoryScoring = () => {
         includedColumns: ['score'] // Default to including the main score column
       };
 
+      console.log('Setting current analysis:', analysis.id);
       setCurrentAnalysis(analysis);
       
       // Update analysis state to completed
       const completedState = { ...analysisState, status: 'completed' as const };
       localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(completedState));
+      console.log('Updated analysis state to completed');
       
       // Clean up analysis state after a short delay
       setTimeout(() => {
         localStorage.removeItem(ANALYSIS_STATE_KEY);
+        console.log('Cleaned up analysis state');
       }, 2000);
       
       console.log('Analysis completed successfully');
@@ -228,7 +229,7 @@ export const useTerritoryScoring = () => {
     } finally {
       setIsLoading(false);
       setAnalysisStartTime(null);
-      stopPolling();
+      analysisRequestRef.current = null;
     }
   };
 
@@ -245,21 +246,34 @@ export const useTerritoryScoring = () => {
       marketSignalScore: Math.round(averageScore)
     };
 
+    console.log('Updating included columns:', columnIds);
     setCurrentAnalysis(updatedAnalysis);
   };
 
   const clearAnalysis = () => {
+    console.log('Clearing analysis');
+    
+    // Cancel any ongoing request
+    if (analysisRequestRef.current) {
+      analysisRequestRef.current.abort();
+      analysisRequestRef.current = null;
+    }
+    
     setCurrentAnalysis(null);
     setAnalysisStartTime(null);
-    stopPolling();
+    setIsLoading(false);
+    setError(null);
+    
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(ANALYSIS_STATE_KEY);
   };
 
-  // Cleanup polling on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopPolling();
+      if (analysisRequestRef.current) {
+        analysisRequestRef.current.abort();
+      }
     };
   }, []);
 
