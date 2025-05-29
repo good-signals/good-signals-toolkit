@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
@@ -10,6 +9,7 @@ import { useColumnSettings } from '@/hooks/territory-targeter/useColumnSettings'
 import { useManualScoreOverrides } from '@/hooks/territory-targeter/useManualScoreOverrides';
 import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
+import { sampleCBSAData } from '@/data/sampleCBSAData';
 import TerritoryHeader from './TerritoryHeader';
 import PromptInput from './PromptInput';
 import TerritoryResultsSection from './TerritoryResultsSection';
@@ -20,22 +20,43 @@ import ProgressCounter from './ProgressCounter';
 
 const TerritoryTargeterPageContent: React.FC = () => {
   const { user } = useUser();
-  const { currentAnalysis, setCurrentAnalysis, clearAnalysis } = useAnalysisState();
+  const { currentAnalysis, setCurrentAnalysis, storedCBSAData, setCBSAData, clearAnalysis } = useAnalysisState();
   const { executiveSummary, setExecutiveSummary, isGeneratingSummary, handleGenerateExecutiveSummary, handleUpdateExecutiveSummary } = useExecutiveSummary(currentAnalysis, user);
   const { columnSettings, toggleColumn, deleteColumn } = useColumnSettings(currentAnalysis);
   const { manualScoreOverrides, addManualOverride, removeManualOverride } = useManualScoreOverrides();
   const { currentAccount, accountGoodThreshold, accountBadThreshold } = useAccountSettings(user?.id);
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [cbsaData, setCBSAData] = useState<CBSAData[]>([]);
+  const [cbsaData, setCBSADataLocal] = useState<CBSAData[]>([]);
   const [prompt, setPrompt] = useState('');
+  const [isRestoringData, setIsRestoringData] = useState(false);
+
+  // Initialize CBSA data from stored data or fallback to sample data
+  useEffect(() => {
+    if (currentAnalysis && storedCBSAData.length > 0) {
+      console.log('Restoring CBSA data from storage:', storedCBSAData.length, 'items');
+      setCBSADataLocal(storedCBSAData);
+    } else if (currentAnalysis && storedCBSAData.length === 0) {
+      console.log('No stored CBSA data found, using sample data as fallback');
+      setIsRestoringData(true);
+      setCBSADataLocal(sampleCBSAData);
+      setCBSAData(sampleCBSAData);
+      setIsRestoringData(false);
+      
+      toast({
+        title: "Analysis Restored",
+        description: "Your saved analysis has been restored with sample market data.",
+      });
+    }
+  }, [currentAnalysis, storedCBSAData, setCBSAData]);
 
   // Debug logging for analysis state
   useEffect(() => {
     console.log('Territory Targeter - Current Analysis:', currentAnalysis);
     console.log('Territory Targeter - CBSA Data Length:', cbsaData.length);
+    console.log('Territory Targeter - Stored CBSA Data Length:', storedCBSAData.length);
     console.log('Territory Targeter - Executive Summary:', executiveSummary);
-  }, [currentAnalysis, cbsaData, executiveSummary]);
+  }, [currentAnalysis, cbsaData, storedCBSAData, executiveSummary]);
 
   const handlePromptSubmit = async (newPrompt: string, mode: 'fast' | 'detailed') => {
     if (isProcessing) return;
@@ -78,7 +99,9 @@ const TerritoryTargeterPageContent: React.FC = () => {
         throw new Error('CBSA data fetch did not return any data.');
       }
 
-      setCBSAData(cbsaResponse.data.cbsa_data);
+      const newCBSAData = cbsaResponse.data.cbsa_data;
+      setCBSADataLocal(newCBSAData);
+      setCBSAData(newCBSAData);
 
       toast({
         title: "Analysis Initiated",
@@ -126,7 +149,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
   const handleClearAnalysis = () => {
     clearAnalysis();
-    setCBSAData([]);
+    setCBSADataLocal([]);
   };
 
   const handleExportCSV = () => {
@@ -202,11 +225,16 @@ const TerritoryTargeterPageContent: React.FC = () => {
   const handleStatusChange = async (cbsaId: string, newStatus: string) => {
     try {
       // Update local state optimistically
-      setCBSAData(prevData =>
+      setCBSADataLocal(prevData =>
         prevData.map(cbsa =>
           cbsa.id === cbsaId ? { ...cbsa, status: newStatus as any } : cbsa
         )
       );
+
+      // Also update stored data
+      setCBSAData(cbsaData.map(cbsa =>
+        cbsa.id === cbsaId ? { ...cbsa, status: newStatus as any } : cbsa
+      ));
 
       toast({
         title: "Status Updated",
@@ -275,9 +303,9 @@ const TerritoryTargeterPageContent: React.FC = () => {
             />
           )}
 
-          {isProcessing && (
+          {(isProcessing || isRestoringData) && (
             <ProgressCounter 
-              isActive={isProcessing}
+              isActive={isProcessing || isRestoringData}
             />
           )}
         </div>

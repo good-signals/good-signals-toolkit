@@ -1,9 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { TerritoryAnalysis } from '@/types/territoryTargeterTypes';
+import { TerritoryAnalysis, CBSAData } from '@/types/territoryTargeterTypes';
 import { safeStorage } from '@/utils/safeStorage';
 
 const STORAGE_KEY = 'territoryTargeter_currentAnalysis';
+const CBSA_DATA_KEY = 'territoryTargeter_cbsaData';
 const ANALYSIS_STATE_KEY = 'territoryTargeter_analysisState';
 
 interface AnalysisState {
@@ -40,6 +41,22 @@ export const useAnalysisState = () => {
     return null;
   });
 
+  const [storedCBSAData, setStoredCBSAData] = useState<CBSAData[]>(() => {
+    // Load CBSA data from localStorage
+    const saved = safeStorage.getItem(CBSA_DATA_KEY);
+    if (saved) {
+      try {
+        const parsed = safeStorage.safeParse(saved, []);
+        console.log('Loaded saved CBSA data from localStorage:', parsed.length, 'items');
+        return parsed;
+      } catch (error) {
+        console.error('Failed to load saved CBSA data:', error);
+        safeStorage.removeItem(CBSA_DATA_KEY);
+      }
+    }
+    return [];
+  });
+
   // Save analysis to localStorage whenever it changes
   useEffect(() => {
     if (currentAnalysis) {
@@ -49,6 +66,16 @@ export const useAnalysisState = () => {
       safeStorage.removeItem(STORAGE_KEY);
     }
   }, [currentAnalysis]);
+
+  // Save CBSA data to localStorage whenever it changes
+  useEffect(() => {
+    if (storedCBSAData.length > 0) {
+      console.log('Saving CBSA data to localStorage:', storedCBSAData.length, 'items');
+      safeStorage.setItem(CBSA_DATA_KEY, JSON.stringify(storedCBSAData));
+    } else {
+      safeStorage.removeItem(CBSA_DATA_KEY);
+    }
+  }, [storedCBSAData]);
 
   const saveAnalysisState = (state: AnalysisState) => {
     safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(state));
@@ -65,13 +92,21 @@ export const useAnalysisState = () => {
 
   const clearAnalysis = () => {
     setCurrentAnalysis(null);
+    setStoredCBSAData([]);
     safeStorage.removeItem(STORAGE_KEY);
+    safeStorage.removeItem(CBSA_DATA_KEY);
     safeStorage.removeItem(ANALYSIS_STATE_KEY);
+  };
+
+  const setCBSAData = (data: CBSAData[]) => {
+    setStoredCBSAData(data);
   };
 
   return {
     currentAnalysis,
     setCurrentAnalysis,
+    storedCBSAData,
+    setCBSAData,
     saveAnalysisState,
     getAnalysisState,
     clearAnalysisState,
