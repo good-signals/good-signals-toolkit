@@ -21,6 +21,8 @@ import {
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { useQuery } from '@tanstack/react-query';
 import { getAssessmentDocuments, AssessmentDocument } from '@/services/documentService';
+import { fetchUserAccountsWithAdminRole } from '@/services/accountService';
+import { useAuth } from '@/contexts/AuthContext';
 import DocumentUpload from './DocumentUpload';
 import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
 
@@ -47,6 +49,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   isDeleting,
   forceClearSelectionsKey,
 }) => {
+  const { user } = useAuth();
   const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [idsToDelete, setIdsToDelete] = useState<string[]>([]);
@@ -58,6 +61,18 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   });
 
   const prevIsDeletingRef = useRef(isDeleting);
+
+  // Fetch account data for threshold values
+  const { data: accountData } = useQuery({
+    queryKey: ['userAccounts', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const accounts = await fetchUserAccountsWithAdminRole(user.id);
+      return accounts.length > 0 ? accounts[0] : null;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   // Enhanced document counts query with better error handling
   const { data: documentCounts = {} } = useQuery<Record<string, number>>({
@@ -220,7 +235,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     idsToDelete,
     isDeleting,
     selectedCount: selectedAssessmentIds.length,
-    assessmentsCount: assessmentsData.length
+    assessmentsCount: assessmentsData.length,
+    accountThresholds: {
+      good: accountData?.signal_good_threshold,
+      bad: accountData?.signal_bad_threshold
+    }
   });
 
   if (isLoading) {
@@ -275,6 +294,8 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
         isDeleting={isDeleting}
         assessmentToDelete={null}
         documentCounts={documentCounts}
+        accountGoodThreshold={accountData?.signal_good_threshold}
+        accountBadThreshold={accountData?.signal_bad_threshold}
       />
 
       <AlertDialog 

@@ -6,6 +6,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from '@/components/ui/badge';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
+import { getSignalStatus } from '@/lib/assessmentDisplayUtils';
 
 interface SiteAssessmentTableRowProps {
   assessment: SiteAssessment;
@@ -18,6 +19,8 @@ interface SiteAssessmentTableRowProps {
   isDeleting: boolean;
   isDeletingThis: boolean;
   documentCount: number;
+  accountGoodThreshold?: number | null;
+  accountBadThreshold?: number | null;
 }
 
 const getSiteStatusColor = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => {
@@ -43,6 +46,8 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
   isDeleting,
   isDeletingThis,
   documentCount,
+  accountGoodThreshold,
+  accountBadThreshold,
 }) => {
   // Ensure score is displayed as percentage (should be 0-100 from database)
   const displayScore = assessment.site_signal_score !== null && assessment.site_signal_score !== undefined
@@ -54,12 +59,16 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
     ? Math.round(assessment.completion_percentage)
     : null;
 
+  // Get signal status for color coding
+  const signalStatus = getSignalStatus(displayScore, accountGoodThreshold, accountBadThreshold);
+
   console.log('Table row display scores:', {
     assessmentId: assessment.id,
     rawScore: assessment.site_signal_score,
     displayScore,
     rawCompletion: assessment.completion_percentage,
-    displayCompletion
+    displayCompletion,
+    signalStatus
   });
 
   return (
@@ -88,9 +97,9 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
       </TableCell>
       <TableCell className="text-center">
         {displayScore !== null ? (
-           <Badge variant={displayScore >= 75 ? "default" : displayScore >= 50 ? "secondary" : "destructive"}>
+          <span className={`font-semibold ${signalStatus.color}`}>
             {displayScore}%
-           </Badge>
+          </span>
         ) : (
           <span className="text-xs text-muted-foreground">N/A</span>
         )}

@@ -21,6 +21,8 @@ interface SiteAssessmentsTableContentProps {
   isDeleting: boolean;
   assessmentToDelete: SiteAssessment | null;
   documentCounts: Record<string, number>;
+  accountGoodThreshold?: number | null;
+  accountBadThreshold?: number | null;
 }
 
 const SiteAssessmentsTableContent: React.FC<SiteAssessmentsTableContentProps> = ({
@@ -37,6 +39,8 @@ const SiteAssessmentsTableContent: React.FC<SiteAssessmentsTableContentProps> = 
   isDeleting,
   assessmentToDelete,
   documentCounts,
+  accountGoodThreshold,
+  accountBadThreshold,
 }) => {
   return (
     <div className="overflow-x-auto">
@@ -63,6 +67,8 @@ const SiteAssessmentsTableContent: React.FC<SiteAssessmentsTableContentProps> = 
               isDeleting={isDeleting}
               isDeletingThis={isDeleting && assessmentToDelete?.id === assessment.id}
               documentCount={documentCounts[assessment.id] || 0}
+              accountGoodThreshold={accountGoodThreshold}
+              accountBadThreshold={accountBadThreshold}
             />
           ))}
         </TableBody>
