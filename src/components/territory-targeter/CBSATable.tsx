@@ -173,7 +173,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
     <div className="space-y-4">
       {/* Table Title */}
       <div className="border-b pb-4">
-        <h2 className="text-2xl font-bold text-foreground">CBSA Market Analysis</h2>
+        <h2 className="text-2xl font-bold text-foreground">Territory Analysis</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Core-Based Statistical Areas ranked by population and custom criteria scoring
         </p>
@@ -192,7 +192,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
             className="sticky top-0 z-20 bg-background"
           />
           <TableBody>
-            {sortedData.map((row) => (
+            {sortedData.map((row, index) => (
               <CBSATableRow
                 key={row.id}
                 row={row}
@@ -201,6 +201,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
                 accountBadThreshold={accountBadThreshold}
                 onStatusChange={handleStatusChange}
                 onScoreClick={handleScoreClick}
+                isEvenRow={index % 2 === 0}
               />
             ))}
           </TableBody>

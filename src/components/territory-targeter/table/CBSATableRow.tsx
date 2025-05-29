@@ -33,6 +33,7 @@ interface CBSATableRowProps {
   accountBadThreshold?: number | null;
   onStatusChange: (cbsaId: string, status: CBSAStatus) => void;
   onScoreClick: (marketName: string, columnId: string) => void;
+  isEvenRow?: boolean;
 }
 
 const CBSATableRow: React.FC<CBSATableRowProps> = ({
@@ -41,7 +42,8 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
   accountGoodThreshold,
   accountBadThreshold,
   onStatusChange,
-  onScoreClick
+  onScoreClick,
+  isEvenRow = false
 }) => {
   const signalStatus = getSignalStatus(row.marketSignalScore, accountGoodThreshold, accountBadThreshold);
   
@@ -66,7 +68,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
   const showMarketSignalScore = criteriaColumns.length > 1;
 
   return (
-    <TableRow key={row.id}>
+    <TableRow key={row.id} className={isEvenRow ? 'bg-muted/30' : ''}>
       <TableCell className="font-medium sticky left-0 z-10 bg-background border-r">{row.name}</TableCell>
       <TableCell>{row.state}</TableCell>
       <TableCell>{row.region}</TableCell>
