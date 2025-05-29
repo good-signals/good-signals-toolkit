@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom"; 
+import React from "react";
 
 import MainLayout from "./components/layout/MainLayout";
 import LandingPage from "./pages/LandingPage";
@@ -20,7 +21,7 @@ import NotFound from "./pages/NotFound";
 import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
 import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
-import SignalSettingsPage from "./pages/SignalSettingsPage"; // Renamed import
+import SignalSettingsPage from "./pages/SignalSettingsPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -98,8 +99,8 @@ const AppContent = () => {
             element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
           />
           <Route 
-            path="signal-settings" // Renamed path
-            element={<ProtectedRoute><SignalSettingsPage /></ProtectedRoute>} // Updated component
+            path="signal-settings"
+            element={<ProtectedRoute><SignalSettingsPage /></ProtectedRoute>}
           />
         </Route>
         <Route path="*" element={<NotFound />} />
@@ -110,13 +111,13 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <TooltipProvider>
         <Toaster />
         <Sonner />
         <AppContent />
-      </AuthProvider>
-    </TooltipProvider>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
