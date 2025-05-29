@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
@@ -163,13 +164,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     return null;
   }, [userAccounts]);
 
-  // Enhanced mutation with better cache invalidation
+  // Fixed mutation with proper return type handling
   const updateScoresMutation = useMutation({
-    mutationFn: (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => {
+    mutationFn: async (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }): Promise<SiteAssessment> => {
       console.log('Updating scores via mutation:', params);
-      return updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage);
+      return await updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage);
     },
-    onSuccess: (updatedAssessment) => {
+    onSuccess: (updatedAssessment: SiteAssessment) => {
       console.log('Scores updated successfully:', {
         id: updatedAssessment.id,
         newScore: updatedAssessment.site_signal_score,
