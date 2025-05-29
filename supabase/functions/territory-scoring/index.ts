@@ -6,6 +6,84 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Enhanced JSON extraction function
+function extractJSON(text: string): any {
+  console.log('Attempting to extract JSON from response...');
+  
+  // Try to find JSON in markdown code blocks first
+  const markdownJsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```/i);
+  if (markdownJsonMatch) {
+    console.log('Found JSON in markdown code block');
+    try {
+      return JSON.parse(markdownJsonMatch[1].trim());
+    } catch (e) {
+      console.log('Failed to parse JSON from markdown block:', e.message);
+    }
+  }
+
+  // Try to find any code block
+  const codeBlockMatch = text.match(/```\s*\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch) {
+    console.log('Found JSON in generic code block');
+    try {
+      return JSON.parse(codeBlockMatch[1].trim());
+    } catch (e) {
+      console.log('Failed to parse JSON from code block:', e.message);
+    }
+  }
+
+  // Look for JSON object starting with { and ending with }
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    console.log('Found JSON object pattern');
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      console.log('Failed to parse JSON object:', e.message);
+    }
+  }
+
+  // Try to parse the entire text as JSON
+  try {
+    console.log('Attempting to parse entire response as JSON');
+    return JSON.parse(text.trim());
+  } catch (e) {
+    console.log('Failed to parse entire response as JSON:', e.message);
+  }
+
+  throw new Error('No valid JSON found in response');
+}
+
+// Validate the parsed response structure
+function validateResponse(data: any): boolean {
+  if (!data || typeof data !== 'object') {
+    console.log('Response is not an object');
+    return false;
+  }
+
+  if (!data.prompt_summary || typeof data.prompt_summary !== 'string') {
+    console.log('Missing or invalid prompt_summary');
+    return false;
+  }
+
+  if (!Array.isArray(data.scores)) {
+    console.log('Missing or invalid scores array');
+    return false;
+  }
+
+  // Validate first few scores to ensure proper structure
+  for (let i = 0; i < Math.min(3, data.scores.length); i++) {
+    const score = data.scores[i];
+    if (!score.market || typeof score.score !== 'number' || !score.reasoning) {
+      console.log(`Invalid score structure at index ${i}`);
+      return false;
+    }
+  }
+
+  console.log(`Response validation passed with ${data.scores.length} scores`);
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -23,8 +101,12 @@ serve(async (req) => {
       throw new Error('Perplexity API key not configured');
     }
 
-    // Prepare the system prompt with CBSA data
+    console.log(`Processing request for ${cbsaData.length} markets with prompt: "${userPrompt.substring(0, 100)}..."`);
+
+    // Enhanced system prompt for better JSON output
     const systemPrompt = `You are part of the Territory Targeter tool inside the Good Signals platform. Your job is to help users assess and score U.S. markets based on criteria they provide in natural language.
+
+CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, explanations, or text outside the JSON object.
 
 Your task:
 1. Interpret the user's criteria prompt (e.g., "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand").
@@ -33,7 +115,7 @@ Your task:
 4. Add a plainspoken paragraph to the executive summary section explaining your logic, the data you considered, and any key assumptions.
 5. Use a professional but clear and approachable tone (no jargon, plain English).
 
-Return the following JSON object:
+Return EXACTLY this JSON structure with NO additional text or formatting:
 
 {
   "prompt_summary": "[One-paragraph explanation of how you approached the user's prompt]",
@@ -48,7 +130,6 @@ Return the following JSON object:
       "score": 42,
       "reasoning": "Smaller Gen Z segment and fewer cultural touchpoints with youth sneaker trends."
     }
-    // Repeat for all markets provided
   ]
 }
 
@@ -60,6 +141,8 @@ Guidelines:
 
 Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Population: ${cbsa.population.toLocaleString()})`).join(', ')}`;
 
+    console.log('Sending request to Perplexity API...');
+    
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -78,7 +161,7 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
             content: `User's scoring criteria: ${userPrompt}`
           }
         ],
-        temperature: 0.2,
+        temperature: 0.1, // Lower temperature for more consistent JSON output
         top_p: 0.9,
         max_tokens: 8000,
         return_images: false,
@@ -96,27 +179,31 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     }
 
     const data = await response.json();
-    console.log('Perplexity response:', data);
+    console.log('Received response from Perplexity API');
 
     const aiContent = data.choices[0]?.message?.content;
     if (!aiContent) {
       throw new Error('No content received from Perplexity API');
     }
 
-    // Parse the JSON response from AI
+    console.log('AI response length:', aiContent.length);
+
+    // Extract and validate JSON from AI response
     let parsedResponse;
     try {
-      // Extract JSON from the response (in case there's additional text)
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedResponse = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No valid JSON found in AI response');
+      parsedResponse = extractJSON(aiContent);
+      
+      if (!validateResponse(parsedResponse)) {
+        throw new Error('Response validation failed - invalid structure');
       }
+      
     } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', parseError);
-      throw new Error('Failed to parse AI response. Please try again.');
+      console.error('Failed to parse AI response:', parseError.message);
+      console.error('Raw AI content (first 500 chars):', aiContent.substring(0, 500));
+      throw new Error(`Failed to parse AI response: ${parseError.message}`);
     }
+
+    console.log(`Successfully processed ${parsedResponse.scores.length} market scores`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -127,9 +214,12 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
 
   } catch (error) {
     console.error('Error in territory-scoring function:', error);
+    
+    // Return detailed error information for debugging
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error.message,
+      details: error.stack || 'No stack trace available'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

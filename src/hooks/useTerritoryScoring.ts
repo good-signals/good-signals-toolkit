@@ -14,7 +14,9 @@ export const useTerritoryScoring = () => {
     setError(null);
 
     try {
-      console.log('Running territory scoring with prompt:', prompt);
+      console.log('Starting territory scoring analysis...');
+      console.log('Prompt:', prompt);
+      console.log('Markets to analyze:', cbsaData.length);
       
       const { data, error } = await supabase.functions.invoke('territory-scoring', {
         body: {
@@ -24,15 +26,35 @@ export const useTerritoryScoring = () => {
       });
 
       if (error) {
-        throw new Error(error.message);
+        console.error('Supabase function error:', error);
+        throw new Error(`Analysis failed: ${error.message}`);
       }
 
       if (!data.success) {
-        throw new Error(data.error || 'Unknown error occurred');
+        console.error('Function returned error:', data.error);
+        console.error('Error details:', data.details);
+        
+        // Provide more user-friendly error messages
+        let userErrorMessage = data.error || 'Unknown error occurred';
+        
+        if (userErrorMessage.includes('Failed to parse AI response')) {
+          userErrorMessage = 'The AI service returned an unexpected format. Please try again with a simpler prompt.';
+        } else if (userErrorMessage.includes('Perplexity API error')) {
+          userErrorMessage = 'There was an issue connecting to the AI service. Please try again in a moment.';
+        } else if (userErrorMessage.includes('timeout')) {
+          userErrorMessage = 'The analysis is taking longer than expected. Please try again with a more specific prompt.';
+        }
+        
+        throw new Error(userErrorMessage);
       }
 
       const aiResponse: AIScoreResponse = data.data;
       
+      // Validate response data
+      if (!aiResponse.scores || aiResponse.scores.length === 0) {
+        throw new Error('No market scores were returned. Please try rephrasing your criteria.');
+      }
+
       // Calculate market signal score (average of all scores)
       const averageScore = aiResponse.scores.reduce((sum, score) => sum + score.score, 0) / aiResponse.scores.length;
       
@@ -47,18 +69,23 @@ export const useTerritoryScoring = () => {
 
       setCurrentAnalysis(analysis);
       
+      console.log('Analysis completed successfully');
+      console.log('Market signal score:', analysis.marketSignalScore);
+      console.log('Number of scored markets:', aiResponse.scores.length);
+      
       toast({
         title: "Territory Analysis Complete",
-        description: `Scored ${aiResponse.scores.length} markets successfully.`,
+        description: `Successfully scored ${aiResponse.scores.length} markets with an average signal score of ${analysis.marketSignalScore}%.`,
       });
 
       return analysis;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      console.error('Territory scoring error:', errorMessage);
       setError(errorMessage);
       
       toast({
-        title: "Scoring Failed",
+        title: "Analysis Failed",
         description: errorMessage,
         variant: "destructive",
       });
