@@ -55,7 +55,17 @@ const TerritoryTargeterPage = () => {
         </Alert>
       </div>
 
-      {/* Prompt Input */}
+      {/* Authentication Notice */}
+      {!user && (
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Please sign in to use the Territory Targeter tool.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* 1. Prompt Input */}
       <PromptInput 
         onSubmit={handlePromptSubmit}
         isLoading={isLoading}
@@ -70,9 +80,14 @@ const TerritoryTargeterPage = () => {
         </Alert>
       )}
 
-      {/* Results Section */}
+      {/* 2. Executive Summary (only show after analysis) */}
       {currentAnalysis && (
         <>
+          <ExecutiveSummary 
+            summary={currentAnalysis.results.prompt_summary}
+            prompt={currentAnalysis.prompt}
+          />
+
           {/* Export Button */}
           <div className="flex justify-end mb-6">
             <Button onClick={handleExport} variant="outline">
@@ -80,33 +95,17 @@ const TerritoryTargeterPage = () => {
               Export to CSV
             </Button>
           </div>
-
-          {/* Executive Summary */}
-          <ExecutiveSummary 
-            summary={currentAnalysis.results.prompt_summary}
-            prompt={currentAnalysis.prompt}
-          />
-
-          {/* Results Table */}
-          <CBSATable 
-            cbsaData={cbsaData}
-            scores={currentAnalysis.results.scores}
-            marketSignalScore={currentAnalysis.marketSignalScore}
-            accountGoodThreshold={0.75} // Default thresholds - can be connected to account settings later
-            accountBadThreshold={0.50}
-          />
         </>
       )}
 
-      {/* Authentication Notice */}
-      {!user && (
-        <Alert className="mt-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Please sign in to use the Territory Targeter tool.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* 3. CBSA Table - Always show with population data */}
+      <CBSATable 
+        cbsaData={cbsaData}
+        scores={currentAnalysis?.results.scores || []}
+        marketSignalScore={currentAnalysis?.marketSignalScore || 0}
+        accountGoodThreshold={0.75}
+        accountBadThreshold={0.50}
+      />
     </div>
   );
 };

@@ -53,6 +53,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
   accountBadThreshold
 }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const hasScores = scores.length > 0;
 
   // Merge CBSA data with scores
   const tableData = useMemo(() => {
@@ -61,7 +62,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
       return {
         ...cbsa,
         score: scoreData?.score || null,
-        reasoning: scoreData?.reasoning || 'No score available'
+        reasoning: scoreData?.reasoning || null
       };
     });
   }, [cbsaData, scores]);
@@ -120,16 +121,18 @@ const CBSATable: React.FC<CBSATableProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Market Signal Score Summary */}
-      <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-        <span className="text-sm font-medium">Market Signal Score:</span>
-        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(marketSignalStatus)}`}>
-          {marketSignalScore}%
-        </span>
-        <span className="text-sm text-muted-foreground">
-          (Average of all market scores)
-        </span>
-      </div>
+      {/* Market Signal Score Summary - Only show when scores are available */}
+      {hasScores && (
+        <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
+          <span className="text-sm font-medium">Market Signal Score:</span>
+          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(marketSignalStatus)}`}>
+            {marketSignalScore}%
+          </span>
+          <span className="text-sm text-muted-foreground">
+            (Average of all market scores)
+          </span>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto">
@@ -176,26 +179,30 @@ const CBSATable: React.FC<CBSATableProps> = ({
                   {getSortIcon('populationGrowth')}
                 </Button>
               </TableHead>
-              <TableHead className="w-[100px] text-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('score')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Score
-                  {getSortIcon('score')}
-                </Button>
-              </TableHead>
-              <TableHead className="min-w-[300px]">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('reasoning')}
-                  className="h-auto p-0 font-medium"
-                >
-                  AI Reasoning
-                  {getSortIcon('reasoning')}
-                </Button>
-              </TableHead>
+              {hasScores && (
+                <>
+                  <TableHead className="w-[100px] text-center">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleSort('score')}
+                      className="h-auto p-0 font-medium"
+                    >
+                      Score
+                      {getSortIcon('score')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="min-w-[300px]">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleSort('reasoning')}
+                      className="h-auto p-0 font-medium"
+                    >
+                      AI Reasoning
+                      {getSortIcon('reasoning')}
+                    </Button>
+                  </TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -210,16 +217,20 @@ const CBSATable: React.FC<CBSATableProps> = ({
                   <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
                     {formatPopulationGrowth(row.populationGrowth)}
                   </TableCell>
-                  <TableCell className="text-center">
-                    {row.score !== null ? (
-                      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(signalStatus)}`}>
-                        {row.score}%
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">N/A</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">{row.reasoning}</TableCell>
+                  {hasScores && (
+                    <>
+                      <TableCell className="text-center">
+                        {row.score !== null ? (
+                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(signalStatus)}`}>
+                            {row.score}%
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{row.reasoning || 'No reasoning available'}</TableCell>
+                    </>
+                  )}
                 </TableRow>
               );
             })}
