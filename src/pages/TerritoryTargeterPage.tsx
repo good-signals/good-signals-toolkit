@@ -39,7 +39,7 @@ const TerritoryTargeterPageContent = () => {
     analysisStartTime,
     analysisMode,
     estimatedDuration,
-    isRefreshing,
+    refreshingColumnId,
     runScoring,
     cancelAnalysis,
     refreshColumn,
@@ -329,7 +329,7 @@ const TerritoryTargeterPageContent = () => {
         onStatusChange={handleStatusChange}
         onManualScoreOverride={handleManualScoreOverride}
         onRefreshColumn={handleRefreshColumn}
-        isRefreshing={isRefreshing}
+        refreshingColumnId={refreshingColumnId}
       />
     </div>
   );

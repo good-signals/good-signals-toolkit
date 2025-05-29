@@ -5,7 +5,7 @@ import { CBSAData, ManualScoreOverride, TerritoryAnalysis } from '@/types/territ
 import { toast } from '@/hooks/use-toast';
 
 export const useColumnOperations = () => {
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshingColumnId, setRefreshingColumnId] = useState<string | null>(null);
   const [refreshStartTime, setRefreshStartTime] = useState<number | null>(null);
 
   const refreshColumn = async (
@@ -21,7 +21,7 @@ export const useColumnOperations = () => {
     const column = currentAnalysis.criteriaColumns.find(c => c.id === columnId);
     if (!column) return;
 
-    setIsRefreshing(true);
+    setRefreshingColumnId(columnId);
     const startTime = Date.now();
     setRefreshStartTime(startTime);
     
@@ -107,7 +107,7 @@ export const useColumnOperations = () => {
         variant: "destructive",
       });
     } finally {
-      setIsRefreshing(false);
+      setRefreshingColumnId(null);
       setRefreshStartTime(null);
       
       // Notify parent component about refresh end
@@ -203,7 +203,7 @@ export const useColumnOperations = () => {
   };
 
   return {
-    isRefreshing,
+    refreshingColumnId,
     refreshStartTime,
     refreshColumn,
     applyManualOverride,

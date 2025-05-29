@@ -34,7 +34,7 @@ export const useTerritoryScoring = () => {
   } = useAnalysisProcessing();
 
   const {
-    isRefreshing,
+    refreshingColumnId,
     refreshStartTime,
     refreshColumn: refreshColumnOperation,
     applyManualOverride: applyOverride,
@@ -387,13 +387,13 @@ export const useTerritoryScoring = () => {
   }, []);
 
   return {
-    isLoading: isLoading || isRefreshing,
+    isLoading: isLoading || !!refreshingColumnId,
     currentAnalysis,
     error,
     analysisStartTime: analysisStartTime || refreshStartTime,
     analysisMode,
     estimatedDuration,
-    isRefreshing,
+    refreshingColumnId,
     runScoring,
     cancelAnalysis,
     refreshColumn,

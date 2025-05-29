@@ -17,7 +17,7 @@ interface CBSATableHeaderProps {
   sortConfig: SortConfig;
   onSort: (key: SortConfig['key']) => void;
   onRefreshColumn?: (columnId: string, type: 'all' | 'na-only') => void;
-  isRefreshing?: boolean;
+  refreshingColumnId?: string | null;
 }
 
 const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
@@ -26,7 +26,7 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
   sortConfig,
   onSort,
   onRefreshColumn,
-  isRefreshing = false
+  refreshingColumnId = null
 }) => {
   const getSortIcon = (key: SortConfig['key']) => {
     if (sortConfig?.key !== key) {
@@ -107,6 +107,8 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
             score.score === null || score.score === undefined
           );
           
+          const isThisColumnRefreshing = refreshingColumnId === column.id;
+          
           return (
             <TableHead key={column.id} className="w-[150px] text-center">
               <div className="flex items-center justify-between">
@@ -124,7 +126,7 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
                     columnTitle={column.title}
                     hasNAValues={columnHasNA}
                     onRefreshColumn={onRefreshColumn}
-                    disabled={isRefreshing}
+                    disabled={isThisColumnRefreshing}
                   />
                 )}
               </div>
