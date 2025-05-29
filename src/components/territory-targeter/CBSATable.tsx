@@ -5,7 +5,6 @@ import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territory
 import CBSATableHeader, { SortConfig } from './table/CBSATableHeader';
 import CBSATableRow from './table/CBSATableRow';
 import ManualScoreOverrideDialog from './ManualScoreOverride';
-import ColumnRefreshOptions from './ColumnRefreshOptions';
 import { CBSAStatus } from './table/CBSAStatusSelector';
 
 interface CBSATableProps {
@@ -62,13 +61,17 @@ const CBSATable: React.FC<CBSATableProps> = ({
         };
       });
 
-      // Calculate market signal score (average of all criteria scores)
-      const scores = Object.values(criteriaScores)
-        .map(cs => cs.score)
+      // Calculate market signal score (average of included criteria scores only)
+      const includedScores = Object.entries(criteriaScores)
+        .filter(([columnId]) => {
+          const column = criteriaColumns.find(c => c.id === columnId);
+          return column && column.isIncludedInSignalScore !== false;
+        })
+        .map(([_, scoreData]) => scoreData.score)
         .filter(score => score !== null) as number[];
       
-      const marketSignalScore = scores.length > 0 
-        ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+      const marketSignalScore = includedScores.length > 0 
+        ? includedScores.reduce((sum, score) => sum + score, 0) / includedScores.length
         : null;
 
       return {

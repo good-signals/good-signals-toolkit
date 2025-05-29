@@ -26,6 +26,7 @@ export interface CriteriaColumn {
   analysisMode: 'fast' | 'detailed';
   createdAt: Date;
   isManuallyOverridden?: { [marketName: string]: boolean };
+  isIncludedInSignalScore?: boolean; // New property to track inclusion in Market Signal Score
 }
 
 export interface AIScoreResponse {

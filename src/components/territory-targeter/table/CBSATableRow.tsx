@@ -23,6 +23,7 @@ interface CBSATableRowData {
       sources?: string[];
     };
   };
+  marketSignalScore?: number | null;
 }
 
 interface CBSATableRowProps {
@@ -42,16 +43,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
   onStatusChange,
   onScoreClick
 }) => {
-  // Calculate average score across all criteria for market signal score
-  const scores = Object.values(row.criteriaScores)
-    .map(cs => cs.score)
-    .filter(score => score !== null) as number[];
-  
-  const averageScore = scores.length > 0 
-    ? scores.reduce((sum, score) => sum + score, 0) / scores.length
-    : null;
-
-  const signalStatus = getSignalStatus(averageScore, accountGoodThreshold, accountBadThreshold);
+  const signalStatus = getSignalStatus(row.marketSignalScore, accountGoodThreshold, accountBadThreshold);
   
   // Combine all reasoning into one text
   const combinedReasoning = criteriaColumns
@@ -124,9 +116,9 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
       })}
       {showMarketSignalScore && (
         <TableCell className="text-center">
-          {averageScore !== null ? (
+          {row.marketSignalScore !== null && row.marketSignalScore !== undefined ? (
             <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold border-2 border-blue-200 ${getScorePillClasses(signalStatus)}`}>
-              {Math.round(averageScore)}%
+              {Math.round(row.marketSignalScore)}%
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">N/A</span>

@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/common/ErrorBoundary';
 import PromptInput from '@/components/territory-targeter/PromptInput';
 import CBSATable from '@/components/territory-targeter/CBSATable';
 import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
+import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
 import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { sampleCBSAData } from '@/data/sampleCBSAData';
 import { exportTerritoryAnalysisToCSV } from '@/services/territoryExportService';
@@ -30,6 +31,8 @@ const TerritoryTargeterPageContent = () => {
     runScoring, 
     refreshColumn,
     applyManualOverride,
+    toggleColumnInSignalScore,
+    deleteColumn,
     clearAnalysis,
     setAnalysisMode
   } = useTerritoryScoring();
@@ -119,6 +122,14 @@ const TerritoryTargeterPageContent = () => {
     applyManualOverride(override);
   };
 
+  const handleToggleColumn = (columnId: string, included: boolean) => {
+    toggleColumnInSignalScore(columnId, included);
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    deleteColumn(columnId);
+  };
+
   // Calculate average market signal score across all criteria
   const averageMarketSignalScore = currentAnalysis 
     ? Math.round(
@@ -201,6 +212,13 @@ const TerritoryTargeterPageContent = () => {
             criteriaColumns={currentAnalysis.criteriaColumns}
           />
 
+          {/* 3. Column Management */}
+          <ColumnManagement
+            criteriaColumns={currentAnalysis.criteriaColumns}
+            onToggleColumn={handleToggleColumn}
+            onDeleteColumn={handleDeleteColumn}
+          />
+
           {/* Export and Clear Buttons */}
           <div className="flex justify-end gap-2 mb-6">
             <Button onClick={handleClearAnalysis} variant="outline">
@@ -214,7 +232,7 @@ const TerritoryTargeterPageContent = () => {
         </>
       )}
 
-      {/* 3. CBSA Table - Always show with population data */}
+      {/* 4. CBSA Table - Always show with population data */}
       <CBSATable 
         cbsaData={cbsaData}
         criteriaColumns={currentAnalysis?.criteriaColumns || []}

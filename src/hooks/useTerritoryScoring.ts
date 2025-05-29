@@ -299,7 +299,8 @@ export const useTerritoryScoring = () => {
         logicSummary: aiResponse.prompt_summary,
         analysisMode: mode,
         createdAt: new Date(),
-        isManuallyOverridden: {}
+        isManuallyOverridden: {},
+        isIncludedInSignalScore: true // Default to included
       };
 
       // Add to existing analysis or create new one
@@ -525,6 +526,52 @@ export const useTerritoryScoring = () => {
     });
   };
 
+  const toggleColumnInSignalScore = (columnId: string, included: boolean) => {
+    if (!currentAnalysis) return;
+
+    const updatedAnalysis = {
+      ...currentAnalysis,
+      criteriaColumns: currentAnalysis.criteriaColumns.map(column =>
+        column.id === columnId
+          ? { ...column, isIncludedInSignalScore: included }
+          : column
+      )
+    };
+
+    setCurrentAnalysis(updatedAnalysis);
+
+    toast({
+      title: included ? "Column Included" : "Column Excluded",
+      description: `${currentAnalysis.criteriaColumns.find(c => c.id === columnId)?.title} ${included ? 'included in' : 'excluded from'} Market Signal Score calculation.`,
+    });
+  };
+
+  const deleteColumn = (columnId: string) => {
+    if (!currentAnalysis) return;
+
+    const columnToDelete = currentAnalysis.criteriaColumns.find(c => c.id === columnId);
+    if (!columnToDelete) return;
+
+    const updatedAnalysis = {
+      ...currentAnalysis,
+      criteriaColumns: currentAnalysis.criteriaColumns.filter(column => column.id !== columnId),
+      includedColumns: currentAnalysis.includedColumns.filter(id => id !== columnId)
+    };
+
+    // If no columns left, clear the entire analysis
+    if (updatedAnalysis.criteriaColumns.length === 0) {
+      setCurrentAnalysis(null);
+      safeStorage.removeItem(STORAGE_KEY);
+    } else {
+      setCurrentAnalysis(updatedAnalysis);
+    }
+
+    toast({
+      title: "Column Deleted",
+      description: `"${columnToDelete.title}" has been removed from the analysis.`,
+    });
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -546,6 +593,8 @@ export const useTerritoryScoring = () => {
     refreshColumn,
     applyManualOverride,
     updateIncludedColumns,
+    toggleColumnInSignalScore,
+    deleteColumn,
     clearAnalysis,
     setAnalysisMode
   };
