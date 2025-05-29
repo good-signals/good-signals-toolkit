@@ -67,30 +67,37 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
   csvContent.push(`Analysis Summary: ${analysis.criteriaColumns.map(c => c.title).join(', ')}`);
   csvContent.push('');
 
-  // AI Logic Summary section
+  // AI Logic Summary section - properly formatted for spreadsheet tabs
   if (analysis.criteriaColumns.length > 0) {
     csvContent.push('=== AI LOGIC SUMMARY ===');
     csvContent.push('');
+    csvContent.push('Criteria,User Prompt,Analysis Mode,AI Logic Summary,Included in Signal Score');
     
     analysis.criteriaColumns.forEach((column, index) => {
-      csvContent.push(`Criteria ${index + 1}: ${column.title}`);
-      csvContent.push(`User Prompt: "${column.prompt}"`);
-      csvContent.push(`Analysis Mode: ${column.analysisMode === 'fast' ? 'Fast' : 'Detailed'}`);
-      csvContent.push(`AI Logic: ${column.logicSummary}`);
-      csvContent.push(`Included in Market Signal Score: ${column.isIncludedInSignalScore !== false ? 'Yes' : 'No'}`);
-      csvContent.push('');
+      const criteriaTitle = `"Criteria ${index + 1}: ${column.title}"`;
+      const userPrompt = `"${column.prompt.replace(/"/g, '""')}"`;
+      const analysisMode = column.analysisMode === 'fast' ? 'Fast' : 'Detailed';
+      const aiLogic = `"${column.logicSummary.replace(/"/g, '""')}"`;
+      const includedInSignal = column.isIncludedInSignalScore !== false ? 'Yes' : 'No';
+      
+      csvContent.push(`${criteriaTitle},${userPrompt},${analysisMode},${aiLogic},${includedInSignal}`);
     });
+    csvContent.push('');
   }
 
-  // Executive Summary section
+  // Executive Summary section - properly formatted for spreadsheet tabs
   if (executiveSummary) {
     csvContent.push('=== AI EXECUTIVE SUMMARY ===');
     csvContent.push('');
-    // Split executive summary into paragraphs and add each as a separate line
-    const summaryParagraphs = executiveSummary.split('\n').filter(p => p.trim());
-    summaryParagraphs.forEach(paragraph => {
-      csvContent.push(paragraph.trim());
-    });
+    csvContent.push('Executive Summary Content');
+    
+    // Clean up and properly escape the executive summary
+    const cleanedSummary = executiveSummary
+      .replace(/"/g, '""')  // Escape quotes
+      .replace(/\n/g, ' ')  // Replace line breaks with spaces for CSV
+      .trim();
+    
+    csvContent.push(`"${cleanedSummary}"`);
     csvContent.push('');
   }
 
