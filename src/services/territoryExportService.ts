@@ -1,3 +1,4 @@
+
 import { CBSAData, CBSAScore, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -28,31 +29,11 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
     };
 
     // Add individual criteria scores
-    const marketScores: number[] = [];
-    const includedMarketScores: number[] = [];
-    
     analysis.criteriaColumns.forEach(column => {
       const scoreData = column.scores.find(s => s.market === cbsa.name);
       row[`${column.title} Score`] = scoreData?.score ?? 'N/A';
       row[`${column.title} Reasoning`] = scoreData?.reasoning || 'No reasoning available';
-      
-      if (scoreData?.score !== null && scoreData?.score !== undefined) {
-        marketScores.push(scoreData.score);
-        
-        // Only include in Market Signal Score if column is included
-        if (column.isIncludedInSignalScore !== false) {
-          includedMarketScores.push(scoreData.score);
-        }
-      }
     });
-
-    // Add Market Signal Score if there are multiple criteria
-    if (analysis.criteriaColumns.length > 1) {
-      const averageScore = includedMarketScores.length > 0 
-        ? Math.round(includedMarketScores.reduce((sum, score) => sum + score, 0) / includedMarketScores.length)
-        : 'N/A';
-      row['Market Signal Score'] = averageScore;
-    }
 
     return row;
   });
@@ -69,7 +50,6 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
   // Header section with metadata
   csvContent.push(`Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`);
   csvContent.push(`Criteria Count: ${analysis.criteriaColumns.length}`);
-  csvContent.push(`Market Signal Score: ${analysis.marketSignalScore}%`);
   csvContent.push(`Analysis Summary: ${analysis.criteriaColumns.map(c => c.title).join(', ')}`);
   csvContent.push('');
 
@@ -162,7 +142,6 @@ export const exportTerritoryAnalysisToExcel = (exportData: TerritoryExportData):
       [''],
       [`Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`],
       [`Criteria Count: ${analysis.criteriaColumns.length}`],
-      [`Market Signal Score: ${analysis.marketSignalScore}%`],
       [''],
       ['EXECUTIVE SUMMARY'],
       [''],
@@ -184,27 +163,11 @@ export const exportTerritoryAnalysisToExcel = (exportData: TerritoryExportData):
     };
 
     // Add individual criteria scores
-    const includedMarketScores: number[] = [];
-    
     analysis.criteriaColumns.forEach(column => {
       const scoreData = column.scores.find(s => s.market === cbsa.name);
       row[`${column.title} Score`] = scoreData?.score ?? 'N/A';
       row[`${column.title} Reasoning`] = scoreData?.reasoning || 'No reasoning available';
-      
-      if (scoreData?.score !== null && scoreData?.score !== undefined) {
-        if (column.isIncludedInSignalScore !== false) {
-          includedMarketScores.push(scoreData.score);
-        }
-      }
     });
-
-    // Add Market Signal Score if there are multiple criteria
-    if (analysis.criteriaColumns.length > 1) {
-      const averageScore = includedMarketScores.length > 0 
-        ? Math.round(includedMarketScores.reduce((sum, score) => sum + score, 0) / includedMarketScores.length)
-        : 'N/A';
-      row['Market Signal Score'] = averageScore;
-    }
 
     return row;
   });
