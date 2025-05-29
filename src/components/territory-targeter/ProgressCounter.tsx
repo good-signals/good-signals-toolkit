@@ -41,7 +41,21 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     return () => clearInterval(interval);
   }, [isActive, duration, onComplete]);
 
-  if (!isActive) return null;
+  // Complete the progress when isActive becomes false (scoring finished)
+  useEffect(() => {
+    if (!isActive && progress > 0) {
+      setProgress(100);
+      // Reset after a short delay to show completion
+      const resetTimeout = setTimeout(() => {
+        setProgress(0);
+        setTimeElapsed(0);
+      }, 1000);
+      
+      return () => clearTimeout(resetTimeout);
+    }
+  }, [isActive, progress]);
+
+  if (!isActive && progress === 0) return null;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -49,14 +63,22 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
   };
 
+  const isCompleted = !isActive && progress === 100;
+
   return (
     <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
       <div className="flex items-center gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        {isCompleted ? (
+          <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+            <div className="h-2 w-2 bg-white rounded-full"></div>
+          </div>
+        ) : (
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        )}
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium">
-              AI analyzing markets...
+              {isCompleted ? 'Analysis complete!' : 'AI analyzing markets...'}
             </span>
             <span className="text-sm text-muted-foreground">
               {formatTime(timeElapsed)}
@@ -66,8 +88,10 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        Perplexity AI is researching and scoring each market based on your criteria. 
-        This typically takes 15-30 seconds.
+        {isCompleted 
+          ? 'Market scores have been generated and added to the table below.'
+          : 'Perplexity AI is researching and scoring each market based on your criteria. This typically takes 15-30 seconds.'
+        }
       </div>
     </div>
   );
