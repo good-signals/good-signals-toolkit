@@ -12,6 +12,7 @@ interface TerritoryResultsSectionProps {
   executiveSummary: string;
   isGeneratingSummary: boolean;
   onGenerateSummary: () => Promise<void>;
+  onUpdateSummary: (newSummary: string) => void;
   onToggleColumn: (columnId: string, included: boolean) => void;
   onDeleteColumn: (columnId: string) => void;
   onClearAnalysis: () => void;
@@ -25,6 +26,7 @@ const TerritoryResultsSection: React.FC<TerritoryResultsSectionProps> = ({
   executiveSummary,
   isGeneratingSummary,
   onGenerateSummary,
+  onUpdateSummary,
   onToggleColumn,
   onDeleteColumn,
   onClearAnalysis,
@@ -43,6 +45,7 @@ const TerritoryResultsSection: React.FC<TerritoryResultsSectionProps> = ({
         onGenerateSummary={onGenerateSummary}
         isGenerating={isGeneratingSummary}
         executiveSummary={executiveSummary}
+        onUpdateSummary={onUpdateSummary}
       />
 
       <ColumnManagement

@@ -1,217 +1,298 @@
-
-import React from 'react';
-import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from '@/hooks/use-toast';
+import { useUser } from '@/hooks/useUser';
+import { supabase } from '@/integrations/supabase/client';
+import { TerritoryAnalysis, CBSAData, ColumnToggleSettings, ManualScoreOverride } from '@/types/territoryTargeterTypes';
+import { useAnalysisState } from '@/hooks/territory-targeter/useAnalysisState';
+import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
+import { useColumnSettings } from '@/hooks/territory-targeter/useColumnSettings';
+import { useManualScoreOverrides } from '@/hooks/territory-targeter/useManualScoreOverrides';
+import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import TerritoryHeader from './TerritoryHeader';
-import TerritoryNotices from './TerritoryNotices';
-import SignalSettingsNotice from './SignalSettingsNotice';
 import PromptInput from './PromptInput';
 import TerritoryResultsSection from './TerritoryResultsSection';
 import CBSATable from './CBSATable';
-import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
-import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
-import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
-import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
-import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
-import { useAuth } from '@/contexts/AuthContext';
-import { ManualScoreOverride } from '@/types/territoryTargeterTypes';
+import TerritoryNotices from './TerritoryNotices';
+import SignalSettingsNotice from './SignalSettingsNotice';
+import ProgressCounter from './ProgressCounter';
 
-const TerritoryTargeterPageContent = () => {
-  const { user } = useAuth();
-  
-  const { cbsaData, isInitialized, handleStatusChange } = useCBSAStatus();
-  const { 
-    accounts, 
-    isLoadingAccounts, 
-    currentAccount, 
-    accountGoodThreshold, 
-    accountBadThreshold 
-  } = useAccountSettings(user?.id);
-  
-  const {
-    isLoading,
-    currentAnalysis,
-    error,
-    analysisStartTime,
-    analysisMode,
-    estimatedDuration,
-    refreshingColumnId,
-    runScoring,
-    cancelAnalysis,
-    refreshColumn,
-    applyManualOverride,
-    toggleColumnInSignalScore,
-    deleteColumn,
-    clearAnalysis,
-    setAnalysisMode
-  } = useTerritoryScoring();
+const TerritoryTargeterPageContent: React.FC = () => {
+  const { user } = useUser();
+  const { currentAnalysis, setCurrentAnalysis, clearAnalysis } = useAnalysisState();
+  const { executiveSummary, setExecutiveSummary, isGeneratingSummary, handleGenerateExecutiveSummary } = useExecutiveSummary(currentAnalysis, user);
+  const { columnSettings, toggleColumn, deleteColumn } = useColumnSettings(currentAnalysis);
+  const { manualScoreOverrides, addManualOverride, removeManualOverride } = useManualScoreOverrides();
 
-  const {
-    executiveSummary,
-    setExecutiveSummary,
-    isGeneratingSummary,
-    handleGenerateExecutiveSummary
-  } = useExecutiveSummary(currentAnalysis, user);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [cbsaData, setCBSAData] = useState<CBSAData[]>([]);
+  const [prompt, setPrompt] = useState('');
+  const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
+  const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
 
-  const handlePromptSubmit = async (prompt: string, mode: 'fast' | 'detailed' = 'detailed') => {
+  // Load column settings from analysis
+  useEffect(() => {
+    if (currentAnalysis) {
+      const initialSettings: ColumnToggleSettings = {};
+      currentAnalysis.criteriaColumns.forEach(column => {
+        initialSettings[column.id] = currentAnalysis.includedColumns?.includes(column.id) !== false;
+      });
+    }
+  }, [currentAnalysis]);
+
+  const handlePromptSubmit = async (newPrompt: string) => {
+    if (isProcessing) return;
+
+    setPrompt(newPrompt);
+    setIsProcessing(true);
+
     try {
-      await runScoring(prompt, cbsaData, mode);
+      const { data, error } = await supabase.functions.invoke('initiate-territory-analysis', {
+        body: { prompt: newPrompt, userId: user?.id }
+      });
+
+      if (error) {
+        throw new Error(`Failed to initiate analysis: ${error.message}`);
+      }
+
+      if (!data || !data.analysisId) {
+        throw new Error('Analysis initiation did not return an analysis ID.');
+      }
+
+      // Optimistically update the analysis state
+      setCurrentAnalysis({
+        id: data.analysisId,
+        criteriaColumns: [],
+        marketSignalScore: 0,
+        createdAt: new Date(),
+        includedColumns: []
+      });
+
+      // Fetch CBSA data and estimated cost/time
+      const cbsaResponse = await supabase.functions.invoke('get-cbsa-data', {
+        body: { analysisId: data.analysisId }
+      });
+
+      if (cbsaResponse.error) {
+        throw new Error(`Failed to fetch CBSA data: ${cbsaResponse.error.message}`);
+      }
+
+      if (!cbsaResponse.data || !cbsaResponse.data.cbsa_data) {
+        throw new Error('CBSA data fetch did not return any data.');
+      }
+
+      setCBSAData(cbsaResponse.data.cbsa_data);
+      setEstimatedCost(cbsaResponse.data.estimated_cost || null);
+      setEstimatedTime(cbsaResponse.data.estimated_time || null);
+
+      toast({
+        title: "Analysis Initiated",
+        description: "Your territory analysis has been initiated and is running in the background.",
+      });
+
     } catch (err) {
-      console.error('Failed to run scoring:', err);
+      console.error('Failed to initiate territory analysis:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+
+      toast({
+        title: "Analysis Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      clearAnalysis();
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleCancelAnalysis = () => {
-    cancelAnalysis();
-  };
-
-  const handleExportCSV = () => {
-    if (!currentAnalysis) return;
-
-    const allScores: any[] = [];
-    currentAnalysis.criteriaColumns.forEach(column => {
-      column.scores.forEach(score => {
-        allScores.push({
-          ...score,
-          criteriaTitle: column.title,
-          criteriaId: column.id
-        });
-      });
-    });
-
-    exportTerritoryAnalysisToCSV({
-      cbsaData,
-      scores: allScores,
-      analysis: currentAnalysis,
-      executiveSummary
-    });
-  };
-
-  const handleExportExcel = () => {
-    if (!currentAnalysis) return;
-
-    const allScores: any[] = [];
-    currentAnalysis.criteriaColumns.forEach(column => {
-      column.scores.forEach(score => {
-        allScores.push({
-          ...score,
-          criteriaTitle: column.title,
-          criteriaId: column.id
-        });
-      });
-    });
-
-    exportTerritoryAnalysisToExcel({
-      cbsaData,
-      scores: allScores,
-      analysis: currentAnalysis,
-      executiveSummary
-    });
-  };
-
-  const handleClearAnalysis = () => {
-    clearAnalysis();
-    setExecutiveSummary('');
-  };
-
-  const handleRefreshColumn = async (columnId: string, type: 'all' | 'na-only') => {
-    await refreshColumn(columnId, type, cbsaData);
-  };
-
-  const handleManualScoreOverride = (override: ManualScoreOverride) => {
-    applyManualOverride(override);
-  };
-
   const handleToggleColumn = (columnId: string, included: boolean) => {
-    toggleColumnInSignalScore(columnId, included);
+    toggleColumn(columnId, included);
+    if (currentAnalysis) {
+      const updatedAnalysis: TerritoryAnalysis = {
+        ...currentAnalysis,
+        includedColumns: included
+          ? [...(currentAnalysis.includedColumns || []), columnId]
+          : (currentAnalysis.includedColumns || []).filter(id => id !== columnId)
+      };
+      setCurrentAnalysis(updatedAnalysis);
+    }
   };
 
   const handleDeleteColumn = (columnId: string) => {
     deleteColumn(columnId);
+    if (currentAnalysis) {
+      const updatedAnalysis: TerritoryAnalysis = {
+        ...currentAnalysis,
+        criteriaColumns: currentAnalysis.criteriaColumns.filter(col => col.id !== columnId)
+      };
+      setCurrentAnalysis(updatedAnalysis);
+    }
   };
 
-  const handleGenerateSummary = async () => {
-    await handleGenerateExecutiveSummary(cbsaData);
+  const handleClearAnalysis = () => {
+    clearAnalysis();
+    setCBSAData([]);
+    setEstimatedCost(null);
+    setEstimatedTime(null);
   };
 
-  const averageMarketSignalScore = currentAnalysis 
-    ? Math.round(
-        currentAnalysis.criteriaColumns.reduce((total, column) => {
-          const avgScore = column.scores.reduce((sum, score) => sum + score.score, 0) / column.scores.length;
-          return total + avgScore;
-        }, 0) / currentAnalysis.criteriaColumns.length
-      )
-    : 0;
+  const handleExportCSV = () => {
+    if (!currentAnalysis) {
+      toast({
+        title: "No Analysis Available",
+        description: "Please run an analysis before exporting data.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  if (!isInitialized || isLoadingAccounts) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="text-center">
-          <div className="animate-pulse">
-            <div className="h-8 bg-muted rounded w-1/3 mx-auto mb-4"></div>
-            <div className="h-4 bg-muted rounded w-1/2 mx-auto"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    exportTerritoryAnalysisToCSV({
+      cbsaData: cbsaData,
+      scores: currentAnalysis.criteriaColumns.flatMap(column => column.scores),
+      analysis: currentAnalysis,
+      executiveSummary: executiveSummary
+    });
+  };
+
+  const handleExportExcel = () => {
+    if (!currentAnalysis) {
+      toast({
+        title: "No Analysis Available",
+        description: "Please run an analysis before exporting data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    exportTerritoryAnalysisToExcel({
+      cbsaData: cbsaData,
+      scores: currentAnalysis.criteriaColumns.flatMap(column => column.scores),
+      analysis: currentAnalysis,
+      executiveSummary: executiveSummary
+    });
+  };
+
+  const handleManualOverride = (override: ManualScoreOverride) => {
+    if (override.score === null) {
+      removeManualOverride(override.marketName, override.columnId);
+    } else {
+      addManualOverride(override);
+    }
+
+    // Update the currentAnalysis state with the manual override
+    if (currentAnalysis) {
+      const updatedAnalysis: TerritoryAnalysis = {
+        ...currentAnalysis,
+        criteriaColumns: currentAnalysis.criteriaColumns.map(column => {
+          if (column.id === override.columnId) {
+            return {
+              ...column,
+              scores: column.scores.map(score => {
+                if (score.market === override.marketName) {
+                  return {
+                    ...score,
+                    score: override.score,
+                    reasoning: override.reasoning
+                  };
+                }
+                return score;
+              })
+            };
+          }
+          return column;
+        })
+      };
+      setCurrentAnalysis(updatedAnalysis);
+    }
+  };
+
+  const handleStatusChange = async (cbsaId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('cbsa_data')
+        .update({ status: newStatus })
+        .eq('id', cbsaId);
+
+      if (error) {
+        throw new Error(`Failed to update CBSA status: ${error.message}`);
+      }
+
+      // Optimistically update the CBSA data in the local state
+      setCBSAData(prevData =>
+        prevData.map(cbsa =>
+          cbsa.id === cbsaId ? { ...cbsa, status: newStatus as any } : cbsa
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `CBSA status updated to ${newStatus}.`,
+      });
+
+    } catch (err) {
+      console.error('Failed to update CBSA status:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+
+      toast({
+        title: "Status Update Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateExecutiveSummary = (newSummary: string) => {
+    setExecutiveSummary(newSummary);
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <TerritoryHeader />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        <TerritoryHeader />
+        
+        <div className="max-w-4xl mx-auto space-y-6">
+          <TerritoryNotices />
+          <SignalSettingsNotice />
+          
+          <PromptInput 
+            isLoading={isProcessing}
+            onSubmit={handlePromptSubmit}
+            estimatedCost={estimatedCost}
+            estimatedTime={estimatedTime}
+          />
 
-      <TerritoryNotices user={user} cbsaDataLength={cbsaData.length} />
-      <SignalSettingsNotice 
-        currentAccount={currentAccount}
-        accountGoodThreshold={accountGoodThreshold}
-        accountBadThreshold={accountBadThreshold}
-      />
+          {currentAnalysis && cbsaData.length > 0 && (
+            <TerritoryResultsSection
+              currentAnalysis={currentAnalysis}
+              cbsaData={cbsaData}
+              executiveSummary={executiveSummary}
+              isGeneratingSummary={isGeneratingSummary}
+              onGenerateSummary={() => handleGenerateExecutiveSummary(cbsaData)}
+              onUpdateSummary={handleUpdateExecutiveSummary}
+              onToggleColumn={handleToggleColumn}
+              onDeleteColumn={handleDeleteColumn}
+              onClearAnalysis={handleClearAnalysis}
+              onExportCSV={handleExportCSV}
+              onExportExcel={handleExportExcel}
+            />
+          )}
 
-      <PromptInput 
-        onSubmit={handlePromptSubmit}
-        onCancel={handleCancelAnalysis}
-        isLoading={isLoading}
-        analysisStartTime={analysisStartTime}
-        analysisMode={analysisMode}
-        estimatedDuration={estimatedDuration}
-        disabled={!user}
-        onModeChange={setAnalysisMode}
-        hasExistingAnalysis={!!currentAnalysis && currentAnalysis.criteriaColumns.length > 0}
-      />
+          {currentAnalysis && cbsaData.length > 0 && (
+            <CBSATable 
+              cbsaData={cbsaData}
+              analysis={currentAnalysis}
+              onManualOverride={handleManualOverride}
+              onStatusChange={handleStatusChange}
+            />
+          )}
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {currentAnalysis && currentAnalysis.criteriaColumns.length > 0 && (
-        <TerritoryResultsSection
-          currentAnalysis={currentAnalysis}
-          cbsaData={cbsaData}
-          executiveSummary={executiveSummary}
-          isGeneratingSummary={isGeneratingSummary}
-          onGenerateSummary={handleGenerateSummary}
-          onToggleColumn={handleToggleColumn}
-          onDeleteColumn={handleDeleteColumn}
-          onClearAnalysis={handleClearAnalysis}
-          onExportCSV={handleExportCSV}
-          onExportExcel={handleExportExcel}
-        />
-      )}
-
-      <CBSATable 
-        cbsaData={cbsaData}
-        criteriaColumns={currentAnalysis?.criteriaColumns || []}
-        marketSignalScore={averageMarketSignalScore}
-        accountGoodThreshold={accountGoodThreshold}
-        accountBadThreshold={accountBadThreshold}
-        onStatusChange={handleStatusChange}
-        onManualScoreOverride={handleManualScoreOverride}
-        onRefreshColumn={handleRefreshColumn}
-        refreshingColumnId={refreshingColumnId}
-      />
+          {isProcessing && (
+            <ProgressCounter 
+              isProcessing={isProcessing}
+              analysisId={currentAnalysis?.id}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };

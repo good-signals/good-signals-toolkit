@@ -74,10 +74,15 @@ export const useExecutiveSummary = (currentAnalysis: TerritoryAnalysis | null, u
     }
   };
 
+  const handleUpdateExecutiveSummary = (newSummary: string) => {
+    setExecutiveSummary(newSummary);
+  };
+
   return {
     executiveSummary,
     setExecutiveSummary,
     isGeneratingSummary,
-    handleGenerateExecutiveSummary
+    handleGenerateExecutiveSummary,
+    handleUpdateExecutiveSummary
   };
 };
