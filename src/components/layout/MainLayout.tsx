@@ -10,7 +10,9 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header />
+      <div className="sticky top-0 z-50">
+        <Header />
+      </div>
       <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ErrorBoundary>
           {children}
