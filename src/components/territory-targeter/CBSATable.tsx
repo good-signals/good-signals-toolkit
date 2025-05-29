@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
@@ -170,6 +171,14 @@ const CBSATable: React.FC<CBSATableProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Table Title */}
+      <div className="border-b pb-4">
+        <h2 className="text-2xl font-bold text-foreground">CBSA Market Analysis</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Core-Based Statistical Areas ranked by population and custom criteria scoring
+        </p>
+      </div>
+
       {/* Table */}
       <div className="overflow-x-auto">
         <Table>
