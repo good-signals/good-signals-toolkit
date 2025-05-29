@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
@@ -7,6 +8,7 @@ import { useAnalysisState } from '@/hooks/territory-targeter/useAnalysisState';
 import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
 import { useColumnSettings } from '@/hooks/territory-targeter/useColumnSettings';
 import { useManualScoreOverrides } from '@/hooks/territory-targeter/useManualScoreOverrides';
+import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import TerritoryHeader from './TerritoryHeader';
 import PromptInput from './PromptInput';
@@ -19,27 +21,16 @@ import ProgressCounter from './ProgressCounter';
 const TerritoryTargeterPageContent: React.FC = () => {
   const { user } = useUser();
   const { currentAnalysis, setCurrentAnalysis, clearAnalysis } = useAnalysisState();
-  const { executiveSummary, setExecutiveSummary, isGeneratingSummary, handleGenerateExecutiveSummary } = useExecutiveSummary(currentAnalysis, user);
+  const { executiveSummary, setExecutiveSummary, isGeneratingSummary, handleGenerateExecutiveSummary, handleUpdateExecutiveSummary } = useExecutiveSummary(currentAnalysis, user);
   const { columnSettings, toggleColumn, deleteColumn } = useColumnSettings(currentAnalysis);
   const { manualScoreOverrides, addManualOverride, removeManualOverride } = useManualScoreOverrides();
+  const { currentAccount, accountGoodThreshold, accountBadThreshold } = useAccountSettings(user?.id);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [cbsaData, setCBSAData] = useState<CBSAData[]>([]);
   const [prompt, setPrompt] = useState('');
-  const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
-  const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
 
-  // Load column settings from analysis
-  useEffect(() => {
-    if (currentAnalysis) {
-      const initialSettings: ColumnToggleSettings = {};
-      currentAnalysis.criteriaColumns.forEach(column => {
-        initialSettings[column.id] = currentAnalysis.includedColumns?.includes(column.id) !== false;
-      });
-    }
-  }, [currentAnalysis]);
-
-  const handlePromptSubmit = async (newPrompt: string) => {
+  const handlePromptSubmit = async (newPrompt: string, mode: 'fast' | 'detailed') => {
     if (isProcessing) return;
 
     setPrompt(newPrompt);
@@ -47,7 +38,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke('initiate-territory-analysis', {
-        body: { prompt: newPrompt, userId: user?.id }
+        body: { prompt: newPrompt, mode, userId: user?.id }
       });
 
       if (error) {
@@ -67,7 +58,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
         includedColumns: []
       });
 
-      // Fetch CBSA data and estimated cost/time
+      // Fetch CBSA data
       const cbsaResponse = await supabase.functions.invoke('get-cbsa-data', {
         body: { analysisId: data.analysisId }
       });
@@ -81,8 +72,6 @@ const TerritoryTargeterPageContent: React.FC = () => {
       }
 
       setCBSAData(cbsaResponse.data.cbsa_data);
-      setEstimatedCost(cbsaResponse.data.estimated_cost || null);
-      setEstimatedTime(cbsaResponse.data.estimated_time || null);
 
       toast({
         title: "Analysis Initiated",
@@ -131,8 +120,6 @@ const TerritoryTargeterPageContent: React.FC = () => {
   const handleClearAnalysis = () => {
     clearAnalysis();
     setCBSAData([]);
-    setEstimatedCost(null);
-    setEstimatedTime(null);
   };
 
   const handleExportCSV = () => {
@@ -207,16 +194,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
   const handleStatusChange = async (cbsaId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('cbsa_data')
-        .update({ status: newStatus })
-        .eq('id', cbsaId);
-
-      if (error) {
-        throw new Error(`Failed to update CBSA status: ${error.message}`);
-      }
-
-      // Optimistically update the CBSA data in the local state
+      // Update local state optimistically
       setCBSAData(prevData =>
         prevData.map(cbsa =>
           cbsa.id === cbsaId ? { ...cbsa, status: newStatus as any } : cbsa
@@ -240,24 +218,26 @@ const TerritoryTargeterPageContent: React.FC = () => {
     }
   };
 
-  const handleUpdateExecutiveSummary = (newSummary: string) => {
-    setExecutiveSummary(newSummary);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="container mx-auto px-4 py-8">
         <TerritoryHeader />
         
         <div className="max-w-4xl mx-auto space-y-6">
-          <TerritoryNotices />
-          <SignalSettingsNotice />
+          <TerritoryNotices 
+            user={user}
+            cbsaDataLength={cbsaData.length || 100}
+          />
+          <SignalSettingsNotice 
+            currentAccount={currentAccount}
+            accountGoodThreshold={accountGoodThreshold}
+            accountBadThreshold={accountBadThreshold}
+          />
           
           <PromptInput 
             isLoading={isProcessing}
             onSubmit={handlePromptSubmit}
-            estimatedCost={estimatedCost}
-            estimatedTime={estimatedTime}
+            analysisStartTime={isProcessing ? Date.now() : null}
           />
 
           {currentAnalysis && cbsaData.length > 0 && (
@@ -279,16 +259,19 @@ const TerritoryTargeterPageContent: React.FC = () => {
           {currentAnalysis && cbsaData.length > 0 && (
             <CBSATable 
               cbsaData={cbsaData}
-              analysis={currentAnalysis}
-              onManualOverride={handleManualOverride}
+              criteriaColumns={currentAnalysis.criteriaColumns}
+              marketSignalScore={currentAnalysis.marketSignalScore}
+              accountGoodThreshold={accountGoodThreshold}
+              accountBadThreshold={accountBadThreshold}
+              onManualScoreOverride={handleManualOverride}
               onStatusChange={handleStatusChange}
             />
           )}
 
-          {isProcessing && (
+          {isProcessing && currentAnalysis && (
             <ProgressCounter 
-              isProcessing={isProcessing}
-              analysisId={currentAnalysis?.id}
+              isActive={isProcessing}
+              analysisId={currentAnalysis.id}
             />
           )}
         </div>
