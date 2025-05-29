@@ -1,3 +1,4 @@
+
 export interface CBSAData {
   id: string;
   name: string;
@@ -13,6 +14,18 @@ export interface CBSAScore {
   market: string;
   score: number;
   reasoning: string;
+  sources?: string[];
+}
+
+export interface CriteriaColumn {
+  id: string;
+  title: string;
+  prompt: string;
+  scores: CBSAScore[];
+  logicSummary: string;
+  analysisMode: 'fast' | 'detailed';
+  createdAt: Date;
+  isManuallyOverridden?: { [marketName: string]: boolean };
 }
 
 export interface AIScoreResponse {
@@ -23,8 +36,7 @@ export interface AIScoreResponse {
 
 export interface TerritoryAnalysis {
   id: string;
-  prompt: string;
-  results: AIScoreResponse;
+  criteriaColumns: CriteriaColumn[];
   marketSignalScore: number;
   createdAt: Date;
   includedColumns: string[];
@@ -32,4 +44,11 @@ export interface TerritoryAnalysis {
 
 export interface ColumnToggleSettings {
   [columnId: string]: boolean;
+}
+
+export interface ManualScoreOverride {
+  marketName: string;
+  columnId: string;
+  score: number;
+  reasoning: string;
 }

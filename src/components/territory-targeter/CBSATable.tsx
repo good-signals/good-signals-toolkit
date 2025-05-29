@@ -1,58 +1,92 @@
 
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
-import { CBSAData, CBSAScore } from '@/types/territoryTargeterTypes';
+import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import CBSATableHeader, { SortConfig } from './table/CBSATableHeader';
 import CBSATableRow from './table/CBSATableRow';
+import ManualScoreOverrideDialog from './ManualScoreOverride';
+import ColumnRefreshOptions from './ColumnRefreshOptions';
 import { CBSAStatus } from './table/CBSAStatusSelector';
 
 interface CBSATableProps {
   cbsaData: CBSAData[];
-  scores: CBSAScore[];
+  criteriaColumns: CriteriaColumn[];
   marketSignalScore: number;
   accountGoodThreshold?: number | null;
   accountBadThreshold?: number | null;
   onStatusChange?: (cbsaId: string, status: CBSAStatus) => void;
+  onManualScoreOverride?: (override: ManualScoreOverride) => void;
+  onRefreshColumn?: (columnId: string, type: 'all' | 'na-only') => void;
+  isRefreshing?: boolean;
 }
 
 const CBSATable: React.FC<CBSATableProps> = ({
   cbsaData,
-  scores,
+  criteriaColumns,
   marketSignalScore,
   accountGoodThreshold,
   accountBadThreshold,
-  onStatusChange
+  onStatusChange,
+  onManualScoreOverride,
+  onRefreshColumn,
+  isRefreshing = false
 }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
-  const hasScores = scores.length > 0;
+  const [overrideDialog, setOverrideDialog] = useState<{
+    isOpen: boolean;
+    marketName: string;
+    columnId: string;
+    columnTitle: string;
+    currentScore?: number;
+    currentReasoning?: string;
+  }>({
+    isOpen: false,
+    marketName: '',
+    columnId: '',
+    columnTitle: ''
+  });
 
-  // Merge CBSA data with scores
+  const hasScores = criteriaColumns.length > 0;
+
+  // Merge CBSA data with scores from all criteria columns
   const tableData = useMemo(() => {
     return cbsaData.map(cbsa => {
-      const scoreData = scores.find(s => s.market === cbsa.name);
+      const criteriaScores: { [columnId: string]: { score: number | null; reasoning: string | null; sources?: string[] } } = {};
+      
+      criteriaColumns.forEach(column => {
+        const scoreData = column.scores.find(s => s.market === cbsa.name);
+        criteriaScores[column.id] = {
+          score: scoreData?.score || null,
+          reasoning: scoreData?.reasoning || null,
+          sources: scoreData?.sources
+        };
+      });
+
       return {
         ...cbsa,
-        score: scoreData?.score || null,
-        reasoning: scoreData?.reasoning || null
+        criteriaScores
       };
     });
-  }, [cbsaData, scores]);
+  }, [cbsaData, criteriaColumns]);
 
   // Sort data based on current sort config
   const sortedData = useMemo(() => {
     if (!sortConfig) return tableData;
 
     return [...tableData].sort((a, b) => {
-      let aValue: any = a[sortConfig.key];
-      let bValue: any = b[sortConfig.key];
+      let aValue: any;
+      let bValue: any;
 
-      // Handle null scores
-      if (sortConfig.key === 'score') {
-        aValue = aValue || 0;
-        bValue = bValue || 0;
+      if (sortConfig.key.startsWith('criteria_')) {
+        const columnId = sortConfig.key.replace('criteria_', '');
+        aValue = a.criteriaScores[columnId]?.score || 0;
+        bValue = b.criteriaScores[columnId]?.score || 0;
+      } else {
+        aValue = a[sortConfig.key as keyof typeof a];
+        bValue = b[sortConfig.key as keyof typeof b];
       }
 
-      // Handle status sorting
+      // Handle null scores and status sorting
       if (sortConfig.key === 'status') {
         aValue = aValue || '';
         bValue = bValue || '';
@@ -90,30 +124,75 @@ const CBSATable: React.FC<CBSATableProps> = ({
     }
   };
 
+  const handleScoreClick = (marketName: string, columnId: string) => {
+    const column = criteriaColumns.find(c => c.id === columnId);
+    if (!column) return;
+
+    const row = tableData.find(r => r.name === marketName);
+    const scoreData = row?.criteriaScores[columnId];
+
+    setOverrideDialog({
+      isOpen: true,
+      marketName,
+      columnId,
+      columnTitle: column.title,
+      currentScore: scoreData?.score || undefined,
+      currentReasoning: scoreData?.reasoning || undefined
+    });
+  };
+
+  const handleOverrideSave = (override: ManualScoreOverride) => {
+    if (onManualScoreOverride) {
+      onManualScoreOverride(override);
+    }
+  };
+
+  const handleRefreshColumn = (columnId: string, type: 'all' | 'na-only') => {
+    if (onRefreshColumn) {
+      onRefreshColumn(columnId, type);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Table */}
       <div className="overflow-x-auto">
         <Table>
           <CBSATableHeader 
-            hasScores={hasScores} 
+            hasScores={hasScores}
+            criteriaColumns={criteriaColumns}
             sortConfig={sortConfig} 
-            onSort={handleSort} 
+            onSort={handleSort}
+            onRefreshColumn={handleRefreshColumn}
+            isRefreshing={isRefreshing}
           />
           <TableBody>
             {sortedData.map((row) => (
               <CBSATableRow
                 key={row.id}
                 row={row}
-                hasScores={hasScores}
+                criteriaColumns={criteriaColumns}
                 accountGoodThreshold={accountGoodThreshold}
                 accountBadThreshold={accountBadThreshold}
                 onStatusChange={handleStatusChange}
+                onScoreClick={handleScoreClick}
               />
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {/* Manual Score Override Dialog */}
+      <ManualScoreOverrideDialog
+        isOpen={overrideDialog.isOpen}
+        onClose={() => setOverrideDialog(prev => ({ ...prev, isOpen: false }))}
+        onSave={handleOverrideSave}
+        marketName={overrideDialog.marketName}
+        columnId={overrideDialog.columnId}
+        columnTitle={overrideDialog.columnTitle}
+        currentScore={overrideDialog.currentScore}
+        currentReasoning={overrideDialog.currentReasoning}
+      />
     </div>
   );
 };

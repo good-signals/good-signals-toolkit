@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -121,7 +120,7 @@ CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, ex
         ? `
 SPEED MODE: Provide quick, efficient scoring with concise reasoning. Focus on the most obvious and direct factors related to the user's criteria. Keep reasoning brief (1-2 sentences max).`
         : `
-DETAILED MODE: Provide comprehensive analysis with thorough research-based scoring. Include multiple factors and data sources in your reasoning.`;
+DETAILED MODE: Provide comprehensive analysis with thorough research-based scoring. Include multiple factors and data sources in your reasoning. When possible, include specific sources or data points you reference.`;
 
       const chunkingInstructions = isChunked
         ? `
@@ -134,7 +133,7 @@ Your task:
 1. Interpret the user's criteria prompt (e.g., "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand").
 2. Generate a short, catchy title for this analysis (e.g., "Gen Z Sneaker Culture" or "Taco Affinity").
 3. Score the provided U.S. markets (by CBSA) from 0–100, where 100 = strongest fit and 0 = weakest.
-4. For each market, provide ${mode === 'fast' ? 'brief' : 'detailed'} explanation of the score.
+4. For each market, provide ${mode === 'fast' ? 'brief' : 'detailed'} explanation of the score${mode === 'detailed' ? ' and include sources when possible' : ''}.
 5. Add a ${mode === 'fast' ? 'concise' : 'comprehensive'} paragraph to the executive summary section explaining your logic, the data you considered, and any key assumptions.
 6. Use a professional but clear and approachable tone (no jargon, plain English).
 
@@ -147,7 +146,8 @@ Return EXACTLY this JSON structure with NO additional text or formatting:
     {
       "market": "Los Angeles-Long Beach-Anaheim, CA",
       "score": 87,
-      "reasoning": "${mode === 'fast' ? 'Strong Gen Z population and vibrant sneaker culture.' : 'Strong Gen Z population, vibrant sneaker culture, and high social media engagement with multiple sneaker retailers and cultural influencers.'}"
+      "reasoning": "${mode === 'fast' ? 'Strong Gen Z population and vibrant sneaker culture.' : 'Strong Gen Z population (32% under 25), vibrant sneaker culture with major retailers like Flight Club and Stadium Goods, and high social media engagement rates.'}",
+      "sources": ${mode === 'detailed' ? '["U.S. Census Bureau", "Social Media Analytics Report 2024"]' : '[]'}
     }
   ]
 }
@@ -155,10 +155,11 @@ Return EXACTLY this JSON structure with NO additional text or formatting:
 Guidelines:
 - Keep the suggested_title short, memorable, and relevant to the criteria (2-4 words max)
 - ${mode === 'fast' ? 'Prioritize speed over exhaustive research' : 'Use comprehensive research and multiple data sources'}
+- ${mode === 'detailed' ? 'Include specific sources in the sources array when you reference data' : 'Keep sources array empty for fast mode'}
 - If data is missing, give a conservative score and explain.
 - Do not make specific business recommendations—only assess signal strength.
 - Stay consistent in your scoring logic${isChunked ? ' across all chunks' : ''}.
-- ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Include sources in your reasoning where possible'}.
+- ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Include sources in your reasoning where possible and list them in the sources array'}.
 
 Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Population: ${cbsa.population.toLocaleString()})`).join(', ')}`;
     };

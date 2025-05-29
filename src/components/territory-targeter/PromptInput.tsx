@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target } from 'lucide-react';
+import { Target, Plus } from 'lucide-react';
 import ProgressCounter from './ProgressCounter';
 import AnalysisModeSelector from './AnalysisModeSelector';
 
@@ -15,6 +15,7 @@ interface PromptInputProps {
   estimatedDuration?: number;
   disabled?: boolean;
   onModeChange?: (mode: 'fast' | 'detailed') => void;
+  hasExistingAnalysis?: boolean;
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({ 
@@ -24,7 +25,8 @@ const PromptInput: React.FC<PromptInputProps> = ({
   analysisMode = 'detailed',
   estimatedDuration = 75,
   disabled = false,
-  onModeChange
+  onModeChange,
+  hasExistingAnalysis = false
 }) => {
   const [prompt, setPrompt] = useState('');
   const [selectedMode, setSelectedMode] = useState<'fast' | 'detailed'>(analysisMode);
@@ -33,6 +35,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
     e.preventDefault();
     if (prompt.trim() && !isLoading) {
       onSubmit(prompt.trim(), selectedMode);
+      setPrompt(''); // Clear prompt after submission
     }
   };
 
@@ -55,7 +58,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5" />
-          Territory Scoring Criteria
+          {hasExistingAnalysis ? 'Add New Scoring Criteria' : 'Territory Scoring Criteria'}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -71,13 +74,19 @@ const PromptInput: React.FC<PromptInputProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="scoring-prompt" className="block text-sm font-medium mb-2">
-              How should AI score each market?
+              {hasExistingAnalysis 
+                ? 'Add another way to score each market:' 
+                : 'How should AI score each market?'
+              }
             </label>
             <Textarea
               id="scoring-prompt"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Enter your scoring criteria here... (e.g., 'Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand')"
+              placeholder={hasExistingAnalysis 
+                ? "Enter additional scoring criteria... (e.g., 'Rate markets for digital marketing reach and social media engagement')"
+                : "Enter your scoring criteria here... (e.g., 'Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand')"
+              }
               className="min-h-[100px]"
               disabled={disabled || isLoading}
             />
@@ -89,22 +98,27 @@ const PromptInput: React.FC<PromptInputProps> = ({
               disabled={!prompt.trim() || isLoading || disabled}
               className="whitespace-nowrap"
             >
+              {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
               {isLoading 
                 ? `Analyzing Markets (${selectedMode})...` 
-                : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
+                : hasExistingAnalysis
+                  ? `Add Criteria (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
+                  : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
               }
             </Button>
             
-            <div className="text-sm text-muted-foreground">
-              <p className="mb-2">Example prompts:</p>
-              <ul className="space-y-1">
-                {examplePrompts.map((example, index) => (
-                  <li key={index} className="text-xs">
-                    • {example}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {!hasExistingAnalysis && (
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-2">Example prompts:</p>
+                <ul className="space-y-1">
+                  {examplePrompts.map((example, index) => (
+                    <li key={index} className="text-xs">
+                      • {example}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </form>
 

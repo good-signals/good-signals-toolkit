@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { CBSAData, AIScoreResponse, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
+import { CBSAData, AIScoreResponse, TerritoryAnalysis, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'territoryTargeter_currentAnalysis';
@@ -26,7 +25,11 @@ export const useTerritoryScoring = () => {
         console.log('Loaded saved analysis from localStorage:', parsed.id);
         return {
           ...parsed,
-          createdAt: new Date(parsed.createdAt)
+          createdAt: new Date(parsed.createdAt),
+          criteriaColumns: parsed.criteriaColumns?.map((col: any) => ({
+            ...col,
+            createdAt: new Date(col.createdAt)
+          })) || []
         };
       } catch (error) {
         console.error('Failed to parse saved analysis:', error);
@@ -39,6 +42,7 @@ export const useTerritoryScoring = () => {
   const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
   const [analysisMode, setAnalysisMode] = useState<'fast' | 'detailed'>('detailed');
   const [estimatedDuration, setEstimatedDuration] = useState<number>(75);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const analysisRequestRef = useRef<AbortController | null>(null);
 
   // Check for in-progress analysis on mount
@@ -106,7 +110,7 @@ export const useTerritoryScoring = () => {
 
   // Process markets in chunks to avoid timeouts
   const processMarketsInChunks = async (prompt: string, cbsaData: CBSAData[], analysisId: string, mode: 'fast' | 'detailed') => {
-    const chunkSize = mode === 'fast' ? 50 : 30; // Smaller chunks for detailed analysis
+    const chunkSize = mode === 'fast' ? 50 : 30;
     const chunks = [];
     
     for (let i = 0; i < cbsaData.length; i += chunkSize) {
@@ -145,12 +149,10 @@ export const useTerritoryScoring = () => {
       allScores = [...allScores, ...data.data.scores];
       
       if (i === 0) {
-        // Use the first chunk's summary and title
         combinedSummary = data.data.prompt_summary;
         suggestedTitle = data.data.suggested_title;
       }
 
-      // Update progress toast
       if (chunks.length > 1) {
         toast({
           title: "Processing Markets",
@@ -281,20 +283,39 @@ export const useTerritoryScoring = () => {
         throw new Error('No market scores were returned. Please try rephrasing your criteria.');
       }
 
-      // Calculate market signal score (average of all scores)
-      const averageScore = aiResponse.scores.reduce((sum, score) => sum + score.score, 0) / aiResponse.scores.length;
-      
-      const analysis: TerritoryAnalysis = {
-        id: analysisId,
-        prompt,
-        results: aiResponse,
-        marketSignalScore: Math.round(averageScore),
+      // Create new criteria column
+      const newColumn: CriteriaColumn = {
+        id: crypto.randomUUID(),
+        title: aiResponse.suggested_title,
+        prompt: prompt,
+        scores: aiResponse.scores,
+        logicSummary: aiResponse.prompt_summary,
+        analysisMode: mode,
         createdAt: new Date(),
-        includedColumns: ['score'] // Default to including the main score column
+        isManuallyOverridden: {}
       };
 
-      console.log('Setting current analysis:', analysis.id);
-      setCurrentAnalysis(analysis);
+      // Add to existing analysis or create new one
+      let updatedAnalysis: TerritoryAnalysis;
+      if (currentAnalysis) {
+        updatedAnalysis = {
+          ...currentAnalysis,
+          criteriaColumns: [...currentAnalysis.criteriaColumns, newColumn],
+          includedColumns: [...currentAnalysis.includedColumns, newColumn.id]
+        };
+      } else {
+        const averageScore = aiResponse.scores.reduce((sum, score) => sum + score.score, 0) / aiResponse.scores.length;
+        updatedAnalysis = {
+          id: analysisId,
+          criteriaColumns: [newColumn],
+          marketSignalScore: Math.round(averageScore),
+          createdAt: new Date(),
+          includedColumns: [newColumn.id]
+        };
+      }
+
+      console.log('Setting current analysis:', updatedAnalysis.id);
+      setCurrentAnalysis(updatedAnalysis);
       
       // Update analysis state to completed
       const completedState = { ...analysisState, status: 'completed' as const };
@@ -312,10 +333,10 @@ export const useTerritoryScoring = () => {
       
       toast({
         title: "Territory Analysis Complete",
-        description: `Successfully scored ${aiResponse.scores.length} markets for "${aiResponse.suggested_title}" in ${Math.round(actualDuration / 60)} minutes with an average signal score of ${analysis.marketSignalScore}%.`,
+        description: `Successfully added "${aiResponse.suggested_title}" criteria with ${aiResponse.scores.length} market scores in ${Math.round(actualDuration / 60)} minutes.`,
       });
 
-      return analysis;
+      return updatedAnalysis;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Territory scoring error:', errorMessage);
@@ -345,41 +366,131 @@ export const useTerritoryScoring = () => {
     }
   };
 
-  const updateIncludedColumns = (columnIds: string[]) => {
+  const refreshColumn = async (columnId: string, type: 'all' | 'na-only', cbsaData: CBSAData[]) => {
     if (!currentAnalysis) return;
 
-    // Recalculate market signal score based on included columns
-    const scores = currentAnalysis.results.scores.map(s => s.score);
-    const averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    const column = currentAnalysis.criteriaColumns.find(c => c.id === columnId);
+    if (!column) return;
+
+    setIsRefreshing(true);
+    
+    try {
+      // Determine which markets to refresh
+      let marketsToRefresh = cbsaData;
+      if (type === 'na-only') {
+        const naMarkets = column.scores
+          .filter(score => score.score === null || score.score === undefined)
+          .map(score => score.market);
+        marketsToRefresh = cbsaData.filter(cbsa => naMarkets.includes(cbsa.name));
+      }
+
+      if (marketsToRefresh.length === 0) {
+        toast({
+          title: "No Markets to Refresh",
+          description: "All markets already have scores for this criteria.",
+        });
+        return;
+      }
+
+      // Run analysis for the specified markets
+      const { data, error } = await supabase.functions.invoke('territory-scoring', {
+        body: {
+          userPrompt: column.prompt,
+          cbsaData: marketsToRefresh,
+          analysisMode: column.analysisMode
+        }
+      });
+
+      if (error) {
+        throw new Error(`Refresh failed: ${error.message}`);
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Unknown error occurred during refresh');
+      }
+
+      // Update the column with new scores
+      const updatedColumn = { ...column };
+      data.data.scores.forEach((newScore: any) => {
+        const existingIndex = updatedColumn.scores.findIndex(s => s.market === newScore.market);
+        if (existingIndex !== -1) {
+          updatedColumn.scores[existingIndex] = newScore;
+        } else {
+          updatedColumn.scores.push(newScore);
+        }
+      });
+
+      // Update the analysis
+      const updatedAnalysis = {
+        ...currentAnalysis,
+        criteriaColumns: currentAnalysis.criteriaColumns.map(c => 
+          c.id === columnId ? updatedColumn : c
+        )
+      };
+
+      setCurrentAnalysis(updatedAnalysis);
+
+      toast({
+        title: "Column Refreshed",
+        description: `Successfully refreshed ${marketsToRefresh.length} markets for "${column.title}".`,
+      });
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      console.error('Column refresh error:', errorMessage);
+      
+      toast({
+        title: "Refresh Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const applyManualOverride = (override: ManualScoreOverride) => {
+    if (!currentAnalysis) return;
 
     const updatedAnalysis = {
       ...currentAnalysis,
-      includedColumns: columnIds,
-      marketSignalScore: Math.round(averageScore)
+      criteriaColumns: currentAnalysis.criteriaColumns.map(column => {
+        if (column.id !== override.columnId) return column;
+
+        // Update the score
+        const updatedScores = column.scores.map(score => 
+          score.market === override.marketName 
+            ? { ...score, score: override.score, reasoning: override.reasoning }
+            : score
+        );
+
+        // If no existing score, add new one
+        if (!updatedScores.some(s => s.market === override.marketName)) {
+          updatedScores.push({
+            market: override.marketName,
+            score: override.score,
+            reasoning: override.reasoning
+          });
+        }
+
+        // Mark as manually overridden
+        const isManuallyOverridden = { ...column.isManuallyOverridden };
+        isManuallyOverridden[override.marketName] = true;
+
+        return {
+          ...column,
+          scores: updatedScores,
+          isManuallyOverridden
+        };
+      })
     };
 
-    console.log('Updating included columns:', columnIds);
     setCurrentAnalysis(updatedAnalysis);
-  };
 
-  const clearAnalysis = () => {
-    console.log('Clearing analysis');
-    
-    // Cancel any ongoing request
-    if (analysisRequestRef.current) {
-      analysisRequestRef.current.abort();
-      analysisRequestRef.current = null;
-    }
-    
-    setCurrentAnalysis(null);
-    setAnalysisStartTime(null);
-    setIsLoading(false);
-    setError(null);
-    setAnalysisMode('detailed');
-    setEstimatedDuration(75);
-    
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(ANALYSIS_STATE_KEY);
+    toast({
+      title: "Score Updated",
+      description: `Manual override applied for ${override.marketName}.`,
+    });
   };
 
   // Cleanup on unmount
@@ -398,7 +509,10 @@ export const useTerritoryScoring = () => {
     analysisStartTime,
     analysisMode,
     estimatedDuration,
+    isRefreshing,
     runScoring,
+    refreshColumn,
+    applyManualOverride,
     updateIncludedColumns,
     clearAnalysis,
     setAnalysisMode

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { sampleCBSAData } from '@/data/sampleCBSAData';
 import { exportTerritoryAnalysisToCSV } from '@/services/territoryExportService';
 import { useAuth } from '@/contexts/AuthContext';
-import { CBSAData } from '@/types/territoryTargeterTypes';
+import { CBSAData, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSelector';
 
 const TerritoryTargeterPage = () => {
@@ -23,7 +22,10 @@ const TerritoryTargeterPage = () => {
     analysisStartTime, 
     analysisMode,
     estimatedDuration,
+    isRefreshing,
     runScoring, 
+    refreshColumn,
+    applyManualOverride,
     clearAnalysis,
     setAnalysisMode
   } = useTerritoryScoring();
@@ -57,10 +59,30 @@ const TerritoryTargeterPage = () => {
   const handleExport = () => {
     if (!currentAnalysis) return;
 
+    // Flatten all scores for CSV export
+    const allScores: any[] = [];
+    currentAnalysis.criteriaColumns.forEach(column => {
+      column.scores.forEach(score => {
+        allScores.push({
+          ...score,
+          criteriaTitle: column.title,
+          criteriaId: column.id
+        });
+      });
+    });
+
     exportTerritoryAnalysisToCSV({
       cbsaData,
-      scores: currentAnalysis.results.scores,
-      analysis: currentAnalysis
+      scores: allScores,
+      analysis: {
+        ...currentAnalysis,
+        prompt: currentAnalysis.criteriaColumns.map(c => c.prompt).join(' | '),
+        results: {
+          suggested_title: currentAnalysis.criteriaColumns.map(c => c.title).join(' + '),
+          prompt_summary: currentAnalysis.criteriaColumns.map(c => c.logicSummary).join(' | '),
+          scores: allScores
+        }
+      }
     });
   };
 
@@ -90,6 +112,24 @@ const TerritoryTargeterPage = () => {
     statusMap[cbsaId] = status;
     localStorage.setItem('cbsa-statuses', JSON.stringify(statusMap));
   };
+
+  const handleRefreshColumn = async (columnId: string, type: 'all' | 'na-only') => {
+    await refreshColumn(columnId, type, cbsaData);
+  };
+
+  const handleManualScoreOverride = (override: ManualScoreOverride) => {
+    applyManualOverride(override);
+  };
+
+  // Calculate average market signal score across all criteria
+  const averageMarketSignalScore = currentAnalysis 
+    ? Math.round(
+        currentAnalysis.criteriaColumns.reduce((total, column) => {
+          const avgScore = column.scores.reduce((sum, score) => sum + score.score, 0) / column.scores.length;
+          return total + avgScore;
+        }, 0) / currentAnalysis.criteriaColumns.length
+      )
+    : 0;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -131,6 +171,7 @@ const TerritoryTargeterPage = () => {
         estimatedDuration={estimatedDuration}
         disabled={!user}
         onModeChange={setAnalysisMode}
+        hasExistingAnalysis={!!currentAnalysis && currentAnalysis.criteriaColumns.length > 0}
       />
 
       {/* Error Display */}
@@ -142,12 +183,10 @@ const TerritoryTargeterPage = () => {
       )}
 
       {/* 2. Executive Summary (only show after analysis) */}
-      {currentAnalysis && (
+      {currentAnalysis && currentAnalysis.criteriaColumns.length > 0 && (
         <>
           <ExecutiveSummary 
-            summary={currentAnalysis.results.prompt_summary}
-            prompt={currentAnalysis.prompt}
-            suggestedTitle={currentAnalysis.results.suggested_title}
+            criteriaColumns={currentAnalysis.criteriaColumns}
           />
 
           {/* Export and Clear Buttons */}
@@ -166,11 +205,14 @@ const TerritoryTargeterPage = () => {
       {/* 3. CBSA Table - Always show with population data */}
       <CBSATable 
         cbsaData={cbsaData}
-        scores={currentAnalysis?.results.scores || []}
-        marketSignalScore={currentAnalysis?.marketSignalScore || 0}
+        criteriaColumns={currentAnalysis?.criteriaColumns || []}
+        marketSignalScore={averageMarketSignalScore}
         accountGoodThreshold={0.75}
         accountBadThreshold={0.50}
         onStatusChange={handleStatusChange}
+        onManualScoreOverride={handleManualScoreOverride}
+        onRefreshColumn={handleRefreshColumn}
+        isRefreshing={isRefreshing}
       />
     </div>
   );
