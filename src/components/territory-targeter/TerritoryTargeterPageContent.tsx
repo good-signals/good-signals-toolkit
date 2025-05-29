@@ -329,7 +329,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
             hasExistingAnalysis={!!currentAnalysis}
           />
 
-          {/* Show analysis results even if data is partially missing */}
+          {/* Show analysis results only if there's an analysis */}
           {currentAnalysis && (
             <TerritoryResultsSection
               currentAnalysis={currentAnalysis}
@@ -346,11 +346,12 @@ const TerritoryTargeterPageContent: React.FC = () => {
             />
           )}
 
-          {currentAnalysis && cbsaData.length > 0 && (
+          {/* Always show the CBSA table if we have data */}
+          {cbsaData.length > 0 && (
             <CBSATable 
               cbsaData={cbsaData}
-              criteriaColumns={currentAnalysis.criteriaColumns}
-              marketSignalScore={currentAnalysis.marketSignalScore}
+              criteriaColumns={currentAnalysis?.criteriaColumns || []}
+              marketSignalScore={currentAnalysis?.marketSignalScore || 0}
               accountGoodThreshold={accountGoodThreshold}
               accountBadThreshold={accountBadThreshold}
               onManualScoreOverride={handleManualOverride}

@@ -175,7 +175,10 @@ const CBSATable: React.FC<CBSATableProps> = ({
       <div className="border-b pb-4">
         <h2 className="text-2xl font-bold text-foreground">Territory Analysis</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Core-Based Statistical Areas ranked by population and custom criteria scoring
+          {hasScores 
+            ? "Core-Based Statistical Areas ranked by population and custom criteria scoring"
+            : "Core-Based Statistical Areas ranked by population (add criteria to see custom scoring)"
+          }
         </p>
       </div>
 
@@ -208,17 +211,19 @@ const CBSATable: React.FC<CBSATableProps> = ({
         </Table>
       </div>
 
-      {/* Manual Score Override Dialog */}
-      <ManualScoreOverrideDialog
-        isOpen={overrideDialog.isOpen}
-        onClose={() => setOverrideDialog(prev => ({ ...prev, isOpen: false }))}
-        onSave={handleOverrideSave}
-        marketName={overrideDialog.marketName}
-        columnId={overrideDialog.columnId}
-        columnTitle={overrideDialog.columnTitle}
-        currentScore={overrideDialog.currentScore}
-        currentReasoning={overrideDialog.currentReasoning}
-      />
+      {/* Manual Score Override Dialog - only show if we have criteria columns */}
+      {hasScores && (
+        <ManualScoreOverrideDialog
+          isOpen={overrideDialog.isOpen}
+          onClose={() => setOverrideDialog(prev => ({ ...prev, isOpen: false }))}
+          onSave={handleOverrideSave}
+          marketName={overrideDialog.marketName}
+          columnId={overrideDialog.columnId}
+          columnTitle={overrideDialog.columnTitle}
+          currentScore={overrideDialog.currentScore}
+          currentReasoning={overrideDialog.currentReasoning}
+        />
+      )}
     </div>
   );
 };
