@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
@@ -69,20 +70,36 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   console.log('SiteAssessmentDetailsView props:', { assessmentId, selectedMetricSetId });
 
+  // Improved query with better error handling and retry logic
   const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError, refetch: refetchAssessment } = useQuery<SiteAssessment, Error>({
     queryKey: ['assessmentDetails', assessmentId],
     queryFn: async () => {
       console.log('Query function called for assessment ID:', assessmentId);
+      if (!assessmentId) {
+        throw new Error('Assessment ID is required');
+      }
       try {
         const result = await getAssessmentDetails(assessmentId);
         console.log('Assessment query result:', result);
         return result;
       } catch (error) {
         console.error('Assessment query error:', error);
+        // Invalidate related queries on error to force refresh
+        queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
         throw error;
       }
     },
     enabled: !!assessmentId,
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network errors, but not for 404s
+      if (failureCount < 3 && error?.message?.includes('Failed to fetch')) {
+        return true;
+      }
+      return false;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });
 
   // Fetch documents separately with error handling
@@ -90,6 +107,9 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     queryKey: ['assessmentDocuments', assessmentId],
     queryFn: async () => {
       console.log('Fetching documents for assessment:', assessmentId);
+      if (!assessmentId) {
+        return [];
+      }
       try {
         const result = await getAssessmentDocuments(assessmentId);
         console.log('Documents fetched:', result);
@@ -101,22 +121,32 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
       }
     },
     enabled: !!assessmentId,
+    retry: 2,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Fetch TargetMetricSet internally
+  // Fetch TargetMetricSet with improved error handling
   const { data: targetMetricSet, isLoading: isLoadingTargetMetricSet, error: targetMetricSetError } = useQuery<TargetMetricSet | null, Error>({
     queryKey: ['targetMetricSetForDetailsView', selectedMetricSetId, user?.id],
     queryFn: async () => {
       if (!user?.id || !selectedMetricSetId) return null;
-      return getTargetMetricSetById(selectedMetricSetId, user.id);
+      try {
+        return await getTargetMetricSetById(selectedMetricSetId, user.id);
+      } catch (error) {
+        console.error('Target metric set fetch error:', error);
+        throw error;
+      }
     },
     enabled: !!user?.id && !!selectedMetricSetId,
+    retry: 2,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: userAccounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
     queryKey: ['userAdminAccounts', user?.id],
     queryFn: () => user ? fetchUserAccountsWithAdminRole(user.id) : Promise.resolve([]),
     enabled: !!user,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const accountSettings = useMemo(() => {
@@ -303,17 +333,38 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   if (assessmentError) {
     console.error('Assessment error details:', assessmentError);
-    return <Alert variant="destructive" className="max-w-2xl mx-auto my-8">
-      <AlertTitle>Error Loading Assessment</AlertTitle>
-      <AlertDescription>{assessmentError.message}</AlertDescription>
-    </Alert>;
+    return (
+      <div className="flex flex-col items-center justify-center h-screen space-y-4">
+        <Alert variant="destructive" className="max-w-2xl mx-auto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Assessment</AlertTitle>
+          <AlertDescription>{assessmentError.message}</AlertDescription>
+        </Alert>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => refetchAssessment()}>
+            Try Again
+          </Button>
+          <Button variant="outline" onClick={onBackToList}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (targetMetricSetError) {
-     return <Alert variant="destructive" className="max-w-2xl mx-auto my-8">
-       <AlertTitle>Error Loading Target Metric Set</AlertTitle>
-       <AlertDescription>{targetMetricSetError.message}</AlertDescription>
-     </Alert>;
+     return (
+       <div className="flex flex-col items-center justify-center h-screen space-y-4">
+         <Alert variant="destructive" className="max-w-2xl mx-auto">
+           <AlertCircle className="h-4 w-4" />
+           <AlertTitle>Error Loading Target Metric Set</AlertTitle>
+           <AlertDescription>{targetMetricSetError.message}</AlertDescription>
+         </Alert>
+         <Button variant="outline" onClick={onBackToList}>
+           <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+         </Button>
+       </div>
+     );
   }
   
   if (!assessment || !targetMetricSet) {
