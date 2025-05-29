@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Plus } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ProgressCounter from './ProgressCounter';
 import AnalysisModeSelector from './AnalysisModeSelector';
 
@@ -30,6 +31,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
 }) => {
   const [prompt, setPrompt] = useState('');
   const [selectedMode, setSelectedMode] = useState<'fast' | 'detailed'>(analysisMode);
+  const [isOpen, setIsOpen] = useState(!hasExistingAnalysis); // Open by default if no existing analysis
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,81 +57,94 @@ const PromptInput: React.FC<PromptInputProps> = ({
 
   return (
     <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Target className="h-5 w-5" />
-          {hasExistingAnalysis ? 'Add New Scoring Criteria' : 'Territory Scoring Criteria'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Analysis Mode Selector */}
-        {!isLoading && (
-          <AnalysisModeSelector
-            selectedMode={selectedMode}
-            onModeChange={handleModeChange}
-            disabled={disabled}
-          />
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="scoring-prompt" className="block text-sm font-medium mb-2">
-              {hasExistingAnalysis 
-                ? 'Add another way to score each market:' 
-                : 'How should AI score each market?'
-              }
-            </label>
-            <Textarea
-              id="scoring-prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={hasExistingAnalysis 
-                ? "Enter additional scoring criteria... (e.g., 'Rate markets for digital marketing reach and social media engagement')"
-                : "Enter your scoring criteria here... (e.g., 'Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand')"
-              }
-              className="min-h-[100px]"
-              disabled={disabled || isLoading}
-            />
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <Button 
-              type="submit" 
-              disabled={!prompt.trim() || isLoading || disabled}
-              className="whitespace-nowrap"
-            >
-              {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
-              {isLoading 
-                ? `Analyzing Markets (${selectedMode})...` 
-                : hasExistingAnalysis
-                  ? `Add Criteria (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
-                  : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
-              }
-            </Button>
-            
-            {!hasExistingAnalysis && (
-              <div className="text-sm text-muted-foreground">
-                <p className="mb-2">Example prompts:</p>
-                <ul className="space-y-1">
-                  {examplePrompts.map((example, index) => (
-                    <li key={index} className="text-xs">
-                      • {example}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between cursor-pointer">
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                {hasExistingAnalysis ? 'Add New Scoring Criteria' : 'Territory Scoring Criteria'}
+              </CardTitle>
+              {isOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="space-y-4">
+            {/* Analysis Mode Selector */}
+            {!isLoading && (
+              <AnalysisModeSelector
+                selectedMode={selectedMode}
+                onModeChange={handleModeChange}
+                disabled={disabled}
+              />
             )}
-          </div>
-        </form>
 
-        {/* Progress Counter */}
-        <ProgressCounter 
-          isActive={isLoading} 
-          duration={estimatedDuration}
-          startTime={analysisStartTime}
-          analysisMode={selectedMode}
-        />
-      </CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="scoring-prompt" className="block text-sm font-medium mb-2">
+                  {hasExistingAnalysis 
+                    ? 'Add another way to score each market:' 
+                    : 'How should AI score each market?'
+                  }
+                </label>
+                <Textarea
+                  id="scoring-prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={hasExistingAnalysis 
+                    ? "Enter additional scoring criteria... (e.g., 'Rate markets for digital marketing reach and social media engagement')"
+                    : "Enter your scoring criteria here... (e.g., 'Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand')"
+                  }
+                  className="min-h-[100px]"
+                  disabled={disabled || isLoading}
+                />
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                <Button 
+                  type="submit" 
+                  disabled={!prompt.trim() || isLoading || disabled}
+                  className="whitespace-nowrap"
+                >
+                  {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
+                  {isLoading 
+                    ? `Analyzing Markets (${selectedMode})...` 
+                    : hasExistingAnalysis
+                      ? `Add Criteria (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
+                      : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
+                  }
+                </Button>
+                
+                {!hasExistingAnalysis && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">Example prompts:</p>
+                    <ul className="space-y-1">
+                      {examplePrompts.map((example, index) => (
+                        <li key={index} className="text-xs">
+                          • {example}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </form>
+
+            {/* Progress Counter */}
+            <ProgressCounter 
+              isActive={isLoading} 
+              duration={estimatedDuration}
+              startTime={analysisStartTime}
+              analysisMode={selectedMode}
+            />
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };

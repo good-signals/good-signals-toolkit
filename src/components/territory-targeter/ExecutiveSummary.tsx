@@ -27,7 +27,7 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({
             <div className="flex items-center justify-between cursor-pointer">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Analysis Summary
+                AI Logic Summary
               </CardTitle>
               {isOpen ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
