@@ -35,6 +35,19 @@ const getSiteStatusColor = (status: string | null | undefined): "default" | "sec
   }
 };
 
+const getScorePillClasses = (signalStatus: { text: string; color: string; iconColor: string }) => {
+  switch (signalStatus.text) {
+    case 'Good':
+      return 'bg-green-500 text-white';
+    case 'Bad':
+      return 'bg-red-500 text-white';
+    case 'Neutral':
+      return 'bg-yellow-500 text-white';
+    default:
+      return 'bg-gray-400 text-white';
+  }
+};
+
 const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
   assessment,
   isSelected,
@@ -97,7 +110,7 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
       </TableCell>
       <TableCell className="text-center">
         {displayScore !== null ? (
-          <span className={`font-semibold ${signalStatus.color}`}>
+          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(signalStatus)}`}>
             {displayScore}%
           </span>
         ) : (
