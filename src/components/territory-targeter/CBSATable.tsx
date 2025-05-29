@@ -62,9 +62,19 @@ const CBSATable: React.FC<CBSATableProps> = ({
         };
       });
 
+      // Calculate market signal score (average of all criteria scores)
+      const scores = Object.values(criteriaScores)
+        .map(cs => cs.score)
+        .filter(score => score !== null) as number[];
+      
+      const marketSignalScore = scores.length > 0 
+        ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+        : null;
+
       return {
         ...cbsa,
-        criteriaScores
+        criteriaScores,
+        marketSignalScore
       };
     });
   }, [cbsaData, criteriaColumns]);
@@ -77,7 +87,10 @@ const CBSATable: React.FC<CBSATableProps> = ({
       let aValue: any;
       let bValue: any;
 
-      if (sortConfig.key.startsWith('criteria_')) {
+      if (sortConfig.key === 'marketSignalScore') {
+        aValue = a.marketSignalScore || 0;
+        bValue = b.marketSignalScore || 0;
+      } else if (sortConfig.key.startsWith('criteria_')) {
         const columnId = sortConfig.key.replace('criteria_', '');
         aValue = a.criteriaScores[columnId]?.score || 0;
         bValue = b.criteriaScores[columnId]?.score || 0;

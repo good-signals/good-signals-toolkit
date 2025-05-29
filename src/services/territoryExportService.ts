@@ -16,18 +16,47 @@ const formatPopulationGrowth = (growth: number) => {
 export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): void => {
   const { cbsaData, scores, analysis } = exportData;
 
+  // Group scores by criteria for easier lookup
+  const scoresByCriteria: { [criteriaId: string]: CBSAScore[] } = {};
+  scores.forEach(score => {
+    if (!scoresByCriteria[score.criteriaId]) {
+      scoresByCriteria[score.criteriaId] = [];
+    }
+    scoresByCriteria[score.criteriaId].push(score);
+  });
+
   // Merge data for CSV
   const csvData = cbsaData.map(cbsa => {
-    const scoreData = scores.find(s => s.market === cbsa.name);
-    return {
+    const row: any = {
       'CBSA Name': cbsa.name,
       'State': cbsa.state,
       'Region': cbsa.region,
       'Population': cbsa.population,
-      'Population Growth': formatPopulationGrowth(cbsa.populationGrowth),
-      'Score': scoreData?.score || 'N/A',
-      'AI Reasoning': scoreData?.reasoning || 'No score available'
+      'Population Growth': formatPopulationGrowth(cbsa.populationGrowth)
     };
+
+    // Add individual criteria scores
+    const marketScores: number[] = [];
+    analysis.criteriaColumns.forEach(column => {
+      const criteriaScores = scoresByCriteria[column.id] || [];
+      const scoreData = criteriaScores.find(s => s.market === cbsa.name);
+      row[`${column.title} Score`] = scoreData?.score ?? 'N/A';
+      row[`${column.title} Reasoning`] = scoreData?.reasoning || 'No reasoning available';
+      
+      if (scoreData?.score !== null && scoreData?.score !== undefined) {
+        marketScores.push(scoreData.score);
+      }
+    });
+
+    // Add Market Signal Score if there are multiple criteria
+    if (analysis.criteriaColumns.length > 1) {
+      const averageScore = marketScores.length > 0 
+        ? Math.round(marketScores.reduce((sum, score) => sum + score, 0) / marketScores.length)
+        : 'N/A';
+      row['Market Signal Score'] = averageScore;
+    }
+
+    return row;
   });
 
   // Create CSV content

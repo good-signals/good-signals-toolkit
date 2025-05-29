@@ -7,7 +7,7 @@ import { CriteriaColumn } from '@/types/territoryTargeterTypes';
 import ColumnRefreshOptions from '../ColumnRefreshOptions';
 
 export type SortConfig = {
-  key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'status' | string;
+  key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'status' | 'marketSignalScore' | string;
   direction: 'asc' | 'desc';
 } | null;
 
@@ -36,6 +36,8 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
       ? <ArrowUp className="h-4 w-4" />
       : <ArrowDown className="h-4 w-4" />;
   };
+
+  const showMarketSignalScore = hasScores && criteriaColumns.length > 1;
 
   return (
     <TableHeader>
@@ -129,6 +131,18 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
             </TableHead>
           );
         })}
+        {showMarketSignalScore && (
+          <TableHead className="w-[150px] text-center">
+            <Button 
+              variant="ghost" 
+              onClick={() => onSort('marketSignalScore')}
+              className="h-auto p-0 font-medium text-blue-600"
+            >
+              Market Signal Score
+              {getSortIcon('marketSignalScore')}
+            </Button>
+          </TableHead>
+        )}
         {hasScores && (
           <TableHead className="min-w-[300px]">
             Combined Reasoning

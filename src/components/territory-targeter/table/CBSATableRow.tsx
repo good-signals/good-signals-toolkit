@@ -42,7 +42,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
   onStatusChange,
   onScoreClick
 }) => {
-  // Calculate average score across all criteria for signal status
+  // Calculate average score across all criteria for market signal score
   const scores = Object.values(row.criteriaScores)
     .map(cs => cs.score)
     .filter(score => score !== null) as number[];
@@ -70,6 +70,8 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
     })
     .filter(Boolean)
     .join(' | ');
+
+  const showMarketSignalScore = criteriaColumns.length > 1;
 
   return (
     <TableRow key={row.id}>
@@ -120,6 +122,17 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
           </TableCell>
         );
       })}
+      {showMarketSignalScore && (
+        <TableCell className="text-center">
+          {averageScore !== null ? (
+            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold border-2 border-blue-200 ${getScorePillClasses(signalStatus)}`}>
+              {Math.round(averageScore)}%
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">N/A</span>
+          )}
+        </TableCell>
+      )}
       {criteriaColumns.length > 0 && (
         <TableCell className="text-sm">
           {combinedReasoning || 'No reasoning available'}
