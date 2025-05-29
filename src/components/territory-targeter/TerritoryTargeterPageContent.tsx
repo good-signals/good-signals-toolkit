@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
-import { supabase } from '@/integrations/supabase/client';
 import { TerritoryAnalysis, CBSAData, ColumnToggleSettings, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { useAnalysisState } from '@/hooks/territory-targeter/useAnalysisState';
 import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
 import { useColumnSettings } from '@/hooks/territory-targeter/useColumnSettings';
 import { useManualScoreOverrides } from '@/hooks/territory-targeter/useManualScoreOverrides';
 import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
+import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { sampleCBSAData } from '@/data/sampleCBSAData';
 import TerritoryHeader from './TerritoryHeader';
@@ -26,10 +26,17 @@ const TerritoryTargeterPageContent: React.FC = () => {
   const { columnSettings, toggleColumn, deleteColumn } = useColumnSettings(currentAnalysis);
   const { manualScoreOverrides, addManualOverride, removeManualOverride } = useManualScoreOverrides();
   const { currentAccount, accountGoodThreshold, accountBadThreshold } = useAccountSettings(user?.id);
+  
+  // Use the existing useTerritoryScoring hook
+  const {
+    isLoading: isProcessing,
+    runScoring,
+    refreshColumn,
+    applyManualOverride,
+    refreshingColumnId
+  } = useTerritoryScoring();
 
-  const [isProcessing, setIsProcessing] = useState(false);
   const [cbsaData, setCBSADataLocal] = useState<CBSAData[]>([]);
-  const [prompt, setPrompt] = useState('');
   const [isRestoringData, setIsRestoringData] = useState(false);
 
   // Initialize CBSA data from stored data or fallback to sample data
@@ -48,6 +55,9 @@ const TerritoryTargeterPageContent: React.FC = () => {
         title: "Analysis Restored",
         description: "Your saved analysis has been restored with sample market data.",
       });
+    } else if (!currentAnalysis) {
+      // If no analysis, start with sample data
+      setCBSADataLocal(sampleCBSAData);
     }
   }, [currentAnalysis, storedCBSAData, setCBSAData]);
 
@@ -62,55 +72,22 @@ const TerritoryTargeterPageContent: React.FC = () => {
   const handlePromptSubmit = async (newPrompt: string, mode: 'fast' | 'detailed') => {
     if (isProcessing) return;
 
-    setPrompt(newPrompt);
-    setIsProcessing(true);
-
     try {
-      const { data, error } = await supabase.functions.invoke('initiate-territory-analysis', {
-        body: { prompt: newPrompt, mode, userId: user?.id }
-      });
-
-      if (error) {
-        throw new Error(`Failed to initiate analysis: ${error.message}`);
+      // Use the existing useTerritoryScoring hook to run the analysis
+      const updatedAnalysis = await runScoring(newPrompt, cbsaData, mode);
+      
+      if (updatedAnalysis) {
+        // Store the CBSA data if we have an analysis
+        setCBSAData(cbsaData);
+        
+        toast({
+          title: "Analysis Complete",
+          description: "Your territory analysis has been completed successfully.",
+        });
       }
-
-      if (!data || !data.analysisId) {
-        throw new Error('Analysis initiation did not return an analysis ID.');
-      }
-
-      // Optimistically update the analysis state
-      setCurrentAnalysis({
-        id: data.analysisId,
-        criteriaColumns: [],
-        marketSignalScore: 0,
-        createdAt: new Date(),
-        includedColumns: []
-      });
-
-      // Fetch CBSA data
-      const cbsaResponse = await supabase.functions.invoke('get-cbsa-data', {
-        body: { analysisId: data.analysisId }
-      });
-
-      if (cbsaResponse.error) {
-        throw new Error(`Failed to fetch CBSA data: ${cbsaResponse.error.message}`);
-      }
-
-      if (!cbsaResponse.data || !cbsaResponse.data.cbsa_data) {
-        throw new Error('CBSA data fetch did not return any data.');
-      }
-
-      const newCBSAData = cbsaResponse.data.cbsa_data;
-      setCBSADataLocal(newCBSAData);
-      setCBSAData(newCBSAData);
-
-      toast({
-        title: "Analysis Initiated",
-        description: "Your territory analysis has been initiated and is running in the background.",
-      });
 
     } catch (err) {
-      console.error('Failed to initiate territory analysis:', err);
+      console.error('Failed to run territory analysis:', err);
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
 
       toast({
@@ -118,9 +95,6 @@ const TerritoryTargeterPageContent: React.FC = () => {
         description: errorMessage,
         variant: "destructive",
       });
-      clearAnalysis();
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -150,7 +124,12 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
   const handleClearAnalysis = () => {
     clearAnalysis();
-    setCBSADataLocal([]);
+    setCBSADataLocal(sampleCBSAData);
+    
+    toast({
+      title: "Analysis Cleared",
+      description: "Your territory analysis has been cleared successfully.",
+    });
   };
 
   const handleExportCSV = () => {
@@ -196,30 +175,13 @@ const TerritoryTargeterPageContent: React.FC = () => {
       addManualOverride(override);
     }
 
-    // Update the currentAnalysis state with the manual override
+    // Apply the override using the useTerritoryScoring hook
+    applyManualOverride(override);
+  };
+
+  const handleRefreshColumn = (columnId: string, type: 'all' | 'na-only') => {
     if (currentAnalysis) {
-      const updatedAnalysis: TerritoryAnalysis = {
-        ...currentAnalysis,
-        criteriaColumns: currentAnalysis.criteriaColumns.map(column => {
-          if (column.id === override.columnId) {
-            return {
-              ...column,
-              scores: column.scores.map(score => {
-                if (score.market === override.marketName) {
-                  return {
-                    ...score,
-                    score: override.score,
-                    reasoning: override.reasoning
-                  };
-                }
-                return score;
-              })
-            };
-          }
-          return column;
-        })
-      };
-      setCurrentAnalysis(updatedAnalysis);
+      refreshColumn(columnId, type, cbsaData);
     }
   };
 
@@ -301,6 +263,8 @@ const TerritoryTargeterPageContent: React.FC = () => {
               accountBadThreshold={accountBadThreshold}
               onManualScoreOverride={handleManualOverride}
               onStatusChange={handleStatusChange}
+              onRefreshColumn={handleRefreshColumn}
+              refreshingColumnId={refreshingColumnId}
             />
           )}
 
