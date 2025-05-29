@@ -6,9 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced JSON extraction function with better error handling
+// Simplified JSON extraction for OpenAI (more reliable than Perplexity)
 function extractJSON(text: string): any {
-  console.log('Attempting to extract JSON from response...');
+  console.log('Attempting to extract JSON from OpenAI response...');
   console.log('Response length:', text.length);
   
   // Try to find JSON in markdown code blocks first
@@ -36,62 +36,14 @@ function extractJSON(text: string): any {
   }
 
   // Look for JSON object starting with { and ending with }
-  // Try to find complete JSON objects
-  const jsonMatches = text.match(/\{[\s\S]*?\}/g);
-  if (jsonMatches) {
-    // Try each match, starting with the longest one
-    const sortedMatches = jsonMatches.sort((a, b) => b.length - a.length);
-    
-    for (const match of sortedMatches) {
-      console.log('Trying JSON object of length:', match.length);
-      try {
-        const parsed = JSON.parse(match);
-        // Basic validation to ensure it looks like our expected structure
-        if (parsed && typeof parsed === 'object' && parsed.suggested_title && Array.isArray(parsed.scores)) {
-          console.log('Successfully parsed JSON object');
-          return parsed;
-        }
-      } catch (e) {
-        console.log('Failed to parse JSON object:', e.message);
-        continue;
-      }
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    console.log('Found JSON object in response');
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      console.log('Failed to parse JSON object:', e.message);
     }
-  }
-
-  // If we get here, try to repair truncated JSON
-  console.log('Attempting to repair truncated JSON...');
-  try {
-    // Find the start of the JSON
-    const jsonStart = text.indexOf('{');
-    if (jsonStart !== -1) {
-      let jsonText = text.substring(jsonStart);
-      
-      // Try to find where the scores array ends and repair it
-      const scoresMatch = jsonText.match(/"scores":\s*\[([\s\S]*)/);
-      if (scoresMatch) {
-        const beforeScores = jsonText.substring(0, jsonText.indexOf('"scores"'));
-        const scoresContent = scoresMatch[1];
-        
-        // Count complete score objects
-        const completeScores = [];
-        const scoreMatches = scoresContent.match(/\{[^{}]*"market"[^{}]*"score"[^{}]*"reasoning"[^{}]*\}/g);
-        
-        if (scoreMatches && scoreMatches.length > 0) {
-          console.log(`Found ${scoreMatches.length} complete score objects`);
-          
-          // Reconstruct the JSON with complete scores only
-          const repairedJson = beforeScores + '"scores": [' + scoreMatches.join(', ') + ']}';
-          
-          try {
-            return JSON.parse(repairedJson);
-          } catch (e) {
-            console.log('Failed to parse repaired JSON:', e.message);
-          }
-        }
-      }
-    }
-  } catch (e) {
-    console.log('JSON repair failed:', e.message);
   }
 
   // Try to parse the entire text as JSON (last resort)
@@ -102,7 +54,7 @@ function extractJSON(text: string): any {
     console.log('Failed to parse entire response as JSON:', e.message);
   }
 
-  throw new Error('No valid JSON found in response. Response may be truncated or malformed.');
+  throw new Error('No valid JSON found in OpenAI response');
 }
 
 // Validate the parsed response structure
@@ -127,9 +79,9 @@ function validateResponse(data: any): boolean {
     return false;
   }
 
-  // Validate first few scores to ensure proper structure
+  // Validate a few scores to ensure proper structure
   let validScores = 0;
-  for (let i = 0; i < Math.min(5, data.scores.length); i++) {
+  for (let i = 0; i < Math.min(3, data.scores.length); i++) {
     const score = data.scores[i];
     if (score.market && typeof score.score === 'number' && score.reasoning) {
       validScores++;
@@ -159,9 +111,9 @@ serve(async (req) => {
       throw new Error('Missing required parameters: userPrompt and cbsaData');
     }
 
-    const perplexityApiKey = Deno.env.get('PERPLEXITY_API_KEY');
-    if (!perplexityApiKey) {
-      throw new Error('Perplexity API key not configured');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
     }
 
     console.log(`Processing ${analysisMode} analysis for ${cbsaData.length} markets with prompt: "${userPrompt.substring(0, 100)}..."`);
@@ -169,7 +121,7 @@ serve(async (req) => {
       console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}`);
     }
 
-    // Enhanced system prompt optimized for speed and chunked processing
+    // Enhanced system prompt optimized for OpenAI
     const getSystemPrompt = (mode: string, isChunked: boolean) => {
       const basePrompt = `You are part of the Territory Targeter tool inside the Good Signals platform. Your job is to help users assess and score U.S. markets based on criteria they provide in natural language.
 
@@ -224,25 +176,19 @@ Guidelines:
 Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Population: ${cbsa.population.toLocaleString()})`).join(', ')}`;
     };
 
-    console.log('Sending request to Perplexity API...');
+    console.log('Sending request to OpenAI API...');
     
-    // Adjust model and parameters based on analysis mode
-    const modelConfig = analysisMode === 'fast' 
-      ? {
-          model: 'llama-3.1-sonar-small-128k-online', // Faster, smaller model
-          temperature: 0.2,
-          max_tokens: 6000 // Increased token limit to reduce truncation
-        }
-      : {
-          model: 'llama-3.1-sonar-large-128k-online', // More capable model
-          temperature: 0.1,
-          max_tokens: 10000 // Increased token limit to reduce truncation
-        };
+    // Configure model based on analysis mode
+    const modelConfig = {
+      model: 'gpt-4o-mini',
+      temperature: analysisMode === 'fast' ? 0.3 : 0.1,
+      max_tokens: analysisMode === 'fast' ? 4000 : 8000
+    };
     
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${perplexityApiKey}`,
+        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -258,26 +204,23 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
           }
         ],
         top_p: 0.9,
-        return_images: false,
-        return_related_questions: false,
-        search_recency_filter: 'month',
-        frequency_penalty: 1,
-        presence_penalty: 0
+        frequency_penalty: 0.5,
+        presence_penalty: 0.1
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Perplexity API error:', errorText);
-      throw new Error(`Perplexity API error: ${response.status} ${response.statusText}`);
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('Received response from Perplexity API');
+    console.log('Received response from OpenAI API');
 
     const aiContent = data.choices[0]?.message?.content;
     if (!aiContent) {
-      throw new Error('No content received from Perplexity API');
+      throw new Error('No content received from OpenAI API');
     }
 
     console.log('AI response length:', aiContent.length);
@@ -295,11 +238,10 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
       
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError.message);
-      console.error('Raw AI content (first 1000 chars):', aiContent.substring(0, 1000));
-      console.error('Raw AI content (last 1000 chars):', aiContent.substring(Math.max(0, aiContent.length - 1000)));
+      console.error('Raw AI content (first 500 chars):', aiContent.substring(0, 500));
+      console.error('Raw AI content (last 500 chars):', aiContent.substring(Math.max(0, aiContent.length - 500)));
       
-      // Return a more helpful error message
-      throw new Error(`Failed to parse AI response: ${parseError.message}. The AI response may have been truncated or malformed. Please try again or use Fast Analysis mode for better reliability.`);
+      throw new Error(`Failed to parse AI response: ${parseError.message}. Please try again or use Fast Analysis mode for better reliability.`);
     }
 
     console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
@@ -314,7 +256,6 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
   } catch (error) {
     console.error('Error in territory-scoring function:', error);
     
-    // Return detailed error information for debugging
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
