@@ -6,14 +6,29 @@ import { toast } from '@/hooks/use-toast';
 
 export const useColumnOperations = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshStartTime, setRefreshStartTime] = useState<number | null>(null);
 
-  const refreshColumn = async (columnId: string, type: 'all' | 'na-only', cbsaData: CBSAData[], currentAnalysis: TerritoryAnalysis) => {
+  const refreshColumn = async (
+    columnId: string, 
+    type: 'all' | 'na-only', 
+    cbsaData: CBSAData[], 
+    currentAnalysis: TerritoryAnalysis,
+    onRefreshStart?: (startTime: number) => void,
+    onRefreshEnd?: () => void
+  ) => {
     if (!currentAnalysis) return;
 
     const column = currentAnalysis.criteriaColumns.find(c => c.id === columnId);
     if (!column) return;
 
     setIsRefreshing(true);
+    const startTime = Date.now();
+    setRefreshStartTime(startTime);
+    
+    // Notify parent component about refresh start
+    if (onRefreshStart) {
+      onRefreshStart(startTime);
+    }
     
     try {
       // Determine which markets to refresh
@@ -33,12 +48,18 @@ export const useColumnOperations = () => {
         return;
       }
 
+      // Show initial toast with progress feedback
+      toast({
+        title: "Refreshing Column",
+        description: `Starting refresh for ${marketsToRefresh.length} markets in "${column.title}"...`,
+      });
+
       // Run analysis for the specified markets
       const { data, error } = await supabase.functions.invoke('territory-scoring', {
         body: {
           userPrompt: column.prompt,
           cbsaData: marketsToRefresh,
-          analysisMode: column.analysisMode
+          analysisMode: column.analysisMode || 'detailed'
         }
       });
 
@@ -87,6 +108,12 @@ export const useColumnOperations = () => {
       });
     } finally {
       setIsRefreshing(false);
+      setRefreshStartTime(null);
+      
+      // Notify parent component about refresh end
+      if (onRefreshEnd) {
+        onRefreshEnd();
+      }
     }
   };
 
@@ -177,6 +204,7 @@ export const useColumnOperations = () => {
 
   return {
     isRefreshing,
+    refreshStartTime,
     refreshColumn,
     applyManualOverride,
     toggleColumnInSignalScore,

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { RefreshCw, MoreVertical } from 'lucide-react';
+import { RefreshCw, MoreVertical, Loader2 } from 'lucide-react';
 
 interface ColumnRefreshOptionsProps {
   columnId: string;
@@ -23,7 +23,11 @@ const ColumnRefreshOptions: React.FC<ColumnRefreshOptionsProps> = ({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" disabled={disabled}>
-          <MoreVertical className="h-4 w-4" />
+          {disabled ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <MoreVertical className="h-4 w-4" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

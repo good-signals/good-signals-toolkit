@@ -35,6 +35,7 @@ export const useTerritoryScoring = () => {
 
   const {
     isRefreshing,
+    refreshStartTime,
     refreshColumn: refreshColumnOperation,
     applyManualOverride: applyOverride,
     toggleColumnInSignalScore: toggleColumn,
@@ -298,7 +299,30 @@ export const useTerritoryScoring = () => {
 
   const refreshColumn = async (columnId: string, type: 'all' | 'na-only', cbsaData: CBSAData[]) => {
     if (!currentAnalysis) return;
-    const updatedAnalysis = await refreshColumnOperation(columnId, type, cbsaData, currentAnalysis);
+    
+    const updatedAnalysis = await refreshColumnOperation(
+      columnId, 
+      type, 
+      cbsaData, 
+      currentAnalysis,
+      // onRefreshStart callback
+      (startTime: number) => {
+        setIsLoading(true);
+        setAnalysisStartTime(startTime);
+        const column = currentAnalysis.criteriaColumns.find(c => c.id === columnId);
+        if (column) {
+          setAnalysisMode(column.analysisMode || 'detailed');
+          const duration = estimateAnalysisDuration(column.prompt, cbsaData.length, column.analysisMode || 'detailed');
+          setEstimatedDuration(duration);
+        }
+      },
+      // onRefreshEnd callback
+      () => {
+        setIsLoading(false);
+        setAnalysisStartTime(null);
+      }
+    );
+    
     if (updatedAnalysis) {
       setCurrentAnalysis(updatedAnalysis);
     }
@@ -363,10 +387,10 @@ export const useTerritoryScoring = () => {
   }, []);
 
   return {
-    isLoading,
+    isLoading: isLoading || isRefreshing,
     currentAnalysis,
     error,
-    analysisStartTime,
+    analysisStartTime: analysisStartTime || refreshStartTime,
     analysisMode,
     estimatedDuration,
     isRefreshing,
