@@ -37,6 +37,8 @@ export const useTerritoryScoring = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<'fast' | 'detailed'>('detailed');
+  const [estimatedDuration, setEstimatedDuration] = useState<number>(75);
   const analysisRequestRef = useRef<AbortController | null>(null);
 
   // Check for in-progress analysis on mount
@@ -48,15 +50,15 @@ export const useTerritoryScoring = () => {
         console.log('Found saved analysis state:', analysisState);
         
         if (analysisState.status === 'running') {
-          // Check if analysis has been running too long (timeout after 5 minutes)
+          // Check if analysis has been running too long (timeout after 12 minutes now)
           const elapsed = Date.now() - analysisState.startTime;
-          if (elapsed > 5 * 60 * 1000) {
+          if (elapsed > 12 * 60 * 1000) {
             console.log('Analysis timed out, cleaning up stale state');
             localStorage.removeItem(ANALYSIS_STATE_KEY);
             
             toast({
               title: "Analysis Timed Out",
-              description: "Your previous analysis took too long and was cancelled. Please try again.",
+              description: "Your previous analysis took too long and was cancelled. Please try again with a simpler prompt or use Fast Analysis mode.",
               variant: "destructive",
             });
             return;
@@ -93,13 +95,102 @@ export const useTerritoryScoring = () => {
     }
   }, [currentAnalysis]);
 
-  const runScoring = async (prompt: string, cbsaData: CBSAData[]) => {
+  // Estimate analysis duration based on complexity
+  const estimateAnalysisDuration = (prompt: string, marketCount: number, mode: 'fast' | 'detailed') => {
+    const baseTime = mode === 'fast' ? 30 : 75;
+    const complexityMultiplier = prompt.length > 200 ? 1.3 : 1;
+    const marketMultiplier = marketCount > 75 ? 1.2 : 1;
+    
+    return Math.round(baseTime * complexityMultiplier * marketMultiplier);
+  };
+
+  // Process markets in chunks to avoid timeouts
+  const processMarketsInChunks = async (prompt: string, cbsaData: CBSAData[], analysisId: string, mode: 'fast' | 'detailed') => {
+    const chunkSize = mode === 'fast' ? 50 : 30; // Smaller chunks for detailed analysis
+    const chunks = [];
+    
+    for (let i = 0; i < cbsaData.length; i += chunkSize) {
+      chunks.push(cbsaData.slice(i, i + chunkSize));
+    }
+
+    console.log(`Processing ${cbsaData.length} markets in ${chunks.length} chunks of ~${chunkSize} markets each`);
+    
+    let allScores: any[] = [];
+    let combinedSummary = '';
+    let suggestedTitle = '';
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
+      
+      const { data, error } = await supabase.functions.invoke('territory-scoring', {
+        body: {
+          userPrompt: prompt,
+          cbsaData: chunk,
+          analysisMode: mode,
+          isChunked: chunks.length > 1,
+          chunkIndex: i,
+          totalChunks: chunks.length
+        }
+      });
+
+      if (error) {
+        throw new Error(`Chunk ${i + 1} failed: ${error.message}`);
+      }
+
+      if (!data.success) {
+        throw new Error(`Chunk ${i + 1} returned error: ${data.error}`);
+      }
+
+      allScores = [...allScores, ...data.data.scores];
+      
+      if (i === 0) {
+        // Use the first chunk's summary and title
+        combinedSummary = data.data.prompt_summary;
+        suggestedTitle = data.data.suggested_title;
+      }
+
+      // Update progress toast
+      if (chunks.length > 1) {
+        toast({
+          title: "Processing Markets",
+          description: `Completed ${i + 1} of ${chunks.length} chunks (${allScores.length}/${cbsaData.length} markets scored)`,
+        });
+      }
+    }
+
+    return {
+      suggested_title: suggestedTitle,
+      prompt_summary: combinedSummary,
+      scores: allScores
+    };
+  };
+
+  // Retry with simpler analysis if detailed fails
+  const retryWithSimpleAnalysis = async (prompt: string, cbsaData: CBSAData[], analysisId: string) => {
+    console.log('Retrying with fast analysis mode after timeout...');
+    
+    toast({
+      title: "Switching to Fast Analysis",
+      description: "Detailed analysis timed out. Trying with faster mode...",
+    });
+
+    setAnalysisMode('fast');
+    const newDuration = estimateAnalysisDuration(prompt, cbsaData.length, 'fast');
+    setEstimatedDuration(newDuration);
+
+    return await processMarketsInChunks(prompt, cbsaData, analysisId, 'fast');
+  };
+
+  const runScoring = async (prompt: string, cbsaData: CBSAData[], mode: 'fast' | 'detailed' = 'detailed') => {
     console.log('Starting territory scoring analysis...');
     console.log('Prompt:', prompt);
     console.log('Markets to analyze:', cbsaData.length);
+    console.log('Analysis mode:', mode);
     
     setIsLoading(true);
     setError(null);
+    setAnalysisMode(mode);
     
     // Cancel any existing request
     if (analysisRequestRef.current) {
@@ -109,6 +200,10 @@ export const useTerritoryScoring = () => {
     const analysisId = crypto.randomUUID();
     const startTime = Date.now();
     setAnalysisStartTime(startTime);
+
+    // Estimate duration and provide user feedback
+    const duration = estimateAnalysisDuration(prompt, cbsaData.length, mode);
+    setEstimatedDuration(duration);
 
     // Create new abort controller for this request
     analysisRequestRef.current = new AbortController();
@@ -125,13 +220,50 @@ export const useTerritoryScoring = () => {
     localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(analysisState));
     console.log('Saved analysis state to localStorage:', analysisId);
 
+    // Show initial feedback with estimated time
+    toast({
+      title: `Starting ${mode === 'fast' ? 'Fast' : 'Detailed'} Analysis`,
+      description: `Estimated completion time: ${Math.round(duration / 60)} minutes. Analyzing ${cbsaData.length} markets...`,
+    });
+
     try {
-      const { data, error } = await supabase.functions.invoke('territory-scoring', {
-        body: {
-          userPrompt: prompt,
-          cbsaData: cbsaData
+      let aiResponse: AIScoreResponse;
+
+      try {
+        // Try main analysis approach first
+        if (cbsaData.length > 50 || mode === 'fast') {
+          // Use chunked processing for large datasets or fast mode
+          aiResponse = await processMarketsInChunks(prompt, cbsaData, analysisId, mode);
+        } else {
+          // Single request for smaller datasets in detailed mode
+          const { data, error } = await supabase.functions.invoke('territory-scoring', {
+            body: {
+              userPrompt: prompt,
+              cbsaData: cbsaData,
+              analysisMode: mode
+            }
+          });
+
+          if (error) {
+            throw new Error(`Analysis failed: ${error.message}`);
+          }
+
+          if (!data.success) {
+            throw new Error(data.error || 'Unknown error occurred');
+          }
+
+          aiResponse = data.data;
         }
-      });
+      } catch (primaryError) {
+        console.error('Primary analysis failed:', primaryError);
+        
+        // If we were doing detailed analysis, try fast mode as fallback
+        if (mode === 'detailed') {
+          aiResponse = await retryWithSimpleAnalysis(prompt, cbsaData, analysisId);
+        } else {
+          throw primaryError;
+        }
+      }
 
       // Check if request was aborted
       if (analysisRequestRef.current?.signal.aborted) {
@@ -139,30 +271,6 @@ export const useTerritoryScoring = () => {
         return;
       }
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(`Analysis failed: ${error.message}`);
-      }
-
-      if (!data.success) {
-        console.error('Function returned error:', data.error);
-        console.error('Error details:', data.details);
-        
-        // Provide more user-friendly error messages
-        let userErrorMessage = data.error || 'Unknown error occurred';
-        
-        if (userErrorMessage.includes('Failed to parse AI response')) {
-          userErrorMessage = 'The AI service returned an unexpected format. Please try again with a simpler prompt.';
-        } else if (userErrorMessage.includes('Perplexity API error')) {
-          userErrorMessage = 'There was an issue connecting to the AI service. Please try again in a moment.';
-        } else if (userErrorMessage.includes('timeout')) {
-          userErrorMessage = 'The analysis is taking longer than expected. Please try again with a more specific prompt.';
-        }
-        
-        throw new Error(userErrorMessage);
-      }
-
-      const aiResponse: AIScoreResponse = data.data;
       console.log('Received AI response:', {
         title: aiResponse.suggested_title,
         scoresCount: aiResponse.scores?.length || 0
@@ -199,14 +307,12 @@ export const useTerritoryScoring = () => {
         console.log('Cleaned up analysis state');
       }, 2000);
       
-      console.log('Analysis completed successfully');
-      console.log('Suggested title:', aiResponse.suggested_title);
-      console.log('Market signal score:', analysis.marketSignalScore);
-      console.log('Number of scored markets:', aiResponse.scores.length);
+      const actualDuration = Math.round((Date.now() - startTime) / 1000);
+      console.log('Analysis completed successfully in', actualDuration, 'seconds');
       
       toast({
         title: "Territory Analysis Complete",
-        description: `Successfully scored ${aiResponse.scores.length} markets for "${aiResponse.suggested_title}" with an average signal score of ${analysis.marketSignalScore}%.`,
+        description: `Successfully scored ${aiResponse.scores.length} markets for "${aiResponse.suggested_title}" in ${Math.round(actualDuration / 60)} minutes with an average signal score of ${analysis.marketSignalScore}%.`,
       });
 
       return analysis;
@@ -219,9 +325,15 @@ export const useTerritoryScoring = () => {
       const failedState = { ...analysisState, status: 'failed' as const };
       localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(failedState));
       
+      // Provide helpful error feedback
+      let userFriendlyMessage = errorMessage;
+      if (errorMessage.includes('timeout') || errorMessage.includes('took too long')) {
+        userFriendlyMessage = `Analysis timed out. Try using Fast Analysis mode or simplifying your prompt. Complex analyses can take up to 12 minutes.`;
+      }
+      
       toast({
         title: "Analysis Failed",
-        description: errorMessage,
+        description: userFriendlyMessage,
         variant: "destructive",
       });
       
@@ -263,6 +375,8 @@ export const useTerritoryScoring = () => {
     setAnalysisStartTime(null);
     setIsLoading(false);
     setError(null);
+    setAnalysisMode('detailed');
+    setEstimatedDuration(75);
     
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(ANALYSIS_STATE_KEY);
@@ -282,8 +396,11 @@ export const useTerritoryScoring = () => {
     currentAnalysis,
     error,
     analysisStartTime,
+    analysisMode,
+    estimatedDuration,
     runScoring,
     updateIncludedColumns,
-    clearAnalysis
+    clearAnalysis,
+    setAnalysisMode
   };
 };

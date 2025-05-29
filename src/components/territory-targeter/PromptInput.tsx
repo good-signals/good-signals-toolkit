@@ -5,26 +5,41 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Target } from 'lucide-react';
 import ProgressCounter from './ProgressCounter';
+import AnalysisModeSelector from './AnalysisModeSelector';
 
 interface PromptInputProps {
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string, mode: 'fast' | 'detailed') => void;
   isLoading: boolean;
   analysisStartTime?: number | null;
+  analysisMode?: 'fast' | 'detailed';
+  estimatedDuration?: number;
   disabled?: boolean;
+  onModeChange?: (mode: 'fast' | 'detailed') => void;
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({ 
   onSubmit, 
   isLoading, 
   analysisStartTime,
-  disabled = false 
+  analysisMode = 'detailed',
+  estimatedDuration = 75,
+  disabled = false,
+  onModeChange
 }) => {
   const [prompt, setPrompt] = useState('');
+  const [selectedMode, setSelectedMode] = useState<'fast' | 'detailed'>(analysisMode);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (prompt.trim() && !isLoading) {
-      onSubmit(prompt.trim());
+      onSubmit(prompt.trim(), selectedMode);
+    }
+  };
+
+  const handleModeChange = (mode: 'fast' | 'detailed') => {
+    setSelectedMode(mode);
+    if (onModeChange) {
+      onModeChange(mode);
     }
   };
 
@@ -44,6 +59,15 @@ const PromptInput: React.FC<PromptInputProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Analysis Mode Selector */}
+        {!isLoading && (
+          <AnalysisModeSelector
+            selectedMode={selectedMode}
+            onModeChange={handleModeChange}
+            disabled={disabled}
+          />
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="scoring-prompt" className="block text-sm font-medium mb-2">
@@ -65,7 +89,10 @@ const PromptInput: React.FC<PromptInputProps> = ({
               disabled={!prompt.trim() || isLoading || disabled}
               className="whitespace-nowrap"
             >
-              {isLoading ? 'Analyzing Markets...' : 'Score Markets'}
+              {isLoading 
+                ? `Analyzing Markets (${selectedMode})...` 
+                : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
+              }
             </Button>
             
             <div className="text-sm text-muted-foreground">
@@ -84,8 +111,9 @@ const PromptInput: React.FC<PromptInputProps> = ({
         {/* Progress Counter */}
         <ProgressCounter 
           isActive={isLoading} 
-          duration={75}
+          duration={estimatedDuration}
           startTime={analysisStartTime}
+          analysisMode={selectedMode}
         />
       </CardContent>
     </Card>

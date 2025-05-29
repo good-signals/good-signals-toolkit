@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,17 @@ import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSele
 const TerritoryTargeterPage = () => {
   const { user } = useAuth();
   const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
-  const { isLoading, currentAnalysis, error, analysisStartTime, runScoring, clearAnalysis } = useTerritoryScoring();
+  const { 
+    isLoading, 
+    currentAnalysis, 
+    error, 
+    analysisStartTime, 
+    analysisMode,
+    estimatedDuration,
+    runScoring, 
+    clearAnalysis,
+    setAnalysisMode
+  } = useTerritoryScoring();
 
   // Load saved statuses from localStorage on component mount
   useEffect(() => {
@@ -35,9 +46,9 @@ const TerritoryTargeterPage = () => {
     }
   }, []);
 
-  const handlePromptSubmit = async (prompt: string) => {
+  const handlePromptSubmit = async (prompt: string, mode: 'fast' | 'detailed' = 'detailed') => {
     try {
-      await runScoring(prompt, cbsaData);
+      await runScoring(prompt, cbsaData, mode);
     } catch (err) {
       console.error('Failed to run scoring:', err);
     }
@@ -116,7 +127,10 @@ const TerritoryTargeterPage = () => {
         onSubmit={handlePromptSubmit}
         isLoading={isLoading}
         analysisStartTime={analysisStartTime}
+        analysisMode={analysisMode}
+        estimatedDuration={estimatedDuration}
         disabled={!user}
+        onModeChange={setAnalysisMode}
       />
 
       {/* Error Display */}

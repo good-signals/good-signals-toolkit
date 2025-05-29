@@ -1,19 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { Progress } from '@/components/ui/progress';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Clock, Zap } from 'lucide-react';
 
 interface ProgressCounterProps {
   isActive: boolean;
   duration?: number; // Duration in seconds
   startTime?: number | null; // Unix timestamp when analysis started
+  analysisMode?: 'fast' | 'detailed';
   onComplete?: () => void;
 }
 
 const ProgressCounter: React.FC<ProgressCounterProps> = ({ 
   isActive, 
-  duration = 75, // Updated to 75 seconds (middle of 60-90 range)
+  duration = 75,
   startTime,
+  analysisMode = 'detailed',
   onComplete 
 }) => {
   const [progress, setProgress] = useState(0);
@@ -88,7 +90,39 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
   };
 
+  const getEstimatedRemaining = () => {
+    if (timeElapsed >= duration) return '0s';
+    const remaining = duration - timeElapsed;
+    return formatTime(remaining);
+  };
+
   const isCompleted = !isActive && progress === 100;
+  const isOvertime = timeElapsed > duration && isActive;
+
+  const getStatusText = () => {
+    if (isCompleted) return 'Analysis complete!';
+    if (isOvertime) return 'Analysis taking longer than expected...';
+    if (isResumed) return `Analysis resumed - AI analyzing markets (${analysisMode} mode)...`;
+    return `AI analyzing markets (${analysisMode} mode)...`;
+  };
+
+  const getDescriptionText = () => {
+    if (isCompleted) {
+      return 'Market scores have been generated and added to the table below.';
+    }
+    if (isOvertime) {
+      return 'Complex analyses can take longer than estimated. Your analysis is still running and will complete soon.';
+    }
+    if (isResumed) {
+      return `Your ${analysisMode} analysis continued running in the background. Estimated remaining: ${getEstimatedRemaining()}.`;
+    }
+    
+    const timeInfo = analysisMode === 'fast' 
+      ? 'This typically takes 30-60 seconds'
+      : 'This typically takes 60-90 seconds';
+    
+    return `Perplexity AI is researching and scoring each market based on your criteria. ${timeInfo}. Estimated remaining: ${getEstimatedRemaining()}.`;
+  };
 
   return (
     <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
@@ -98,32 +132,40 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
             <div className="h-2 w-2 bg-white rounded-full"></div>
           </div>
         ) : (
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            {analysisMode === 'fast' ? (
+              <Zap className="h-4 w-4 text-yellow-500" />
+            ) : (
+              <Clock className="h-4 w-4 text-blue-500" />
+            )}
+          </div>
         )}
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium">
-              {isCompleted 
-                ? 'Analysis complete!' 
-                : isResumed 
-                  ? 'Analysis resumed - AI analyzing markets...'
-                  : 'AI analyzing markets...'
-              }
+              {getStatusText()}
             </span>
-            <span className="text-sm text-muted-foreground">
-              {formatTime(timeElapsed)}
-            </span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{formatTime(timeElapsed)}</span>
+              {!isCompleted && !isOvertime && (
+                <span className="text-xs">/ ~{formatTime(duration)}</span>
+              )}
+            </div>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress 
+            value={progress} 
+            className={`h-2 ${isOvertime ? 'opacity-75' : ''}`} 
+          />
+          {isOvertime && (
+            <div className="mt-1 text-xs text-yellow-600">
+              Taking longer than expected...
+            </div>
+          )}
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        {isCompleted 
-          ? 'Market scores have been generated and added to the table below.'
-          : isResumed
-            ? 'Your analysis continued running in the background. This typically takes 60-90 seconds total.'
-            : 'Perplexity AI is researching and scoring each market based on your criteria. This typically takes 60-90 seconds.'
-        }
+        {getDescriptionText()}
       </div>
     </div>
   );
