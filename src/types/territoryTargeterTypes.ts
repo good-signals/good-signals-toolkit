@@ -4,6 +4,7 @@ export interface CBSAData {
   name: string;
   state: string;
   population: number;
+  populationGrowth: number; // Growth rate as decimal (e.g., 0.0606 for 6.06%)
   rank: number;
 }
 

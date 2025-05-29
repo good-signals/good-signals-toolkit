@@ -8,6 +8,11 @@ export interface TerritoryExportData {
   analysis: TerritoryAnalysis;
 }
 
+const formatPopulationGrowth = (growth: number) => {
+  const percentage = (growth * 100).toFixed(2);
+  return growth >= 0 ? `+${percentage}%` : `${percentage}%`;
+};
+
 export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): void => {
   const { cbsaData, scores, analysis } = exportData;
 
@@ -18,6 +23,7 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
       'CBSA Name': cbsa.name,
       'State': cbsa.state,
       'Population': cbsa.population,
+      'Population Growth': formatPopulationGrowth(cbsa.populationGrowth),
       'Score': scoreData?.score || 'N/A',
       'AI Reasoning': scoreData?.reasoning || 'No score available'
     };

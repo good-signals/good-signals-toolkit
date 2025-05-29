@@ -16,7 +16,7 @@ interface CBSATableProps {
 }
 
 type SortConfig = {
-  key: 'name' | 'state' | 'population' | 'score' | 'reasoning';
+  key: 'name' | 'state' | 'population' | 'populationGrowth' | 'score' | 'reasoning';
   direction: 'asc' | 'desc';
 } | null;
 
@@ -31,6 +31,18 @@ const getScorePillClasses = (signalStatus: { text: string; color: string; iconCo
     default:
       return 'bg-gray-400 text-white';
   }
+};
+
+const formatPopulationGrowth = (growth: number) => {
+  const percentage = (growth * 100).toFixed(2);
+  return growth >= 0 ? `+${percentage}%` : `${percentage}%`;
+};
+
+const getGrowthColor = (growth: number) => {
+  if (growth > 0.03) return 'text-green-600'; // Above 3% growth
+  if (growth > 0) return 'text-green-500'; // Positive growth
+  if (growth > -0.01) return 'text-yellow-600'; // Slight decline
+  return 'text-red-500'; // Significant decline
 };
 
 const CBSATable: React.FC<CBSATableProps> = ({
@@ -134,7 +146,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
                   {getSortIcon('name')}
                 </Button>
               </TableHead>
-              <TableHead className="w-[100px]">
+              <TableHead className="w-[80px]">
                 <Button 
                   variant="ghost" 
                   onClick={() => handleSort('state')}
@@ -152,6 +164,16 @@ const CBSATable: React.FC<CBSATableProps> = ({
                 >
                   Population
                   {getSortIcon('population')}
+                </Button>
+              </TableHead>
+              <TableHead className="w-[100px] text-right">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('populationGrowth')}
+                  className="h-auto p-0 font-medium"
+                >
+                  Growth
+                  {getSortIcon('populationGrowth')}
                 </Button>
               </TableHead>
               <TableHead className="w-[100px] text-center">
@@ -185,6 +207,9 @@ const CBSATable: React.FC<CBSATableProps> = ({
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{row.state}</TableCell>
                   <TableCell className="text-right">{row.population.toLocaleString()}</TableCell>
+                  <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
+                    {formatPopulationGrowth(row.populationGrowth)}
+                  </TableCell>
                   <TableCell className="text-center">
                     {row.score !== null ? (
                       <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(signalStatus)}`}>
