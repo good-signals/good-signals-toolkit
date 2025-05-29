@@ -1,3 +1,4 @@
+
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -124,14 +125,33 @@ const addGoodSignalsLogo = async (pdf: jsPDF): Promise<void> => {
   }
 };
 
-// Generate Google Maps static image URL
-const generateMapImageUrl = (latitude: number, longitude: number): string => {
-  const apiKey = 'YOUR_GOOGLE_MAPS_API_KEY'; // This would need to be configured
-  const zoom = 15;
-  const size = '600x300';
-  const marker = `color:red|${latitude},${longitude}`;
-  
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=${zoom}&size=${size}&markers=${marker}&key=${apiKey}`;
+// Generate Google Maps static image URL using Supabase edge function
+const generateMapImageUrl = async (latitude: number, longitude: number): Promise<string | null> => {
+  try {
+    const response = await fetch('https://thfphcgufrygruqoekvz.supabase.co/functions/v1/generate-map-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoZnBoY2d1ZnJ5Z3J1cW9la3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgzMTIwNDEsImV4cCI6MjA2Mzg4ODA0MX0.i10fd7Ix3fTnAFEIVjIw8b9w0R8TPHsSI62Fr61XNto'}`,
+      },
+      body: JSON.stringify({
+        latitude,
+        longitude,
+        zoom: 15,
+        size: '600x300',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate map image');
+    }
+
+    const data = await response.json();
+    return data.imageUrl;
+  } catch (error) {
+    console.error('Error generating map image:', error);
+    return null;
+  }
 };
 
 // Generate PDF header with logo
@@ -261,11 +281,12 @@ const generateOverviewPage = async (
   addPDFFooter(pdf);
 };
 
-// Generate location map page
+// Generate location map page with Google Maps integration
 const generateLocationMapPage = async (
   pdf: jsPDF,
   assessment: SiteAssessment,
-  pageNumber: number
+  pageNumber: number,
+  options: ExportOptions
 ): Promise<void> => {
   pdf.addPage();
   await addPDFHeader(pdf, assessment, pageNumber);
@@ -288,16 +309,34 @@ const generateLocationMapPage = async (
     pdf.text(`Coordinates: ${assessment.latitude}, ${assessment.longitude}`, 20, yPos);
     yPos += 20;
     
-    // Try to add map image (placeholder for now since we need Google Maps API key)
-    pdf.setFontSize(10);
-    pdf.text('Map would be displayed here with Google Maps integration', 20, yPos);
-    yPos += 10;
-    pdf.text('(Requires Google Maps API key configuration)', 20, yPos);
-    
-    // Add a simple rectangle as placeholder for the map
-    pdf.setDrawColor(200);
-    pdf.rect(20, yPos + 10, 170, 100);
-    pdf.text('Site Location Map', 95, yPos + 65);
+    // Add map image if images are enabled in export options
+    if (options.includeImages) {
+      try {
+        const mapImageUrl = await generateMapImageUrl(
+          Number(assessment.latitude),
+          Number(assessment.longitude)
+        );
+        
+        if (mapImageUrl) {
+          yPos = await addImageToPDF(pdf, mapImageUrl, 20, yPos, 170, 100);
+        } else {
+          // Fallback if map image generation fails
+          pdf.setFontSize(10);
+          pdf.text('Map image could not be generated', 20, yPos);
+          yPos += 15;
+        }
+      } catch (error) {
+        console.error('Error adding map to PDF:', error);
+        pdf.setFontSize(10);
+        pdf.text('Map image could not be generated', 20, yPos);
+        yPos += 15;
+      }
+    } else {
+      // Map disabled in export options
+      pdf.setFontSize(10);
+      pdf.text('Map display disabled in export options', 20, yPos);
+      yPos += 15;
+    }
   }
   
   addPDFFooter(pdf);
@@ -494,7 +533,7 @@ export const exportAssessmentToPDF = async (
   
   // Generate location map page if coordinates exist
   if (assessment.latitude && assessment.longitude) {
-    await generateLocationMapPage(pdf, assessment, pageNumber);
+    await generateLocationMapPage(pdf, assessment, pageNumber, options);
     pageNumber++;
   }
   
