@@ -179,9 +179,9 @@ const CBSATable: React.FC<CBSATableProps> = ({
         </p>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <Table>
+      {/* Table with frozen header and first column */}
+      <div className="relative max-h-[600px] overflow-auto border rounded-lg">
+        <Table className="relative">
           <CBSATableHeader 
             hasScores={hasScores}
             criteriaColumns={criteriaColumns}
@@ -189,6 +189,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
             onSort={handleSort}
             onRefreshColumn={handleRefreshColumn}
             refreshingColumnId={refreshingColumnId}
+            className="sticky top-0 z-20 bg-background"
           />
           <TableBody>
             {sortedData.map((row) => (

@@ -67,7 +67,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
 
   return (
     <TableRow key={row.id}>
-      <TableCell className="font-medium">{row.name}</TableCell>
+      <TableCell className="font-medium sticky left-0 z-10 bg-background border-r">{row.name}</TableCell>
       <TableCell>{row.state}</TableCell>
       <TableCell>{row.region}</TableCell>
       <TableCell>

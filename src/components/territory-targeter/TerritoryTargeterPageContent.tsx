@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/useUser';
@@ -255,10 +256,10 @@ const TerritoryTargeterPageContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 py-8 max-w-none">
         <TerritoryHeader />
         
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="mx-auto space-y-6">
           <TerritoryNotices 
             user={user}
             cbsaDataLength={cbsaData.length || 100}

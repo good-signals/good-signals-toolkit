@@ -5,6 +5,7 @@ import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { CriteriaColumn } from '@/types/territoryTargeterTypes';
 import ColumnRefreshOptions from '../ColumnRefreshOptions';
+import { cn } from '@/lib/utils';
 
 export type SortConfig = {
   key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'status' | 'marketSignalScore' | string;
@@ -18,6 +19,7 @@ interface CBSATableHeaderProps {
   onSort: (key: SortConfig['key']) => void;
   onRefreshColumn?: (columnId: string, type: 'all' | 'na-only') => void;
   refreshingColumnId?: string | null;
+  className?: string;
 }
 
 const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
@@ -26,7 +28,8 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
   sortConfig,
   onSort,
   onRefreshColumn,
-  refreshingColumnId = null
+  refreshingColumnId = null,
+  className
 }) => {
   const getSortIcon = (key: SortConfig['key']) => {
     if (sortConfig?.key !== key) {
@@ -40,9 +43,9 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
   const showMarketSignalScore = hasScores && criteriaColumns.length > 1;
 
   return (
-    <TableHeader>
+    <TableHeader className={cn(className)}>
       <TableRow>
-        <TableHead className="w-[200px]">
+        <TableHead className="w-[200px] sticky left-0 z-10 bg-background border-r">
           <Button 
             variant="ghost" 
             onClick={() => onSort('name')}
