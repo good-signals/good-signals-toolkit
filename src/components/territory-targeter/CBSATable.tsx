@@ -189,7 +189,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
             onSort={handleSort}
             onRefreshColumn={handleRefreshColumn}
             refreshingColumnId={refreshingColumnId}
-            className="sticky top-0 z-20 bg-background"
+            className="sticky top-0 z-30 bg-background shadow-sm"
           />
           <TableBody>
             {sortedData.map((row, index) => (
