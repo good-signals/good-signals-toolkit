@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { TargetMetricSet } from '@/types/targetMetrics';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
-import { updateAssessmentScores } from '@/services/siteAssessmentService';
+import { updateAssessmentScores } from './siteAssessmentService';
 
 interface MetricScoreData {
   enteredValue: number | null;
@@ -112,10 +112,15 @@ export const recalculateAssessmentScoresForMetricSet = async (
 };
 
 export const invalidateAssessmentQueries = (queryClient: any, metricSetId: string) => {
-  // Invalidate all assessment-related queries when metric set is updated
-  queryClient.invalidateQueries({ queryKey: ['site-assessments'] });
-  queryClient.invalidateQueries({ queryKey: ['assessment-details'] });
-  queryClient.invalidateQueries({ queryKey: ['target-metric-set', metricSetId] });
-  
-  console.log('Invalidated assessment queries for metric set:', metricSetId);
+  try {
+    // Invalidate all assessment-related queries when metric set is updated
+    queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
+    queryClient.invalidateQueries({ queryKey: ['assessmentDetails'] });
+    queryClient.invalidateQueries({ queryKey: ['targetMetricSetForDetailsView'] });
+    queryClient.invalidateQueries({ queryKey: ['userAdminAccounts'] });
+    
+    console.log('Invalidated assessment queries for metric set:', metricSetId);
+  } catch (error) {
+    console.error('Error invalidating queries:', error);
+  }
 };

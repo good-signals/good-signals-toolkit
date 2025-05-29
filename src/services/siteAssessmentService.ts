@@ -19,12 +19,18 @@ import {
 import { saveAssessmentMetricValues, getAssessmentMetricValues } from './siteAssessment/metricValues';
 import { saveSiteVisitRatings, getSiteVisitRatings } from './siteAssessment/siteVisitRatings';
 import { updateAssessmentScores as updateScores } from './siteAssessment/scoring';
+import { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary } from './siteAssessment/summary';
 
 export const createSiteAssessment = async (
   assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'>,
   userId: string
 ): Promise<SiteAssessment> => {
-  return createSiteAssessmentInDb(assessmentData, userId);
+  try {
+    return await createSiteAssessmentInDb(assessmentData, userId);
+  } catch (error) {
+    console.error('Error creating site assessment:', error);
+    throw error;
+  }
 };
 
 export const updateSiteAssessment = async (
@@ -32,47 +38,77 @@ export const updateSiteAssessment = async (
   updates: { target_metric_set_id?: string; site_status?: string },
   userId: string
 ): Promise<SiteAssessment> => {
-  return updateSiteAssessmentInDb(assessmentId, updates, userId);
+  try {
+    return await updateSiteAssessmentInDb(assessmentId, updates, userId);
+  } catch (error) {
+    console.error('Error updating site assessment:', error);
+    throw error;
+  }
 };
 
 export const deleteSiteAssessment = async (
   assessmentId: string,
   userId: string
 ): Promise<void> => {
-  return deleteSiteAssessmentFromDb(assessmentId, userId);
+  try {
+    return await deleteSiteAssessmentFromDb(assessmentId, userId);
+  } catch (error) {
+    console.error('Error deleting site assessment:', error);
+    throw error;
+  }
 };
 
 export const getSiteAssessmentsForUser = async (userId: string): Promise<SiteAssessment[]> => {
-  return getSiteAssessmentsFromDb(userId);
+  try {
+    return await getSiteAssessmentsFromDb(userId);
+  } catch (error) {
+    console.error('Error getting site assessments for user:', error);
+    throw error;
+  }
 };
 
 export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAssessment> => {
-  const assessment = await getSiteAssessmentFromDb(assessmentId);
-  
-  const [metricValues, siteVisitRatings] = await Promise.all([
-    getAssessmentMetricValues(assessmentId),
-    getSiteVisitRatings(assessmentId)
-  ]);
+  try {
+    const assessment = await getSiteAssessmentFromDb(assessmentId);
+    
+    const [metricValues, siteVisitRatings] = await Promise.all([
+      getAssessmentMetricValues(assessmentId),
+      getSiteVisitRatings(assessmentId)
+    ]);
 
-  return {
-    ...assessment,
-    assessment_metric_values: metricValues,
-    site_visit_ratings: siteVisitRatings,
-  };
+    return {
+      ...assessment,
+      assessment_metric_values: metricValues,
+      site_visit_ratings: siteVisitRatings,
+    };
+  } catch (error) {
+    console.error('Error getting assessment details:', error);
+    throw error;
+  }
 };
 
 export const saveMetricValuesForAssessment = async (
   assessmentId: string,
   metricValues: AssessmentMetricValueInsert[]
 ): Promise<void> => {
-  await saveAssessmentMetricValues(assessmentId, metricValues);
+  try {
+    await saveAssessmentMetricValues(assessmentId, metricValues);
+  } catch (error) {
+    console.error('Error saving metric values:', error);
+    throw error;
+  }
 };
 
 export const saveSiteVisitRatingsForAssessment = async (
   assessmentId: string,
   siteVisitRatings: AssessmentSiteVisitRatingInsert[]
 ): Promise<void> => {
-  await saveSiteVisitRatings(assessmentId, siteVisitRatings);
+  try {
+    await saveSiteVisitRatings(assessmentId, siteVisitRatings);
+  } catch (error) {
+    console.error('Error saving site visit ratings:', error);
+    throw error;
+  }
 };
 
 export const updateAssessmentScores = async (
@@ -80,16 +116,27 @@ export const updateAssessmentScores = async (
   overallSiteSignalScore: number | null,
   completionPercentage: number | null
 ): Promise<SiteAssessment> => {
-  return await updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
+  try {
+    return await updateScores(assessmentId, overallSiteSignalScore, completionPercentage);
+  } catch (error) {
+    console.error('Error updating assessment scores:', error);
+    throw error;
+  }
 };
 
-// New function to update site status
+// Function to update site status
 export const updateSiteStatus = async (
   assessmentId: string,
   siteStatus: string,
   userId: string
 ): Promise<SiteAssessment> => {
-  return updateSiteStatusInDb(assessmentId, siteStatus, userId);
+  try {
+    return await updateSiteStatusInDb(assessmentId, siteStatus, userId);
+  } catch (error) {
+    console.error('Error updating site status:', error);
+    throw error;
+  }
 };
 
-export { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary } from './siteAssessment/summary';
+// Export the summary functions with error handling
+export { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary };
