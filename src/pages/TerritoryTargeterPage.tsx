@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSele
 import { safeStorage } from '@/utils/safeStorage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
 
 const EXECUTIVE_SUMMARY_STORAGE_KEY = 'territoryTargeter_executiveSummary';
 
@@ -24,6 +26,8 @@ const TerritoryTargeterPageContent = () => {
   const { user } = useAuth();
   const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [executiveSummary, setExecutiveSummary] = useState<string>(() => {
     // Load saved executive summary from localStorage
     const saved = safeStorage.getItem(EXECUTIVE_SUMMARY_STORAGE_KEY);
@@ -49,6 +53,32 @@ const TerritoryTargeterPageContent = () => {
     clearAnalysis,
     setAnalysisMode
   } = useTerritoryScoring();
+  
+  // Fetch user accounts on component mount
+  useEffect(() => {
+    const loadAccounts = async () => {
+      if (!user?.id) {
+        setIsLoadingAccounts(false);
+        return;
+      }
+
+      try {
+        const userAccounts = await fetchUserAccountsWithAdminRole(user.id);
+        setAccounts(userAccounts);
+      } catch (error) {
+        console.error('Failed to fetch user accounts:', error);
+        toast({
+          title: "Account Loading Failed",
+          description: "Could not load account settings. Using default signal thresholds.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingAccounts(false);
+      }
+    };
+
+    loadAccounts();
+  }, [user?.id]);
   
   // Save executive summary to localStorage whenever it changes
   useEffect(() => {
@@ -85,6 +115,11 @@ const TerritoryTargeterPageContent = () => {
       setIsInitialized(true);
     }
   }, []);
+
+  // Get account signal thresholds (use first account's thresholds or defaults)
+  const currentAccount = accounts.length > 0 ? accounts[0] : null;
+  const accountGoodThreshold = currentAccount?.signal_good_threshold ?? 0.75;
+  const accountBadThreshold = currentAccount?.signal_bad_threshold ?? 0.50;
 
   const handlePromptSubmit = async (prompt: string, mode: 'fast' | 'detailed' = 'detailed') => {
     try {
@@ -218,7 +253,7 @@ const TerritoryTargeterPageContent = () => {
     : 0;
 
   // Show loading state while initializing
-  if (!isInitialized) {
+  if (!isInitialized || isLoadingAccounts) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="text-center">
@@ -260,6 +295,18 @@ const TerritoryTargeterPageContent = () => {
             Please sign in to use the Territory Targeter tool.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Signal Settings Info */}
+      {currentAccount && (
+        <div className="mb-6">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Using account signal settings: Good ≥ {Math.round(accountGoodThreshold * 100)}%, Bad ≤ {Math.round(accountBadThreshold * 100)}%
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {/* 1. Prompt Input */}
@@ -324,8 +371,8 @@ const TerritoryTargeterPageContent = () => {
         cbsaData={cbsaData}
         criteriaColumns={currentAnalysis?.criteriaColumns || []}
         marketSignalScore={averageMarketSignalScore}
-        accountGoodThreshold={0.75}
-        accountBadThreshold={0.50}
+        accountGoodThreshold={accountGoodThreshold}
+        accountBadThreshold={accountBadThreshold}
         onStatusChange={handleStatusChange}
         onManualScoreOverride={handleManualScoreOverride}
         onRefreshColumn={handleRefreshColumn}
