@@ -1,4 +1,3 @@
-
 import { CBSAData, CBSAScore, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
 import { format } from 'date-fns';
 
@@ -22,6 +21,7 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
     return {
       'CBSA Name': cbsa.name,
       'State': cbsa.state,
+      'Region': cbsa.region,
       'Population': cbsa.population,
       'Population Growth': formatPopulationGrowth(cbsa.populationGrowth),
       'Score': scoreData?.score || 'N/A',

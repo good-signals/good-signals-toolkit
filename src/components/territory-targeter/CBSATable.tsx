@@ -16,7 +16,7 @@ interface CBSATableProps {
 }
 
 type SortConfig = {
-  key: 'name' | 'state' | 'population' | 'populationGrowth' | 'score' | 'reasoning';
+  key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'score' | 'reasoning';
   direction: 'asc' | 'desc';
 } | null;
 
@@ -159,6 +159,16 @@ const CBSATable: React.FC<CBSATableProps> = ({
                   {getSortIcon('state')}
                 </Button>
               </TableHead>
+              <TableHead className="w-[120px]">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleSort('region')}
+                  className="h-auto p-0 font-medium"
+                >
+                  Region
+                  {getSortIcon('region')}
+                </Button>
+              </TableHead>
               <TableHead className="w-[120px] text-right">
                 <Button 
                   variant="ghost" 
@@ -213,6 +223,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
                 <TableRow key={row.id}>
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{row.state}</TableCell>
+                  <TableCell>{row.region}</TableCell>
                   <TableCell className="text-right">{row.population.toLocaleString()}</TableCell>
                   <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
                     {formatPopulationGrowth(row.populationGrowth)}
