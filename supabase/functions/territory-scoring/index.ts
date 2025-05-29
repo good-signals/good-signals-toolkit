@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced JSON extraction with multiple recovery strategies
+// Enhanced JSON extraction with aggressive cleaning and multiple recovery strategies
 function extractJSON(text: string): any {
   console.log('Attempting to extract JSON from OpenAI response...');
   console.log('Response length:', text.length);
@@ -51,24 +51,8 @@ function extractJSON(text: string): any {
     try {
       let jsonStr = jsonMatch[0];
       
-      // Clean up common JSON issues more aggressively
-      jsonStr = jsonStr
-        // Remove any trailing text after the last }
-        .replace(/}\s*[^}]*$/, '}')
-        // Fix trailing commas
-        .replace(/,(\s*[}\]])/g, '$1')
-        // Fix missing commas between objects
-        .replace(/}\s*{/g, '},{')
-        // Fix missing commas between array elements
-        .replace(/}\s*\]/g, '}]')
-        // Fix unescaped quotes in strings (basic attempt)
-        .replace(/([^\\])"/g, '$1\\"')
-        // Fix the fix above for legitimate JSON quotes
-        .replace(/\\":/g, '":')
-        .replace(/:\s*\\"/g, ': "')
-        .replace(/,\s*\\"/g, ', "')
-        .replace(/{\s*\\"/g, '{ "')
-        .replace(/\[\s*\\"/g, '[ "');
+      // Enhanced JSON cleaning with multiple passes
+      jsonStr = cleanJsonString(jsonStr);
       
       const parsed = JSON.parse(jsonStr);
       console.log('Successfully parsed cleaned JSON object');
@@ -76,19 +60,23 @@ function extractJSON(text: string): any {
     } catch (e) {
       console.log('Failed to parse JSON object after cleaning:', e.message);
       
-      // Strategy 4: Try to extract key components manually
+      // Strategy 4: Try to fix incomplete JSON structures
+      try {
+        console.log('Attempting aggressive JSON repair...');
+        const repairedJson = repairIncompleteJson(jsonMatch[0]);
+        const parsed = JSON.parse(repairedJson);
+        console.log('Successfully parsed repaired JSON');
+        return parsed;
+      } catch (repairError) {
+        console.log('JSON repair also failed:', repairError.message);
+      }
+      
+      // Strategy 5: Try to extract key components manually
       try {
         console.log('Attempting manual JSON reconstruction');
-        const titleMatch = cleanedText.match(/"suggested_title":\s*"([^"]+)"/);
-        const summaryMatch = cleanedText.match(/"prompt_summary":\s*"([^"]+)"/);
-        
-        if (titleMatch && summaryMatch) {
-          console.log('Found basic components, creating minimal valid response');
-          return {
-            suggested_title: titleMatch[1],
-            prompt_summary: summaryMatch[1],
-            scores: []
-          };
+        const manualResult = extractManualComponents(cleanedText);
+        if (manualResult) {
+          return manualResult;
         }
       } catch (manualError) {
         console.log('Manual extraction also failed:', manualError.message);
@@ -96,7 +84,7 @@ function extractJSON(text: string): any {
     }
   }
 
-  // Strategy 5: Try to parse the entire text as JSON (last resort)
+  // Strategy 6: Try to parse the entire text as JSON (last resort)
   try {
     console.log('Attempting to parse entire response as JSON');
     const parsed = JSON.parse(cleanedText);
@@ -110,14 +98,97 @@ function extractJSON(text: string): any {
   throw new Error('Unable to extract valid JSON from OpenAI response. The AI may have provided malformed output.');
 }
 
-// Enhanced validation with detailed error reporting
-function validateResponse(data: any): { isValid: boolean; errors: string[] } {
+// Enhanced JSON cleaning function
+function cleanJsonString(jsonStr: string): string {
+  return jsonStr
+    // Remove any trailing text after the last }
+    .replace(/}\s*[^}]*$/, '}')
+    // Fix trailing commas
+    .replace(/,(\s*[}\]])/g, '$1')
+    // Fix missing commas between objects
+    .replace(/}\s*{/g, '},{')
+    // Fix missing commas between array elements
+    .replace(/}\s*\]/g, '}]')
+    // Fix incomplete string values (remove quotes that aren't properly closed)
+    .replace(/"[^"]*$/g, '""')
+    // Fix empty property values
+    .replace(/:\s*""\s*""/g, ': ""')
+    // Remove incomplete properties at the end
+    .replace(/,\s*"[^"]*"?\s*:\s*"?[^"}]*$/, '')
+    // Ensure proper closing
+    .replace(/[^}]*$/, '}');
+}
+
+// Repair incomplete JSON structures
+function repairIncompleteJson(jsonStr: string): string {
+  console.log('Attempting to repair incomplete JSON...');
+  
+  // Count opening and closing braces
+  const openBraces = (jsonStr.match(/\{/g) || []).length;
+  const closeBraces = (jsonStr.match(/\}/g) || []).length;
+  
+  // Count opening and closing brackets
+  const openBrackets = (jsonStr.match(/\[/g) || []).length;
+  const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+  
+  let repaired = jsonStr;
+  
+  // Add missing closing brackets
+  for (let i = 0; i < openBrackets - closeBrackets; i++) {
+    repaired += ']';
+  }
+  
+  // Add missing closing braces
+  for (let i = 0; i < openBraces - closeBraces; i++) {
+    repaired += '}';
+  }
+  
+  // Clean up any trailing commas or incomplete entries
+  repaired = cleanJsonString(repaired);
+  
+  console.log('Repaired JSON structure');
+  return repaired;
+}
+
+// Extract components manually as fallback
+function extractManualComponents(text: string): any | null {
+  console.log('Extracting components manually...');
+  
+  const titleMatch = text.match(/"suggested_title":\s*"([^"]+)"/);
+  const summaryMatch = text.match(/"prompt_summary":\s*"([^"]+)"/);
+  
+  if (titleMatch && summaryMatch) {
+    console.log('Found basic components, creating minimal valid response');
+    
+    // Try to extract some market scores if available
+    const scoreMatches = [...text.matchAll(/"market":\s*"([^"]+)"[^}]*"score":\s*(\d+)[^}]*"reasoning":\s*"([^"]+)"/g)];
+    
+    const scores = scoreMatches.slice(0, 10).map(match => ({
+      market: match[1],
+      score: parseInt(match[2]),
+      reasoning: match[3],
+      sources: []
+    }));
+    
+    return {
+      suggested_title: titleMatch[1],
+      prompt_summary: summaryMatch[1],
+      scores: scores
+    };
+  }
+  
+  return null;
+}
+
+// Enhanced validation with detailed error reporting and recovery suggestions
+function validateResponse(data: any): { isValid: boolean; errors: string[]; canRetry: boolean } {
   console.log('Validating response structure...');
   const errors: string[] = [];
+  let canRetry = true;
   
   if (!data || typeof data !== 'object') {
     errors.push('Response is not a valid object');
-    return { isValid: false, errors };
+    return { isValid: false, errors, canRetry: true };
   }
 
   if (!data.suggested_title || typeof data.suggested_title !== 'string') {
@@ -130,6 +201,7 @@ function validateResponse(data: any): { isValid: boolean; errors: string[] } {
 
   if (!Array.isArray(data.scores)) {
     errors.push('Missing or invalid scores array');
+    canRetry = true;
   } else {
     // Validate score structure more thoroughly
     let validScores = 0;
@@ -147,6 +219,11 @@ function validateResponse(data: any): { isValid: boolean; errors: string[] } {
 
     if (validScores === 0 && data.scores.length > 0) {
       errors.push('No valid market scores found in response');
+      canRetry = true;
+    } else if (validScores < data.scores.length * 0.5) {
+      // If less than 50% of scores are valid, suggest retry
+      errors.push(`Only ${validScores} out of ${data.scores.length} scores are valid`);
+      canRetry = true;
     }
     
     console.log(`Found ${validScores} valid scores out of ${data.scores.length} total`);
@@ -155,107 +232,51 @@ function validateResponse(data: any): { isValid: boolean; errors: string[] } {
   const isValid = errors.length === 0;
   console.log(`Response validation ${isValid ? 'passed' : 'failed'} with ${errors.length} errors`);
   
-  return { isValid, errors };
+  return { isValid, errors, canRetry };
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// Progressive retry with simpler prompts
+async function callOpenAIWithRetry(userPrompt: string, cbsaData: any[], analysisMode: string, retryAttempt: number = 0): Promise<any> {
+  const maxRetries = 3;
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  
+  if (!openaiApiKey) {
+    throw new Error('OpenAI API key not configured');
   }
 
+  // Progressive simplification of prompts and settings
+  const getRetryConfig = (attempt: number) => {
+    switch (attempt) {
+      case 0: // First attempt - original approach
+        return {
+          temperature: analysisMode === 'fast' ? 0.1 : 0.05,
+          max_tokens: analysisMode === 'fast' ? 4000 : 8000,
+          systemPrompt: getDetailedSystemPrompt(analysisMode, cbsaData.length),
+          description: 'detailed analysis'
+        };
+      case 1: // Second attempt - simplified prompt
+        return {
+          temperature: 0.1,
+          max_tokens: 3000,
+          systemPrompt: getSimplifiedSystemPrompt(cbsaData.length),
+          description: 'simplified analysis'
+        };
+      case 2: // Third attempt - basic prompt
+        return {
+          temperature: 0.05,
+          max_tokens: 2000,
+          systemPrompt: getBasicSystemPrompt(cbsaData.length),
+          description: 'basic analysis'
+        };
+      default:
+        throw new Error('Maximum retry attempts exceeded');
+    }
+  };
+
+  const config = getRetryConfig(retryAttempt);
+  console.log(`Attempt ${retryAttempt + 1}/${maxRetries}: ${config.description}`);
+
   try {
-    const { userPrompt, cbsaData, analysisMode = 'detailed', isChunked = false, chunkIndex = 0, totalChunks = 1 } = await req.json();
-    
-    if (!userPrompt || !cbsaData) {
-      throw new Error('Missing required parameters: userPrompt and cbsaData');
-    }
-
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    console.log(`Processing ${analysisMode} analysis for ${cbsaData.length} markets with prompt: "${userPrompt.substring(0, 100)}..."`);
-    if (isChunked) {
-      console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}`);
-    }
-
-    // Enhanced system prompt with clearer instructions and examples
-    const getSystemPrompt = (mode: string, isChunked: boolean) => {
-      const jsonExample = `{
-  "suggested_title": "Taco Affinity",
-  "prompt_summary": "I assessed markets based on Hispanic population, taco restaurant density, and cultural factors that indicate strong taco affinity.",
-  "scores": [
-    {
-      "market": "Los Angeles-Long Beach-Anaheim, CA",
-      "score": 87,
-      "reasoning": "High Hispanic population (45%) with extensive authentic taco culture and numerous taquerias.",
-      "sources": []
-    },
-    {
-      "market": "Dallas-Fort Worth-Arlington, TX", 
-      "score": 78,
-      "reasoning": "Strong Tex-Mex culture with growing taco scene and significant Hispanic community.",
-      "sources": []
-    }
-  ]
-}`;
-
-      const basePrompt = `You are an expert market analyst helping users score U.S. markets based on their criteria.
-
-CRITICAL RESPONSE REQUIREMENTS:
-1. You MUST respond with ONLY valid JSON - no markdown, explanations, or text outside the JSON
-2. Your response must start with { and end with }
-3. You MUST include ALL required fields exactly as shown in the example
-4. Each market MUST have a score between 0-100 (integers only)
-5. Each reasoning MUST be a clear, specific explanation for that market's score
-
-REQUIRED JSON STRUCTURE:
-${jsonExample}
-
-FIELD REQUIREMENTS:
-- "suggested_title": Short, catchy title (2-4 words max)
-- "prompt_summary": Brief explanation of your scoring approach (1-2 sentences)
-- "scores": Array of market score objects
-- Each score object MUST have: "market" (exact name from list), "score" (0-100 integer), "reasoning" (specific explanation), "sources" (empty array)
-
-JSON FORMATTING RULES:
-- Use double quotes only
-- No trailing commas
-- No line breaks inside string values
-- Escape quotes within strings using \"
-- End with a single } character`;
-
-      const speedOptimizations = mode === 'fast' 
-        ? `\nSPEED MODE: Provide efficient scoring with concise reasoning (1-2 sentences max per market).`
-        : `\nDETAILED MODE: Provide comprehensive analysis with thorough reasoning for each market score.`;
-
-      const chunkingInstructions = isChunked
-        ? `\nCHUNKED PROCESSING: You are processing ${cbsaData.length} markets (chunk ${chunkIndex + 1}/${totalChunks}). Maintain consistent scoring standards.`
-        : '';
-
-      return `${basePrompt}${speedOptimizations}${chunkingInstructions}
-
-TASK: Score these ${cbsaData.length} U.S. markets based on: "${userPrompt}"
-
-MARKETS TO SCORE: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Pop: ${cbsa.population.toLocaleString()})`).join(', ')}
-
-IMPORTANT: Respond with ONLY the JSON object, nothing else. Start your response with { and end with }.`;
-    };
-
-    console.log('Sending request to OpenAI API...');
-    
-    // Configure model based on analysis mode with stricter JSON requirements
-    const modelConfig = {
-      model: 'gpt-4o-mini',
-      temperature: analysisMode === 'fast' ? 0.1 : 0.05, // Lower temperature for more consistent JSON
-      max_tokens: analysisMode === 'fast' ? 4000 : 8000,
-      response_format: { type: "json_object" },
-      top_p: 0.8, // Reduced for more focused responses
-      frequency_penalty: 0.1,
-      presence_penalty: 0.1
-    };
-    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -263,11 +284,17 @@ IMPORTANT: Respond with ONLY the JSON object, nothing else. Start your response 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        ...modelConfig,
+        model: 'gpt-4o-mini',
+        temperature: config.temperature,
+        max_tokens: config.max_tokens,
+        response_format: { type: "json_object" },
+        top_p: 0.8,
+        frequency_penalty: 0.1,
+        presence_penalty: 0.1,
         messages: [
           {
             role: 'system',
-            content: getSystemPrompt(analysisMode, isChunked)
+            content: config.systemPrompt
           },
           {
             role: 'user',
@@ -284,53 +311,133 @@ IMPORTANT: Respond with ONLY the JSON object, nothing else. Start your response 
     }
 
     const data = await response.json();
-    console.log('Received response from OpenAI API');
-
     const aiContent = data.choices[0]?.message?.content;
+    
     if (!aiContent) {
       throw new Error('No content received from OpenAI API');
     }
 
-    console.log('AI response length:', aiContent.length);
+    console.log(`Attempt ${retryAttempt + 1} - AI response length:`, aiContent.length);
 
-    // Extract and validate JSON from AI response
+    // Try to extract and validate JSON
     let parsedResponse;
     try {
       parsedResponse = extractJSON(aiContent);
-      
       const validation = validateResponse(parsedResponse);
-      if (!validation.isValid) {
-        console.error('Response validation failed:', validation.errors);
-        
-        // If we have basic structure but no scores, provide helpful error
-        if (parsedResponse.suggested_title && parsedResponse.prompt_summary && (!parsedResponse.scores || parsedResponse.scores.length === 0)) {
-          throw new Error(`Analysis completed but no market scores were generated for "${userPrompt}". This can happen when the criteria is too complex or specific. Try simplifying your prompt or using Fast Analysis mode.`);
-        }
-        
-        throw new Error(`Response validation failed: ${validation.errors.join(', ')}`);
-      }
       
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError.message);
-      console.error('Raw AI content preview:', aiContent.substring(0, 500));
-      
-      // Provide more specific error guidance based on the error type
-      let errorMessage = 'Failed to parse AI response. ';
-      if (parseError.message.includes('JSON')) {
-        errorMessage += 'The AI provided malformed JSON. Try using Fast Analysis mode or simplifying your prompt.';
-      } else if (parseError.message.includes('no market scores')) {
-        errorMessage += 'No market scores were generated. Try rephrasing your criteria to be more specific or use Fast Analysis mode.';
+      if (validation.isValid) {
+        console.log(`Attempt ${retryAttempt + 1} succeeded`);
+        return parsedResponse;
+      } else if (retryAttempt < maxRetries - 1 && validation.canRetry) {
+        console.log(`Attempt ${retryAttempt + 1} failed validation, retrying with simpler approach...`);
+        console.log('Validation errors:', validation.errors);
+        return await callOpenAIWithRetry(userPrompt, cbsaData, analysisMode, retryAttempt + 1);
       } else {
-        errorMessage += 'Please try again with a simpler prompt or use Fast Analysis mode for better reliability.';
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
       }
+    } catch (parseError) {
+      console.error(`Attempt ${retryAttempt + 1} parse error:`, parseError.message);
       
-      throw new Error(errorMessage);
+      if (retryAttempt < maxRetries - 1) {
+        console.log('Retrying with simpler approach...');
+        return await callOpenAIWithRetry(userPrompt, cbsaData, analysisMode, retryAttempt + 1);
+      } else {
+        throw new Error(`All retry attempts failed. Last error: ${parseError.message}`);
+      }
     }
+  } catch (error) {
+    console.error(`Attempt ${retryAttempt + 1} failed:`, error.message);
+    
+    if (retryAttempt < maxRetries - 1) {
+      console.log('Retrying with simpler approach...');
+      return await callOpenAIWithRetry(userPrompt, cbsaData, analysisMode, retryAttempt + 1);
+    } else {
+      throw error;
+    }
+  }
+}
+
+// System prompts with progressive simplification
+function getDetailedSystemPrompt(analysisMode: string, marketCount: number): string {
+  const jsonExample = `{
+  "suggested_title": "Market Analysis",
+  "prompt_summary": "Brief explanation of scoring methodology.",
+  "scores": [
+    {
+      "market": "New York-Newark-Jersey City, NY-NJ-PA",
+      "score": 85,
+      "reasoning": "High population and economic indicators support strong performance.",
+      "sources": []
+    }
+  ]
+}`;
+
+  return `You are a market analyst. Respond with ONLY valid JSON in this exact format:
+
+${jsonExample}
+
+CRITICAL REQUIREMENTS:
+- Start response with { and end with }
+- Include exactly these fields: suggested_title, prompt_summary, scores
+- Each score needs: market (exact name), score (0-100 integer), reasoning (clear explanation), sources (empty array)
+- Provide scores for ALL ${marketCount} markets requested
+- Keep reasoning concise but informative
+- Use only double quotes, no trailing commas
+
+${analysisMode === 'fast' ? 'FAST MODE: Be efficient with 1-2 sentence reasoning.' : 'DETAILED MODE: Provide thorough analysis.'}`;
+}
+
+function getSimplifiedSystemPrompt(marketCount: number): string {
+  return `Respond with valid JSON only. Format:
+{
+  "suggested_title": "Short Title",
+  "prompt_summary": "Brief explanation of your scoring approach.",
+  "scores": [
+    {
+      "market": "Market Name",
+      "score": 75,
+      "reasoning": "Brief explanation.",
+      "sources": []
+    }
+  ]
+}
+
+Score all ${marketCount} markets. Keep explanations short. Use exact market names provided.`;
+}
+
+function getBasicSystemPrompt(marketCount: number): string {
+  return `Return JSON with market scores. Required format:
+{"suggested_title":"Title","prompt_summary":"Summary","scores":[{"market":"Name","score":75,"reasoning":"Brief reason","sources":[]}]}
+
+Score all ${marketCount} markets with brief reasoning.`;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { userPrompt, cbsaData, analysisMode = 'detailed', isChunked = false, chunkIndex = 0, totalChunks = 1 } = await req.json();
+    
+    if (!userPrompt || !cbsaData) {
+      throw new Error('Missing required parameters: userPrompt and cbsaData');
+    }
+
+    console.log(`Processing ${analysisMode} analysis for ${cbsaData.length} markets with prompt: "${userPrompt.substring(0, 100)}..."`);
+    if (isChunked) {
+      console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}`);
+    }
+
+    console.log('Starting progressive retry approach...');
+    
+    // Use the new progressive retry approach
+    const parsedResponse = await callOpenAIWithRetry(userPrompt, cbsaData, analysisMode);
 
     // Final validation to ensure we have usable data
     if (!parsedResponse.scores || parsedResponse.scores.length === 0) {
-      console.error('No market scores found in validated response');
-      throw new Error(`Analysis completed but no market scores were generated for "${userPrompt}". This can happen when the criteria is too specific or complex. Try simplifying your prompt or use Fast Analysis mode.`);
+      console.error('No market scores found in final response');
+      throw new Error(`Analysis completed but no market scores were generated. Try simplifying your prompt or using a different approach.`);
     }
 
     // Count valid scores
@@ -343,7 +450,7 @@ IMPORTANT: Respond with ONLY the JSON object, nothing else. Start your response 
     );
 
     if (validScores.length === 0) {
-      throw new Error(`No valid market scores found in the analysis. The AI response contained ${parsedResponse.scores.length} scores but none were properly formatted. Try using Fast Analysis mode or simplifying your prompt.`);
+      throw new Error(`No valid market scores found in the analysis. Try using Fast Analysis mode or simplifying your prompt.`);
     }
 
     console.log(`Successfully processed ${validScores.length} valid market scores in ${analysisMode} mode`);
@@ -361,9 +468,19 @@ IMPORTANT: Respond with ONLY the JSON object, nothing else. Start your response 
   } catch (error) {
     console.error('Error in territory-scoring function:', error);
     
+    // Provide enhanced error messaging with specific suggestions
+    let userFriendlyMessage = error.message;
+    if (error.message.includes('JSON') || error.message.includes('parse')) {
+      userFriendlyMessage = 'The analysis encountered a formatting issue. Try using Fast Analysis mode or simplifying your prompt for better reliability.';
+    } else if (error.message.includes('no market scores') || error.message.includes('No valid market scores')) {
+      userFriendlyMessage = 'The analysis completed but couldn\'t generate valid scores. Try rephrasing your criteria to be more specific, or use Fast Analysis mode.';
+    } else if (error.message.includes('retry attempts')) {
+      userFriendlyMessage = 'Multiple analysis attempts failed. Try using Fast Analysis mode with a simpler, more direct prompt (e.g., "high income areas" instead of complex multi-factor criteria).';
+    }
+    
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: userFriendlyMessage,
       details: error.stack || 'No stack trace available'
     }), {
       status: 500,
