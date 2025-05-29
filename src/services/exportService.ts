@@ -178,7 +178,6 @@ const addPDFHeader = async (pdf: jsPDF, assessment: SiteAssessment, pageNumber: 
   pdf.setFontSize(10);
   pdf.setTextColor(100);
   pdf.text(`Site Assessment: ${assessment.assessment_name || 'Untitled'}`, 20, 15);
-  pdf.text(`Page ${pageNumber}`, pdf.internal.pageSize.width - 40, 15);
   
   // Add a line under header
   pdf.setDrawColor(200);
@@ -186,7 +185,7 @@ const addPDFHeader = async (pdf: jsPDF, assessment: SiteAssessment, pageNumber: 
 };
 
 // Generate PDF footer with Good Signals branding
-const addPDFFooter = (pdf: jsPDF) => {
+const addPDFFooter = (pdf: jsPDF, pageNumber: number) => {
   const pageHeight = pdf.internal.pageSize.height;
   pdf.setFontSize(8);
   pdf.setTextColor(100);
@@ -201,6 +200,9 @@ const addPDFFooter = (pdf: jsPDF) => {
   
   // Add generation date on the left
   pdf.text(`Generated: ${format(new Date(), 'MMM dd, yyyy')}`, 20, pageHeight - 10);
+  
+  // Add page number on the right
+  pdf.text(`Page ${pageNumber}`, pageWidth - 40, pageHeight - 10);
 };
 
 // Build full address string
@@ -295,7 +297,7 @@ const generateOverviewPage = async (
     pdf.text(splitSummary, 20, yPos);
   }
   
-  addPDFFooter(pdf);
+  addPDFFooter(pdf, 1);
 };
 
 // Generate location map page with Google Maps integration
@@ -356,7 +358,7 @@ const generateLocationMapPage = async (
     }
   }
   
-  addPDFFooter(pdf);
+  addPDFFooter(pdf, pageNumber);
 };
 
 // Generate metric category page with improved image handling
@@ -450,7 +452,7 @@ const generateCategoryPage = async (
     yPos += 8;
   });
   
-  addPDFFooter(pdf);
+  addPDFFooter(pdf, pageNumber);
 };
 
 // Generate site visit ratings page with improved image handling
@@ -525,7 +527,7 @@ const generateSiteVisitPage = async (
     });
   }
   
-  addPDFFooter(pdf);
+  addPDFFooter(pdf, pageNumber);
 };
 
 // Main export function
