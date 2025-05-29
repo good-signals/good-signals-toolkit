@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -55,7 +54,7 @@ const SiteProspectorPage = () => {
     }
   }, [currentStep, activeAssessmentId, selectedMetricSetId]);
 
-  // Enhanced assessments query with better cache management
+  // Enhanced assessments query with better error handling
   const { 
     data: assessments = [], 
     isLoading: isLoadingAssessments, 
@@ -81,6 +80,13 @@ const SiteProspectorPage = () => {
     enabled: !!user?.id && currentStep === 'idle',
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 2 * 60 * 1000, // 2 minutes
+    retry: (failureCount, error) => {
+      // Don't retry on authentication errors
+      if (error.message.includes('authentication') || error.message.includes('unauthorized')) {
+        return false;
+      }
+      return failureCount < 2;
+    }
   });
   
   // Enhanced deletion mutation with better error handling and cache management
@@ -296,41 +302,57 @@ const SiteProspectorPage = () => {
     clearSelectionsKey
   });
 
-  if (currentStep === 'newAddress') {
-    return <NewAssessmentForm 
-              onAssessmentCreated={handleAddressStepCompleted} 
-              onCancel={handleCancelAssessmentProcess}
-            />;
-  }
+  // Enhanced error handling for step rendering
+  try {
+    if (currentStep === 'newAddress') {
+      return <NewAssessmentForm 
+                onAssessmentCreated={handleAddressStepCompleted} 
+                onCancel={handleCancelAssessmentProcess}
+              />;
+    }
 
-  if (currentStep === 'selectMetrics' && activeAssessmentId) {
-    return <SelectTargetMetricSetStep 
-              assessmentId={activeAssessmentId}
-              onMetricSetSelected={handleMetricSetSelected}
-              onBack={handleBackFromMetricSelection}
-            />;
-  }
+    if (currentStep === 'selectMetrics' && activeAssessmentId) {
+      return <SelectTargetMetricSetStep 
+                assessmentId={activeAssessmentId}
+                onMetricSetSelected={handleMetricSetSelected}
+                onBack={handleBackFromMetricSelection}
+              />;
+    }
 
-  if (currentStep === 'inputMetrics' && activeAssessmentId && selectedMetricSetId) {
-    return <InputMetricValuesStep
-              assessmentId={activeAssessmentId}
-              targetMetricSetId={selectedMetricSetId}
-              onMetricsSubmitted={handleMetricValuesSubmitted}
-              onBack={handleBackFromMetricInput}
-            />;
-  }
-  
-  if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
-    return (
-      <SiteAssessmentDetailsView
-        assessmentId={activeAssessmentId}
-        selectedMetricSetId={selectedMetricSetId}
-        onEditGoToInputMetrics={() => {
-            setCurrentStep('inputMetrics');
-        }}
-        onBackToList={handleCancelAssessmentProcess}
-      />
-    );
+    if (currentStep === 'inputMetrics' && activeAssessmentId && selectedMetricSetId) {
+      return <InputMetricValuesStep
+                assessmentId={activeAssessmentId}
+                targetMetricSetId={selectedMetricSetId}
+                onMetricsSubmitted={handleMetricValuesSubmitted}
+                onBack={handleBackFromMetricInput}
+              />;
+    }
+    
+    if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
+      return (
+        <SiteAssessmentDetailsView
+          assessmentId={activeAssessmentId}
+          selectedMetricSetId={selectedMetricSetId}
+          onEditGoToInputMetrics={() => {
+              setCurrentStep('inputMetrics');
+          }}
+          onBackToList={handleCancelAssessmentProcess}
+        />
+      );
+    }
+  } catch (error) {
+    console.error('Error rendering step component:', error);
+    // Reset to idle state on error
+    setCurrentStep('idle');
+    setActiveAssessmentId(null);
+    setSelectedMetricSetId(null);
+    clearSessionStorageAssessmentState();
+    
+    toast({
+      title: "Navigation Error", 
+      description: "An error occurred. Returning to the main view.",
+      variant: "destructive"
+    });
   }
   
   return (

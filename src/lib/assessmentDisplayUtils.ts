@@ -13,21 +13,33 @@ export const getSignalStatus = (
   accountGoodThreshold?: number | null,
   accountBadThreshold?: number | null
 ): SignalStatus => {
-  if (score === null || score === undefined) {
-    return { text: 'N/A', color: 'text-muted-foreground', iconColor: 'text-muted-foreground' };
-  }
+  try {
+    if (score === null || score === undefined || isNaN(score)) {
+      return { text: 'N/A', color: 'text-muted-foreground', iconColor: 'text-muted-foreground' };
+    }
 
-  // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
-  const scoreDecimal = score / 100;
+    // Ensure score is a valid number between 0 and 100
+    const validScore = Math.max(0, Math.min(100, Number(score)));
+    
+    // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
+    const scoreDecimal = validScore / 100;
 
-  const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
-  const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
+    const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
+    const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
 
-  if (scoreDecimal >= goodThreshold) {
-    return { text: 'Good', color: 'text-green-600', iconColor: 'text-green-500' };
+    // Ensure thresholds are valid numbers
+    const validGoodThreshold = isNaN(goodThreshold) ? DEFAULT_GOOD_THRESHOLD : goodThreshold;
+    const validBadThreshold = isNaN(badThreshold) ? DEFAULT_BAD_THRESHOLD : badThreshold;
+
+    if (scoreDecimal >= validGoodThreshold) {
+      return { text: 'Good', color: 'text-green-600', iconColor: 'text-green-500' };
+    }
+    if (scoreDecimal <= validBadThreshold) {
+      return { text: 'Bad', color: 'text-red-600', iconColor: 'text-red-500' };
+    }
+    return { text: 'Neutral', color: 'text-yellow-600', iconColor: 'text-yellow-500' };
+  } catch (error) {
+    console.error('Error calculating signal status:', error);
+    return { text: 'Error', color: 'text-muted-foreground', iconColor: 'text-muted-foreground' };
   }
-  if (scoreDecimal <= badThreshold) {
-    return { text: 'Bad', color: 'text-red-600', iconColor: 'text-red-500' };
-  }
-  return { text: 'Neutral', color: 'text-yellow-600', iconColor: 'text-yellow-500' };
 };

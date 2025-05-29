@@ -146,6 +146,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-6">
+          {/* Assessment Name - First field */}
           <div>
             <Label htmlFor="assessment_name">Assessment Name</Label>
             <Input 
@@ -156,6 +157,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
             {errors.assessment_name && <p className="text-sm text-destructive mt-1">{errors.assessment_name.message}</p>}
           </div>
 
+          {/* Site Status - Second field */}
           <div>
             <Label htmlFor="site_status">Site Status</Label>
             <Select onValueChange={(value) => setValue("site_status", value as typeof siteStatusOptions[number])} defaultValue="Prospect">
@@ -173,21 +175,25 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
             {errors.site_status && <p className="text-sm text-destructive mt-1">{errors.site_status.message}</p>}
           </div>
           
-          <AddressAutocompleteInput
-            onAddressSelect={handleAddressSelected}
-            label="Search and Select Address"
-            id="address_search"
-            error={errors.address_line1?.message}
-          />
+          {/* Address Search - Third field */}
+          <div>
+            <AddressAutocompleteInput
+              onAddressSelect={handleAddressSelected}
+              label="Search and Select Address"
+              id="address_search"
+              error={errors.address_line1?.message}
+            />
 
-          {/* Display validation errors for other address fields if they exist */}
-          {errors.city && <p className="text-sm text-destructive mt-1">City: {errors.city.message}</p>}
-          {errors.state_province && <p className="text-sm text-destructive mt-1">State/Province: {errors.state_province.message}</p>}
-          {errors.postal_code && <p className="text-sm text-destructive mt-1">Postal Code: {errors.postal_code.message}</p>}
-          {errors.country && <p className="text-sm text-destructive mt-1">Country: {errors.country.message}</p>}
+            {/* Display validation errors for other address fields if they exist */}
+            {errors.city && <p className="text-sm text-destructive mt-1">City: {errors.city.message}</p>}
+            {errors.state_province && <p className="text-sm text-destructive mt-1">State/Province: {errors.state_province.message}</p>}
+            {errors.postal_code && <p className="text-sm text-destructive mt-1">Postal Code: {errors.postal_code.message}</p>}
+            {errors.country && <p className="text-sm text-destructive mt-1">Country: {errors.country.message}</p>}
+          </div>
           
+          {/* Map Display - Fourth section (only when coordinates available) */}
           {coordinates.lat && coordinates.lng && (
-            <div className="mt-4">
+            <div>
               <p className="text-xs text-muted-foreground mb-2">
                 Coordinates: Lat: {coordinates.lat.toFixed(6)}, Lng: {coordinates.lng.toFixed(6)}
               </p>
@@ -195,9 +201,12 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
             </div>
           )}
           
-          <p className="text-sm text-muted-foreground pt-4">
-            Step 2 (Select Target Metric Set) and Step 3 (Input fields) will appear after this step.
-          </p>
+          {/* Information text - Last section */}
+          <div className="pt-4">
+            <p className="text-sm text-muted-foreground">
+              Step 2 (Select Target Metric Set) and Step 3 (Input fields) will appear after this step.
+            </p>
+          </div>
         </CardContent>
         <CardFooter className="flex justify-end space-x-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>

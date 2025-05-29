@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
@@ -11,6 +10,7 @@ import {
   MeasurementType
 } from '@/types/targetMetrics';
 import { Database } from '@/integrations/supabase/types';
+import { recalculateAssessmentScoresForMetricSet } from './assessmentRecalculationService';
 
 const USER_METRICS_TABLE_NAME = 'user_custom_metrics_settings';
 const METRIC_SETS_TABLE_NAME = 'target_metric_sets';
@@ -362,9 +362,6 @@ export async function triggerAssessmentRecalculation(
   userId: string
 ): Promise<{ success: boolean; message: string; details?: any }> {
   try {
-    // Import the recalculation service
-    const { recalculateAssessmentScoresForMetricSet } = await import('./assessmentRecalculationService');
-    
     const result = await recalculateAssessmentScoresForMetricSet(metricSetId, userId);
     
     if (result.errors.length > 0) {
