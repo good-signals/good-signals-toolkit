@@ -14,6 +14,61 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
   const [mapError, setMapError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+
+  // Load Google Maps JavaScript API
+  useEffect(() => {
+    const loadGoogleMaps = () => {
+      // Check if Google Maps is already loaded
+      if (window.google && window.google.maps) {
+        setGoogleMapsLoaded(true);
+        return;
+      }
+
+      // Check if script is already being loaded
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        // Wait for it to load
+        const checkLoaded = setInterval(() => {
+          if (window.google && window.google.maps) {
+            setGoogleMapsLoaded(true);
+            clearInterval(checkLoaded);
+          }
+        }, 100);
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          clearInterval(checkLoaded);
+          if (!window.google || !window.google.maps) {
+            console.warn('Google Maps failed to load within timeout');
+            setMapError(true);
+            setIsLoading(false);
+          }
+        }, 10000);
+        return;
+      }
+
+      // Create and load the script
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCYg8pkH1rO2z8p6YtsocdhG0s-FKInCnU'}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      
+      script.onload = () => {
+        console.log('Google Maps API loaded successfully');
+        setGoogleMapsLoaded(true);
+      };
+      
+      script.onerror = (error) => {
+        console.error('Failed to load Google Maps API:', error);
+        setMapError(true);
+        setIsLoading(false);
+      };
+      
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+  }, []);
 
   // Generate static map as fallback
   useEffect(() => {
@@ -45,14 +100,9 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     generateStaticMap();
   }, [latitude, longitude]);
 
+  // Initialize Google Maps when API is loaded
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    // Check if Google Maps is available
-    if (typeof window === 'undefined' || !window.google || !window.google.maps) {
-      console.warn("Google Maps API not loaded.");
-      setMapError(true);
-      setIsLoading(false);
+    if (!googleMapsLoaded || !mapContainerRef.current || mapError) {
       return;
     }
 
@@ -88,7 +138,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       setMapError(true);
       setIsLoading(false);
     }
-  }, [latitude, longitude]);
+  }, [googleMapsLoaded, latitude, longitude, mapError]);
 
   // Show loading state
   if (isLoading && !mapError) {
@@ -103,7 +153,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
   }
 
   // Show static map fallback if Google Maps failed to load
-  if (mapError) {
+  if (mapError || !googleMapsLoaded) {
     return (
       <div className="w-full h-[300px] rounded-md border bg-gray-50 overflow-hidden">
         {staticMapUrl ? (
