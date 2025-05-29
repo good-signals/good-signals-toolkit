@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -9,31 +9,28 @@ import CBSATable from '@/components/territory-targeter/CBSATable';
 import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
 import TerritoryExecutiveSummary from '@/components/territory-targeter/TerritoryExecutiveSummary';
 import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
+import TerritoryNotices from '@/components/territory-targeter/TerritoryNotices';
+import SignalSettingsNotice from '@/components/territory-targeter/SignalSettingsNotice';
 import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
-import { sampleCBSAData } from '@/data/sampleCBSAData';
+import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
+import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
+import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
 import { exportTerritoryAnalysisToCSV } from '@/services/territoryExportService';
 import { useAuth } from '@/contexts/AuthContext';
-import { CBSAData, ManualScoreOverride } from '@/types/territoryTargeterTypes';
-import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSelector';
-import { safeStorage } from '@/utils/safeStorage';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
-
-const EXECUTIVE_SUMMARY_STORAGE_KEY = 'territoryTargeter_executiveSummary';
+import { ManualScoreOverride } from '@/types/territoryTargeterTypes';
 
 const TerritoryTargeterPageContent = () => {
   const { user } = useAuth();
-  const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
-  const [executiveSummary, setExecutiveSummary] = useState<string>(() => {
-    // Load saved executive summary from localStorage
-    const saved = safeStorage.getItem(EXECUTIVE_SUMMARY_STORAGE_KEY);
-    return saved || '';
-  });
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  
+  // Custom hooks for different concerns
+  const { cbsaData, isInitialized, handleStatusChange } = useCBSAStatus();
+  const { 
+    accounts, 
+    isLoadingAccounts, 
+    currentAccount, 
+    accountGoodThreshold, 
+    accountBadThreshold 
+  } = useAccountSettings(user?.id);
   
   // Use the territory scoring hook
   const {
@@ -53,73 +50,13 @@ const TerritoryTargeterPageContent = () => {
     clearAnalysis,
     setAnalysisMode
   } = useTerritoryScoring();
-  
-  // Fetch user accounts on component mount
-  useEffect(() => {
-    const loadAccounts = async () => {
-      if (!user?.id) {
-        setIsLoadingAccounts(false);
-        return;
-      }
 
-      try {
-        const userAccounts = await fetchUserAccountsWithAdminRole(user.id);
-        setAccounts(userAccounts);
-      } catch (error) {
-        console.error('Failed to fetch user accounts:', error);
-        toast({
-          title: "Account Loading Failed",
-          description: "Could not load account settings. Using default signal thresholds.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingAccounts(false);
-      }
-    };
-
-    loadAccounts();
-  }, [user?.id]);
-  
-  // Save executive summary to localStorage whenever it changes
-  useEffect(() => {
-    if (executiveSummary) {
-      safeStorage.setItem(EXECUTIVE_SUMMARY_STORAGE_KEY, executiveSummary);
-    } else {
-      safeStorage.removeItem(EXECUTIVE_SUMMARY_STORAGE_KEY);
-    }
-  }, [executiveSummary]);
-
-  // Clear executive summary when analysis is cleared
-  useEffect(() => {
-    if (!currentAnalysis) {
-      setExecutiveSummary('');
-    }
-  }, [currentAnalysis]);
-  
-  // Load saved statuses from localStorage on component mount
-  useEffect(() => {
-    try {
-      const savedStatuses = safeStorage.getItem('cbsa-statuses');
-      if (savedStatuses) {
-        const statusMap = safeStorage.safeParse(savedStatuses, {});
-        setCbsaData(prevData =>
-          prevData.map(cbsa => ({
-            ...cbsa,
-            status: statusMap[cbsa.id] || undefined
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Failed to load saved CBSA statuses:', error);
-    } finally {
-      setIsInitialized(true);
-    }
-  }, []);
-
-  // Get account signal thresholds (use first account's thresholds or defaults)
-  const currentAccount = accounts.length > 0 ? accounts[0] : null;
-  const accountGoodThreshold = currentAccount?.signal_good_threshold ?? 0.75;
-  const accountBadThreshold = currentAccount?.signal_bad_threshold ?? 0.50;
+  const {
+    executiveSummary,
+    setExecutiveSummary,
+    isGeneratingSummary,
+    handleGenerateExecutiveSummary
+  } = useExecutiveSummary(currentAnalysis, user);
 
   const handlePromptSubmit = async (prompt: string, mode: 'fast' | 'detailed' = 'detailed') => {
     try {
@@ -160,29 +97,6 @@ const TerritoryTargeterPageContent = () => {
     setExecutiveSummary(''); // Clear executive summary when clearing analysis
   };
 
-  const handleStatusChange = (cbsaId: string, status: CBSAStatus) => {
-    // Update the local state
-    setCbsaData(prevData => 
-      prevData.map(cbsa => 
-        cbsa.id === cbsaId ? { ...cbsa, status } : cbsa
-      )
-    );
-
-    // Save to localStorage
-    try {
-      const savedStatuses = safeStorage.getItem('cbsa-statuses');
-      let statusMap = {};
-      if (savedStatuses) {
-        statusMap = safeStorage.safeParse(savedStatuses, {});
-      }
-      
-      statusMap[cbsaId] = status;
-      safeStorage.setItem('cbsa-statuses', JSON.stringify(statusMap));
-    } catch (error) {
-      console.error('Failed to save CBSA status:', error);
-    }
-  };
-
   const handleRefreshColumn = async (columnId: string, type: 'all' | 'na-only') => {
     await refreshColumn(columnId, type, cbsaData);
   };
@@ -199,47 +113,8 @@ const TerritoryTargeterPageContent = () => {
     deleteColumn(columnId);
   };
 
-  const handleGenerateExecutiveSummary = async () => {
-    if (!currentAnalysis || !user) return;
-
-    setIsGeneratingSummary(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-territory-summary', {
-        body: {
-          analysis: currentAnalysis,
-          cbsaData: cbsaData,
-          topMarketCount: 8
-        }
-      });
-
-      if (error) {
-        throw new Error(`Failed to generate executive summary: ${error.message}`);
-      }
-
-      if (!data || !data.executiveSummary) {
-        throw new Error('Executive summary generation did not return content.');
-      }
-
-      setExecutiveSummary(data.executiveSummary);
-      
-      toast({
-        title: "Executive Summary Generated",
-        description: "AI-powered executive summary has been created for your territory analysis.",
-      });
-
-    } catch (err) {
-      console.error('Failed to generate executive summary:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      
-      toast({
-        title: "Summary Generation Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingSummary(false);
-    }
+  const handleGenerateSummary = async () => {
+    await handleGenerateExecutiveSummary(cbsaData);
   };
 
   // Calculate average market signal score across all criteria
@@ -277,37 +152,13 @@ const TerritoryTargeterPageContent = () => {
         </p>
       </div>
 
-      {/* CBSA Data Info */}
-      <div className="mb-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Currently showing top {cbsaData.length} U.S. CBSAs by population. You can upload your own CBSA dataset to replace this sample data.
-          </AlertDescription>
-        </Alert>
-      </div>
-
-      {/* Authentication Notice */}
-      {!user && (
-        <Alert className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Please sign in to use the Territory Targeter tool.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Signal Settings Info */}
-      {currentAccount && (
-        <div className="mb-6">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Using account signal settings: Good ≥ {Math.round(accountGoodThreshold * 100)}%, Bad ≤ {Math.round(accountBadThreshold * 100)}%
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+      {/* Notices */}
+      <TerritoryNotices user={user} cbsaDataLength={cbsaData.length} />
+      <SignalSettingsNotice 
+        currentAccount={currentAccount}
+        accountGoodThreshold={accountGoodThreshold}
+        accountBadThreshold={accountBadThreshold}
+      />
 
       {/* 1. Prompt Input */}
       <PromptInput 
@@ -341,7 +192,7 @@ const TerritoryTargeterPageContent = () => {
           <TerritoryExecutiveSummary
             analysis={currentAnalysis}
             cbsaData={cbsaData}
-            onGenerateSummary={handleGenerateExecutiveSummary}
+            onGenerateSummary={handleGenerateSummary}
             isGenerating={isGeneratingSummary}
             executiveSummary={executiveSummary}
           />
