@@ -82,7 +82,6 @@ const ColumnRefreshOptions: React.FC<ColumnRefreshOptionsProps> = ({
               <Switch
                 checked={isIncludedInSignalScore}
                 onCheckedChange={handleToggleChange}
-                size="sm"
               />
             </div>
             <DropdownMenuSeparator />

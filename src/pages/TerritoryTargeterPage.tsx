@@ -101,16 +101,17 @@ const TerritoryTargeterPage: React.FC = () => {
 
       {/* Analysis Mode Selector */}
       <AnalysisModeSelector 
-        value={analysisMode}
-        onChange={setAnalysisMode}
+        selectedMode={analysisMode}
+        onModeChange={setAnalysisMode}
         disabled={isLoading}
       />
 
       {/* Progress Counter */}
       {isLoading && analysisStartTime && (
         <ProgressCounter 
+          isActive={isLoading}
           startTime={analysisStartTime}
-          estimatedDuration={estimatedDuration}
+          duration={estimatedDuration}
           analysisMode={analysisMode}
         />
       )}
@@ -140,15 +141,14 @@ const TerritoryTargeterPage: React.FC = () => {
       {/* Executive Summary */}
       {currentAnalysis && (
         <ExecutiveSummary 
-          analysis={currentAnalysis}
+          criteriaColumns={currentAnalysis.criteriaColumns}
         />
       )}
 
       {/* Market Signal Summary */}
       {currentAnalysis && currentAnalysis.criteriaColumns.length > 1 && (
         <MarketSignalSummary 
-          analysis={currentAnalysis}
-          cbsaData={sampleCBSAData}
+          marketSignalScore={currentAnalysis.marketSignalScore}
         />
       )}
 
