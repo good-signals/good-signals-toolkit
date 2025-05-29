@@ -166,11 +166,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   // Fixed mutation with proper return type handling
   const updateScoresMutation = useMutation({
-    mutationFn: async (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }): Promise<SiteAssessment> => {
+    mutationFn: async (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => {
       console.log('Updating scores via mutation:', params);
-      return await updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage);
+      const updatedAssessment = await updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage);
+      return updatedAssessment;
     },
-    onSuccess: (updatedAssessment: SiteAssessment) => {
+    onSuccess: (updatedAssessment) => {
       console.log('Scores updated successfully:', {
         id: updatedAssessment.id,
         newScore: updatedAssessment.site_signal_score,
