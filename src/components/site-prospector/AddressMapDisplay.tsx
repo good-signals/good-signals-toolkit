@@ -13,6 +13,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
   const markerRef = useRef<google.maps.Marker | null>(null);
   const [mapState, setMapState] = useState<'loading' | 'google-maps' | 'error'>('loading');
   const timeoutRef = useRef<number | null>(null);
+  const initRetryRef = useRef<number>(0);
 
   console.log('AddressMapDisplay initializing with coordinates:', { latitude, longitude });
 
@@ -25,8 +26,65 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     };
   }, []);
 
-  // Load Google Maps JavaScript API
+  // Load Google Maps JavaScript API and initialize map
   useEffect(() => {
+    let isMounted = true;
+
+    const waitForContainer = (callback: () => void, retries = 0): void => {
+      if (!isMounted) return;
+      
+      if (mapContainerRef.current && mapContainerRef.current.offsetHeight > 0) {
+        console.log('Map container found and ready');
+        callback();
+      } else if (retries < 10) {
+        console.log(`Map container not ready, retrying... (${retries + 1}/10)`);
+        setTimeout(() => waitForContainer(callback, retries + 1), 100);
+      } else {
+        console.error('Map container never became available after 10 retries');
+        if (isMounted) {
+          setMapState('error');
+        }
+      }
+    };
+
+    const initializeGoogleMap = () => {
+      console.log('Starting map initialization...');
+      
+      waitForContainer(() => {
+        if (!isMounted || !mapContainerRef.current) return;
+
+        try {
+          console.log('Initializing Google Maps with coordinates:', { latitude, longitude });
+          const mapCenter = { lat: latitude, lng: longitude };
+
+          // Initialize map
+          mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
+            center: mapCenter,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+          });
+
+          // Add marker
+          markerRef.current = new window.google.maps.Marker({
+            position: mapCenter,
+            map: mapRef.current,
+            title: 'Selected Location',
+          });
+          
+          console.log('Google Maps initialized successfully');
+          if (isMounted) {
+            setMapState('google-maps');
+          }
+        } catch (error) {
+          console.error('Error initializing Google Maps:', error);
+          if (isMounted) {
+            setMapState('error');
+          }
+        }
+      });
+    };
+
     const loadGoogleMaps = () => {
       console.log('Starting Google Maps load process...');
       
@@ -45,16 +103,19 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
           if (window.google && window.google.maps) {
             console.log('Google Maps loaded via existing script');
             clearInterval(checkLoaded);
-            initializeGoogleMap();
+            if (isMounted) {
+              initializeGoogleMap();
+            }
           }
         }, 100);
         
-        // Increased timeout to 30 seconds
         timeoutRef.current = window.setTimeout(() => {
           clearInterval(checkLoaded);
           if (!window.google || !window.google.maps) {
-            console.error('Google Maps failed to load within 30 second timeout');
-            setMapState('error');
+            console.error('Google Maps failed to load within timeout');
+            if (isMounted) {
+              setMapState('error');
+            }
           }
         }, 30000);
         return;
@@ -73,7 +134,9 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
-        initializeGoogleMap();
+        if (isMounted) {
+          initializeGoogleMap();
+        }
       };
       
       script.onerror = (error) => {
@@ -81,53 +144,31 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
-        setMapState('error');
+        if (isMounted) {
+          setMapState('error');
+        }
       };
       
-      // Increased timeout to 30 seconds
       timeoutRef.current = window.setTimeout(() => {
         console.error('Google Maps loading timeout after 30 seconds');
-        setMapState('error');
+        if (isMounted) {
+          setMapState('error');
+        }
       }, 30000);
       
       document.head.appendChild(script);
     };
 
-    const initializeGoogleMap = () => {
-      if (!mapContainerRef.current) {
-        console.error('Map container not found');
-        setMapState('error');
-        return;
-      }
+    // Start the loading process
+    loadGoogleMaps();
 
-      try {
-        console.log('Initializing Google Maps with coordinates:', { latitude, longitude });
-        const mapCenter = { lat: latitude, lng: longitude };
-
-        // Initialize map
-        mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
-          center: mapCenter,
-          zoom: 15,
-          mapTypeControl: false,
-          streetViewControl: false,
-        });
-
-        // Add marker
-        markerRef.current = new window.google.maps.Marker({
-          position: mapCenter,
-          map: mapRef.current,
-          title: 'Selected Location',
-        });
-        
-        console.log('Google Maps initialized successfully');
-        setMapState('google-maps');
-      } catch (error) {
-        console.error('Error initializing Google Maps:', error);
-        setMapState('error');
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-
-    loadGoogleMaps();
   }, [latitude, longitude]);
 
   // Update Google Map when coordinates change
