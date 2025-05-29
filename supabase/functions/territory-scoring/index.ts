@@ -180,7 +180,7 @@ serve(async (req) => {
       console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}`);
     }
 
-    // Enhanced system prompt with clear JSON structure and examples
+    // Enhanced system prompt with clearer instructions and examples
     const getSystemPrompt = (mode: string, isChunked: boolean) => {
       const jsonExample = `{
   "suggested_title": "Taco Affinity",
@@ -203,28 +203,28 @@ serve(async (req) => {
 
       const basePrompt = `You are an expert market analyst helping users score U.S. markets based on their criteria.
 
-CRITICAL JSON REQUIREMENTS - MUST FOLLOW EXACTLY:
-1. You MUST respond with ONLY valid JSON - no explanations, markdown, or text outside the JSON
-2. Your response must match this EXACT structure:
+CRITICAL RESPONSE REQUIREMENTS:
+1. You MUST respond with ONLY valid JSON - no markdown, explanations, or text outside the JSON
+2. Your response must start with { and end with }
+3. You MUST include ALL required fields exactly as shown in the example
+4. Each market MUST have a score between 0-100 (integers only)
+5. Each reasoning MUST be a clear, specific explanation for that market's score
+
+REQUIRED JSON STRUCTURE:
 ${jsonExample}
 
-3. REQUIRED FIELDS (all must be present):
-   - "suggested_title": Short catchy title (2-4 words max)
-   - "prompt_summary": Brief explanation of your scoring approach
-   - "scores": Array of market score objects
-   
-4. Each score object MUST have:
-   - "market": Exact market name from the provided list
-   - "score": Number between 0-100 (integers only)
-   - "reasoning": Clear explanation of the score
-   - "sources": Empty array []
+FIELD REQUIREMENTS:
+- "suggested_title": Short, catchy title (2-4 words max)
+- "prompt_summary": Brief explanation of your scoring approach (1-2 sentences)
+- "scores": Array of market score objects
+- Each score object MUST have: "market" (exact name from list), "score" (0-100 integer), "reasoning" (specific explanation), "sources" (empty array)
 
-5. JSON FORMATTING RULES:
-   - Use double quotes only
-   - No trailing commas
-   - No line breaks inside string values
-   - Escape any quotes within strings using \"
-   - End with a single } character`;
+JSON FORMATTING RULES:
+- Use double quotes only
+- No trailing commas
+- No line breaks inside string values
+- Escape quotes within strings using \"
+- End with a single } character`;
 
       const speedOptimizations = mode === 'fast' 
         ? `\nSPEED MODE: Provide efficient scoring with concise reasoning (1-2 sentences max per market).`
@@ -236,21 +236,24 @@ ${jsonExample}
 
       return `${basePrompt}${speedOptimizations}${chunkingInstructions}
 
-TASK: Score these ${cbsaData.length} U.S. markets based on the user's criteria: "${userPrompt}"
+TASK: Score these ${cbsaData.length} U.S. markets based on: "${userPrompt}"
 
 MARKETS TO SCORE: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Pop: ${cbsa.population.toLocaleString()})`).join(', ')}
 
-Remember: Respond with ONLY the JSON object, nothing else.`;
+IMPORTANT: Respond with ONLY the JSON object, nothing else. Start your response with { and end with }.`;
     };
 
     console.log('Sending request to OpenAI API...');
     
-    // Configure model based on analysis mode
+    // Configure model based on analysis mode with stricter JSON requirements
     const modelConfig = {
       model: 'gpt-4o-mini',
-      temperature: analysisMode === 'fast' ? 0.2 : 0.1,
+      temperature: analysisMode === 'fast' ? 0.1 : 0.05, // Lower temperature for more consistent JSON
       max_tokens: analysisMode === 'fast' ? 4000 : 8000,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      top_p: 0.8, // Reduced for more focused responses
+      frequency_penalty: 0.1,
+      presence_penalty: 0.1
     };
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -268,12 +271,9 @@ Remember: Respond with ONLY the JSON object, nothing else.`;
           },
           {
             role: 'user',
-            content: `Score these markets: ${userPrompt}`
+            content: `Score these markets based on: ${userPrompt}`
           }
-        ],
-        top_p: 0.9,
-        frequency_penalty: 0.3,
-        presence_penalty: 0.1
+        ]
       }),
     });
 
@@ -301,6 +301,12 @@ Remember: Respond with ONLY the JSON object, nothing else.`;
       const validation = validateResponse(parsedResponse);
       if (!validation.isValid) {
         console.error('Response validation failed:', validation.errors);
+        
+        // If we have basic structure but no scores, provide helpful error
+        if (parsedResponse.suggested_title && parsedResponse.prompt_summary && (!parsedResponse.scores || parsedResponse.scores.length === 0)) {
+          throw new Error(`Analysis completed but no market scores were generated for "${userPrompt}". This can happen when the criteria is too complex or specific. Try simplifying your prompt or using Fast Analysis mode.`);
+        }
+        
         throw new Error(`Response validation failed: ${validation.errors.join(', ')}`);
       }
       
@@ -308,10 +314,12 @@ Remember: Respond with ONLY the JSON object, nothing else.`;
       console.error('Failed to parse AI response:', parseError.message);
       console.error('Raw AI content preview:', aiContent.substring(0, 500));
       
-      // Provide more specific error guidance
+      // Provide more specific error guidance based on the error type
       let errorMessage = 'Failed to parse AI response. ';
       if (parseError.message.includes('JSON')) {
         errorMessage += 'The AI provided malformed JSON. Try using Fast Analysis mode or simplifying your prompt.';
+      } else if (parseError.message.includes('no market scores')) {
+        errorMessage += 'No market scores were generated. Try rephrasing your criteria to be more specific or use Fast Analysis mode.';
       } else {
         errorMessage += 'Please try again with a simpler prompt or use Fast Analysis mode for better reliability.';
       }
@@ -322,14 +330,30 @@ Remember: Respond with ONLY the JSON object, nothing else.`;
     // Final validation to ensure we have usable data
     if (!parsedResponse.scores || parsedResponse.scores.length === 0) {
       console.error('No market scores found in validated response');
-      throw new Error('Analysis completed but no market scores were generated. Please try rephrasing your criteria or use Fast Analysis mode.');
+      throw new Error(`Analysis completed but no market scores were generated for "${userPrompt}". This can happen when the criteria is too specific or complex. Try simplifying your prompt or use Fast Analysis mode.`);
     }
 
-    console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
+    // Count valid scores
+    const validScores = parsedResponse.scores.filter((score: any) => 
+      score && 
+      typeof score.market === 'string' && 
+      typeof score.score === 'number' && 
+      score.score >= 0 && score.score <= 100 &&
+      typeof score.reasoning === 'string'
+    );
+
+    if (validScores.length === 0) {
+      throw new Error(`No valid market scores found in the analysis. The AI response contained ${parsedResponse.scores.length} scores but none were properly formatted. Try using Fast Analysis mode or simplifying your prompt.`);
+    }
+
+    console.log(`Successfully processed ${validScores.length} valid market scores in ${analysisMode} mode`);
 
     return new Response(JSON.stringify({
       success: true,
-      data: parsedResponse
+      data: {
+        ...parsedResponse,
+        scores: validScores // Only return valid scores
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
