@@ -88,7 +88,8 @@ const TerritoryTargeterPageContent = () => {
     exportTerritoryAnalysisToCSV({
       cbsaData,
       scores: allScores,
-      analysis: currentAnalysis
+      analysis: currentAnalysis,
+      executiveSummary // Pass the executive summary to the export
     });
   };
 

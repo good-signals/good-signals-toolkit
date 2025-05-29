@@ -6,6 +6,7 @@ export interface TerritoryExportData {
   cbsaData: CBSAData[];
   scores: CBSAScore[];
   analysis: TerritoryAnalysis;
+  executiveSummary?: string;
 }
 
 const formatPopulationGrowth = (growth: number) => {
@@ -14,7 +15,7 @@ const formatPopulationGrowth = (growth: number) => {
 };
 
 export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): void => {
-  const { cbsaData, analysis } = exportData;
+  const { cbsaData, analysis, executiveSummary } = exportData;
 
   // Merge data for CSV
   const csvData = cbsaData.map(cbsa => {
@@ -56,33 +57,70 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
     return row;
   });
 
-  // Create CSV content
+  // Build CSV content with enhanced sections
+  const csvContent = [];
+  
+  // Header section with metadata
+  csvContent.push(`Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`);
+  csvContent.push(`Criteria Count: ${analysis.criteriaColumns.length}`);
+  csvContent.push(`Market Signal Score: ${analysis.marketSignalScore}%`);
+  csvContent.push(`Analysis Summary: ${analysis.criteriaColumns.map(c => c.title).join(', ')}`);
+  csvContent.push('');
+
+  // AI Logic Summary section
+  if (analysis.criteriaColumns.length > 0) {
+    csvContent.push('=== AI LOGIC SUMMARY ===');
+    csvContent.push('');
+    
+    analysis.criteriaColumns.forEach((column, index) => {
+      csvContent.push(`Criteria ${index + 1}: ${column.title}`);
+      csvContent.push(`User Prompt: "${column.prompt}"`);
+      csvContent.push(`Analysis Mode: ${column.analysisMode === 'fast' ? 'Fast' : 'Detailed'}`);
+      csvContent.push(`AI Logic: ${column.logicSummary}`);
+      csvContent.push(`Included in Market Signal Score: ${column.isIncludedInSignalScore !== false ? 'Yes' : 'No'}`);
+      csvContent.push('');
+    });
+  }
+
+  // Executive Summary section
+  if (executiveSummary) {
+    csvContent.push('=== AI EXECUTIVE SUMMARY ===');
+    csvContent.push('');
+    // Split executive summary into paragraphs and add each as a separate line
+    const summaryParagraphs = executiveSummary.split('\n').filter(p => p.trim());
+    summaryParagraphs.forEach(paragraph => {
+      csvContent.push(paragraph.trim());
+    });
+    csvContent.push('');
+  }
+
+  // Market data table section
+  csvContent.push('=== MARKET ANALYSIS DATA ===');
+  csvContent.push('');
+  
+  // Add column headers
   const headers = Object.keys(csvData[0]);
-  const csvContent = [
-    // Add metadata header
-    `Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`,
-    `Criteria Count: ${analysis.criteriaColumns.length}`,
-    `Market Signal Score: ${analysis.marketSignalScore}%`,
-    `Analysis Summary: ${analysis.criteriaColumns.map(c => c.title).join(', ')}`,
-    '', // Empty row
-    // Add column headers
-    headers.join(','),
-    // Add data rows
-    ...csvData.map(row => 
-      headers.map(header => {
-        const value = row[header as keyof typeof row];
-        // Escape quotes and wrap in quotes if contains comma
-        const stringValue = String(value);
-        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-          return `"${stringValue.replace(/"/g, '""')}"`;
-        }
-        return stringValue;
-      }).join(',')
-    )
-  ].join('\n');
+  csvContent.push(headers.join(','));
+  
+  // Add data rows
+  csvData.forEach(row => {
+    const rowValues = headers.map(header => {
+      const value = row[header as keyof typeof row];
+      // Escape quotes and wrap in quotes if contains comma
+      const stringValue = String(value);
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    });
+    csvContent.push(rowValues.join(','));
+  });
+
+  // Join all content
+  const finalCsvContent = csvContent.join('\n');
 
   // Download CSV
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([finalCsvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   
   if (link.download !== undefined) {
