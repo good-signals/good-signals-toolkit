@@ -493,6 +493,31 @@ export const useTerritoryScoring = () => {
     });
   };
 
+  const updateIncludedColumns = (columnToggleSettings: { [columnId: string]: boolean }) => {
+    if (!currentAnalysis) return;
+
+    const updatedAnalysis = {
+      ...currentAnalysis,
+      includedColumns: Object.entries(columnToggleSettings)
+        .filter(([_, isIncluded]) => isIncluded)
+        .map(([columnId]) => columnId)
+    };
+
+    setCurrentAnalysis(updatedAnalysis);
+  };
+
+  const clearAnalysis = () => {
+    setCurrentAnalysis(null);
+    setError(null);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ANALYSIS_STATE_KEY);
+    
+    toast({
+      title: "Analysis Cleared",
+      description: "Territory analysis has been cleared.",
+    });
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {

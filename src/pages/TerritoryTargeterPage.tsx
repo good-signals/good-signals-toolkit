@@ -74,15 +74,7 @@ const TerritoryTargeterPage = () => {
     exportTerritoryAnalysisToCSV({
       cbsaData,
       scores: allScores,
-      analysis: {
-        ...currentAnalysis,
-        prompt: currentAnalysis.criteriaColumns.map(c => c.prompt).join(' | '),
-        results: {
-          suggested_title: currentAnalysis.criteriaColumns.map(c => c.title).join(' + '),
-          prompt_summary: currentAnalysis.criteriaColumns.map(c => c.logicSummary).join(' | '),
-          scores: allScores
-        }
-      }
+      analysis: currentAnalysis
     });
   };
 

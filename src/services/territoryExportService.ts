@@ -1,3 +1,4 @@
+
 import { CBSAData, CBSAScore, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
 import { format } from 'date-fns';
 
@@ -34,9 +35,9 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
   const csvContent = [
     // Add metadata header
     `Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`,
-    `Scoring Criteria: "${analysis.prompt}"`,
+    `Criteria Count: ${analysis.criteriaColumns.length}`,
     `Market Signal Score: ${analysis.marketSignalScore}%`,
-    `Executive Summary: "${analysis.results.prompt_summary}"`,
+    `Analysis Summary: ${analysis.criteriaColumns.map(c => c.title).join(', ')}`,
     '', // Empty row
     // Add column headers
     headers.join(','),
