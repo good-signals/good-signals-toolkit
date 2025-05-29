@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -5,16 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced JSON extraction function
+// Enhanced JSON extraction function with better error handling
 function extractJSON(text: string): any {
   console.log('Attempting to extract JSON from response...');
+  console.log('Response length:', text.length);
   
   // Try to find JSON in markdown code blocks first
   const markdownJsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?```/i);
   if (markdownJsonMatch) {
     console.log('Found JSON in markdown code block');
     try {
-      return JSON.parse(markdownJsonMatch[1].trim());
+      const jsonContent = markdownJsonMatch[1].trim();
+      return JSON.parse(jsonContent);
     } catch (e) {
       console.log('Failed to parse JSON from markdown block:', e.message);
     }
@@ -25,24 +28,73 @@ function extractJSON(text: string): any {
   if (codeBlockMatch) {
     console.log('Found JSON in generic code block');
     try {
-      return JSON.parse(codeBlockMatch[1].trim());
+      const jsonContent = codeBlockMatch[1].trim();
+      return JSON.parse(jsonContent);
     } catch (e) {
       console.log('Failed to parse JSON from code block:', e.message);
     }
   }
 
   // Look for JSON object starting with { and ending with }
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    console.log('Found JSON object pattern');
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      console.log('Failed to parse JSON object:', e.message);
+  // Try to find complete JSON objects
+  const jsonMatches = text.match(/\{[\s\S]*?\}/g);
+  if (jsonMatches) {
+    // Try each match, starting with the longest one
+    const sortedMatches = jsonMatches.sort((a, b) => b.length - a.length);
+    
+    for (const match of sortedMatches) {
+      console.log('Trying JSON object of length:', match.length);
+      try {
+        const parsed = JSON.parse(match);
+        // Basic validation to ensure it looks like our expected structure
+        if (parsed && typeof parsed === 'object' && parsed.suggested_title && Array.isArray(parsed.scores)) {
+          console.log('Successfully parsed JSON object');
+          return parsed;
+        }
+      } catch (e) {
+        console.log('Failed to parse JSON object:', e.message);
+        continue;
+      }
     }
   }
 
-  // Try to parse the entire text as JSON
+  // If we get here, try to repair truncated JSON
+  console.log('Attempting to repair truncated JSON...');
+  try {
+    // Find the start of the JSON
+    const jsonStart = text.indexOf('{');
+    if (jsonStart !== -1) {
+      let jsonText = text.substring(jsonStart);
+      
+      // Try to find where the scores array ends and repair it
+      const scoresMatch = jsonText.match(/"scores":\s*\[([\s\S]*)/);
+      if (scoresMatch) {
+        const beforeScores = jsonText.substring(0, jsonText.indexOf('"scores"'));
+        const scoresContent = scoresMatch[1];
+        
+        // Count complete score objects
+        const completeScores = [];
+        const scoreMatches = scoresContent.match(/\{[^{}]*"market"[^{}]*"score"[^{}]*"reasoning"[^{}]*\}/g);
+        
+        if (scoreMatches && scoreMatches.length > 0) {
+          console.log(`Found ${scoreMatches.length} complete score objects`);
+          
+          // Reconstruct the JSON with complete scores only
+          const repairedJson = beforeScores + '"scores": [' + scoreMatches.join(', ') + ']}';
+          
+          try {
+            return JSON.parse(repairedJson);
+          } catch (e) {
+            console.log('Failed to parse repaired JSON:', e.message);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log('JSON repair failed:', e.message);
+  }
+
+  // Try to parse the entire text as JSON (last resort)
   try {
     console.log('Attempting to parse entire response as JSON');
     return JSON.parse(text.trim());
@@ -50,7 +102,7 @@ function extractJSON(text: string): any {
     console.log('Failed to parse entire response as JSON:', e.message);
   }
 
-  throw new Error('No valid JSON found in response');
+  throw new Error('No valid JSON found in response. Response may be truncated or malformed.');
 }
 
 // Validate the parsed response structure
@@ -76,15 +128,22 @@ function validateResponse(data: any): boolean {
   }
 
   // Validate first few scores to ensure proper structure
-  for (let i = 0; i < Math.min(3, data.scores.length); i++) {
+  let validScores = 0;
+  for (let i = 0; i < Math.min(5, data.scores.length); i++) {
     const score = data.scores[i];
-    if (!score.market || typeof score.score !== 'number' || !score.reasoning) {
-      console.log(`Invalid score structure at index ${i}`);
-      return false;
+    if (score.market && typeof score.score === 'number' && score.reasoning) {
+      validScores++;
+    } else {
+      console.log(`Invalid score structure at index ${i}:`, score);
     }
   }
 
-  console.log(`Response validation passed with ${data.scores.length} scores`);
+  if (validScores === 0 && data.scores.length > 0) {
+    console.log('No valid scores found in response');
+    return false;
+  }
+
+  console.log(`Response validation passed with ${data.scores.length} scores (${validScores} validated)`);
   return true;
 }
 
@@ -114,7 +173,7 @@ serve(async (req) => {
     const getSystemPrompt = (mode: string, isChunked: boolean) => {
       const basePrompt = `You are part of the Territory Targeter tool inside the Good Signals platform. Your job is to help users assess and score U.S. markets based on criteria they provide in natural language.
 
-CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, explanations, or text outside the JSON object.`;
+CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, explanations, or text outside the JSON object. Ensure your JSON is complete and properly formatted.`;
 
       const speedOptimizations = mode === 'fast' 
         ? `
@@ -160,6 +219,7 @@ Guidelines:
 - Do not make specific business recommendations—only assess signal strength.
 - Stay consistent in your scoring logic${isChunked ? ' across all chunks' : ''}.
 - ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Include sources in your reasoning where possible and list them in the sources array'}.
+- ENSURE your JSON response is complete and properly terminated.
 
 Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Population: ${cbsa.population.toLocaleString()})`).join(', ')}`;
     };
@@ -171,12 +231,12 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
       ? {
           model: 'llama-3.1-sonar-small-128k-online', // Faster, smaller model
           temperature: 0.2,
-          max_tokens: 4000
+          max_tokens: 6000 // Increased token limit to reduce truncation
         }
       : {
           model: 'llama-3.1-sonar-large-128k-online', // More capable model
           temperature: 0.1,
-          max_tokens: 8000
+          max_tokens: 10000 // Increased token limit to reduce truncation
         };
     
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -221,6 +281,8 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     }
 
     console.log('AI response length:', aiContent.length);
+    console.log('First 200 chars:', aiContent.substring(0, 200));
+    console.log('Last 200 chars:', aiContent.substring(Math.max(0, aiContent.length - 200)));
 
     // Extract and validate JSON from AI response
     let parsedResponse;
@@ -233,8 +295,11 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
       
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError.message);
-      console.error('Raw AI content (first 500 chars):', aiContent.substring(0, 500));
-      throw new Error(`Failed to parse AI response: ${parseError.message}`);
+      console.error('Raw AI content (first 1000 chars):', aiContent.substring(0, 1000));
+      console.error('Raw AI content (last 1000 chars):', aiContent.substring(Math.max(0, aiContent.length - 1000)));
+      
+      // Return a more helpful error message
+      throw new Error(`Failed to parse AI response: ${parseError.message}. The AI response may have been truncated or malformed. Please try again or use Fast Analysis mode for better reliability.`);
     }
 
     console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
