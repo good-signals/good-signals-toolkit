@@ -9,10 +9,16 @@ import ProgressCounter from './ProgressCounter';
 interface PromptInputProps {
   onSubmit: (prompt: string) => void;
   isLoading: boolean;
+  analysisStartTime?: number | null;
   disabled?: boolean;
 }
 
-const PromptInput: React.FC<PromptInputProps> = ({ onSubmit, isLoading, disabled = false }) => {
+const PromptInput: React.FC<PromptInputProps> = ({ 
+  onSubmit, 
+  isLoading, 
+  analysisStartTime,
+  disabled = false 
+}) => {
   const [prompt, setPrompt] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -78,7 +84,8 @@ const PromptInput: React.FC<PromptInputProps> = ({ onSubmit, isLoading, disabled
         {/* Progress Counter */}
         <ProgressCounter 
           isActive={isLoading} 
-          duration={30}
+          duration={75}
+          startTime={analysisStartTime}
         />
       </CardContent>
     </Card>

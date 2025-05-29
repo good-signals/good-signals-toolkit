@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import { CBSAStatus } from '@/components/territory-targeter/table/CBSAStatusSele
 const TerritoryTargeterPage = () => {
   const { user } = useAuth();
   const [cbsaData, setCbsaData] = useState<CBSAData[]>(sampleCBSAData);
-  const { isLoading, currentAnalysis, error, runScoring, clearAnalysis } = useTerritoryScoring();
+  const { isLoading, currentAnalysis, error, analysisStartTime, runScoring, clearAnalysis } = useTerritoryScoring();
 
   // Load saved statuses from localStorage on component mount
   useEffect(() => {
@@ -116,6 +115,7 @@ const TerritoryTargeterPage = () => {
       <PromptInput 
         onSubmit={handlePromptSubmit}
         isLoading={isLoading}
+        analysisStartTime={analysisStartTime}
         disabled={!user}
       />
 

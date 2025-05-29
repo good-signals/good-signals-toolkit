@@ -6,22 +6,38 @@ import { Loader2 } from 'lucide-react';
 interface ProgressCounterProps {
   isActive: boolean;
   duration?: number; // Duration in seconds
+  startTime?: number | null; // Unix timestamp when analysis started
   onComplete?: () => void;
 }
 
 const ProgressCounter: React.FC<ProgressCounterProps> = ({ 
   isActive, 
   duration = 75, // Updated to 75 seconds (middle of 60-90 range)
+  startTime,
   onComplete 
 }) => {
   const [progress, setProgress] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [isResumed, setIsResumed] = useState(false);
 
   useEffect(() => {
     if (!isActive) {
       setProgress(0);
       setTimeElapsed(0);
+      setIsResumed(false);
       return;
+    }
+
+    // Calculate initial elapsed time if we have a start time (resumed analysis)
+    let initialElapsed = 0;
+    if (startTime) {
+      initialElapsed = Math.floor((Date.now() - startTime) / 1000);
+      setTimeElapsed(initialElapsed);
+      setIsResumed(true);
+      
+      // Calculate initial progress
+      const initialProgress = Math.min((initialElapsed / duration) * 100, 95);
+      setProgress(initialProgress);
     }
 
     const interval = setInterval(() => {
@@ -39,7 +55,7 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, duration, onComplete]);
+  }, [isActive, duration, startTime, onComplete]);
 
   // Complete the progress when isActive becomes false (scoring finished)
   useEffect(() => {
@@ -49,6 +65,7 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
       const resetTimeout = setTimeout(() => {
         setProgress(0);
         setTimeElapsed(0);
+        setIsResumed(false);
       }, 1000);
       
       return () => clearTimeout(resetTimeout);
@@ -78,7 +95,12 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium">
-              {isCompleted ? 'Analysis complete!' : 'AI analyzing markets...'}
+              {isCompleted 
+                ? 'Analysis complete!' 
+                : isResumed 
+                  ? 'Analysis resumed - AI analyzing markets...'
+                  : 'AI analyzing markets...'
+              }
             </span>
             <span className="text-sm text-muted-foreground">
               {formatTime(timeElapsed)}
@@ -90,7 +112,9 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
       <div className="text-xs text-muted-foreground">
         {isCompleted 
           ? 'Market scores have been generated and added to the table below.'
-          : 'Perplexity AI is researching and scoring each market based on your criteria. This typically takes 60-90 seconds.'
+          : isResumed
+            ? 'Your analysis continued running in the background. This typically takes 60-90 seconds total.'
+            : 'Perplexity AI is researching and scoring each market based on your criteria. This typically takes 60-90 seconds.'
         }
       </div>
     </div>
