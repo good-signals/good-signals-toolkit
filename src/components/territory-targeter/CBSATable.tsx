@@ -1,11 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CBSAScore } from '@/types/territoryTargeterTypes';
-import { getSignalStatus } from '@/lib/assessmentDisplayUtils';
+import MarketSignalSummary from './table/MarketSignalSummary';
+import CBSATableHeader, { SortConfig } from './table/CBSATableHeader';
+import CBSATableRow from './table/CBSATableRow';
 
 interface CBSATableProps {
   cbsaData: CBSAData[];
@@ -14,36 +13,6 @@ interface CBSATableProps {
   accountGoodThreshold?: number | null;
   accountBadThreshold?: number | null;
 }
-
-type SortConfig = {
-  key: 'name' | 'state' | 'region' | 'population' | 'populationGrowth' | 'score' | 'reasoning';
-  direction: 'asc' | 'desc';
-} | null;
-
-const getScorePillClasses = (signalStatus: { text: string; color: string; iconColor: string }) => {
-  switch (signalStatus.text) {
-    case 'Good':
-      return 'bg-green-500 text-white';
-    case 'Bad':
-      return 'bg-red-500 text-white';
-    case 'Neutral':
-      return 'bg-yellow-500 text-white';
-    default:
-      return 'bg-gray-400 text-white';
-  }
-};
-
-const formatPopulationGrowth = (growth: number) => {
-  const percentage = (growth * 100).toFixed(2);
-  return growth >= 0 ? `+${percentage}%` : `${percentage}%`;
-};
-
-const getGrowthColor = (growth: number) => {
-  if (growth > 0.03) return 'text-green-600'; // Above 3% growth
-  if (growth > 0) return 'text-green-500'; // Positive growth
-  if (growth > -0.01) return 'text-yellow-600'; // Slight decline
-  return 'text-red-500'; // Significant decline
-};
 
 const CBSATable: React.FC<CBSATableProps> = ({
   cbsaData,
@@ -107,144 +76,35 @@ const CBSATable: React.FC<CBSATableProps> = ({
     });
   };
 
-  const getSortIcon = (key: SortConfig['key']) => {
-    if (sortConfig?.key !== key) {
-      return <ArrowUpDown className="h-4 w-4" />;
-    }
-    return sortConfig.direction === 'asc' 
-      ? <ArrowUp className="h-4 w-4" />
-      : <ArrowDown className="h-4 w-4" />;
-  };
-
-  // Get signal status for market signal score
-  const marketSignalStatus = getSignalStatus(marketSignalScore, accountGoodThreshold, accountBadThreshold);
-
   return (
     <div className="space-y-4">
       {/* Market Signal Score Summary - Only show when scores are available */}
       {hasScores && (
-        <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-          <span className="text-sm font-medium">Market Signal Score:</span>
-          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(marketSignalStatus)}`}>
-            {marketSignalScore}%
-          </span>
-          <span className="text-sm text-muted-foreground">
-            (Average of all market scores)
-          </span>
-        </div>
+        <MarketSignalSummary 
+          marketSignalScore={marketSignalScore} 
+          accountGoodThreshold={accountGoodThreshold}
+          accountBadThreshold={accountBadThreshold}
+        />
       )}
 
       {/* Table */}
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[200px]">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('name')}
-                  className="h-auto p-0 font-medium"
-                >
-                  CBSA Name
-                  {getSortIcon('name')}
-                </Button>
-              </TableHead>
-              <TableHead className="w-[80px]">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('state')}
-                  className="h-auto p-0 font-medium"
-                >
-                  State
-                  {getSortIcon('state')}
-                </Button>
-              </TableHead>
-              <TableHead className="w-[120px]">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('region')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Region
-                  {getSortIcon('region')}
-                </Button>
-              </TableHead>
-              <TableHead className="w-[120px] text-right">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('population')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Population
-                  {getSortIcon('population')}
-                </Button>
-              </TableHead>
-              <TableHead className="w-[100px] text-right">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleSort('populationGrowth')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Growth
-                  {getSortIcon('populationGrowth')}
-                </Button>
-              </TableHead>
-              {hasScores && (
-                <>
-                  <TableHead className="w-[100px] text-center">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('score')}
-                      className="h-auto p-0 font-medium"
-                    >
-                      Score
-                      {getSortIcon('score')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="min-w-[300px]">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('reasoning')}
-                      className="h-auto p-0 font-medium"
-                    >
-                      AI Reasoning
-                      {getSortIcon('reasoning')}
-                    </Button>
-                  </TableHead>
-                </>
-              )}
-            </TableRow>
-          </TableHeader>
+          <CBSATableHeader 
+            hasScores={hasScores} 
+            sortConfig={sortConfig} 
+            onSort={handleSort} 
+          />
           <TableBody>
-            {sortedData.map((row) => {
-              const signalStatus = getSignalStatus(row.score, accountGoodThreshold, accountBadThreshold);
-              
-              return (
-                <TableRow key={row.id}>
-                  <TableCell className="font-medium">{row.name}</TableCell>
-                  <TableCell>{row.state}</TableCell>
-                  <TableCell>{row.region}</TableCell>
-                  <TableCell className="text-right">{row.population.toLocaleString()}</TableCell>
-                  <TableCell className={`text-right font-medium ${getGrowthColor(row.populationGrowth)}`}>
-                    {formatPopulationGrowth(row.populationGrowth)}
-                  </TableCell>
-                  {hasScores && (
-                    <>
-                      <TableCell className="text-center">
-                        {row.score !== null ? (
-                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(signalStatus)}`}>
-                            {row.score}%
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">N/A</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">{row.reasoning || 'No reasoning available'}</TableCell>
-                    </>
-                  )}
-                </TableRow>
-              );
-            })}
+            {sortedData.map((row) => (
+              <CBSATableRow
+                key={row.id}
+                row={row}
+                hasScores={hasScores}
+                accountGoodThreshold={accountGoodThreshold}
+                accountBadThreshold={accountBadThreshold}
+              />
+            ))}
           </TableBody>
         </Table>
       </div>
