@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,13 +57,13 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     direction: 'desc',
   });
 
-  // Track previous isDeleting state to detect when deletion actually completes
   const prevIsDeletingRef = useRef(isDeleting);
 
-  // Query to get document counts for all assessments
+  // Enhanced document counts query with better error handling
   const { data: documentCounts = {} } = useQuery<Record<string, number>>({
     queryKey: ['assessmentDocumentCounts', assessmentsData.map(a => a.id)],
     queryFn: async () => {
+      console.log('Fetching document counts for assessments:', assessmentsData.length);
       const counts: Record<string, number> = {};
       await Promise.all(
         assessmentsData.map(async (assessment) => {
@@ -75,9 +76,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           }
         })
       );
+      console.log('Document counts fetched:', counts);
       return counts;
     },
     enabled: assessmentsData.length > 0,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
   const { data: documentsForSelectedAssessment, refetch: refetchDocuments } = useQuery<AssessmentDocument[]>({
@@ -100,7 +103,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     );
   }, [assessmentsData]);
 
-  // Only clear dialog state when deletion actually transitions from pending to complete
   useEffect(() => {
     const prevIsDeleting = prevIsDeletingRef.current;
     const currentIsDeleting = isDeleting;
@@ -112,15 +114,13 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
       idsToDelete 
     });
 
-    // Only clear state if we were deleting and now we're not (deletion completed)
     if (prevIsDeleting && !currentIsDeleting && showDeleteDialog) {
-      console.log('Deletion actually completed, clearing dialog state');
+      console.log('Deletion completed, clearing dialog state');
       setShowDeleteDialog(false);
       setIdsToDelete([]);
       setSelectedAssessmentIds([]);
     }
 
-    // Update the ref for next time
     prevIsDeletingRef.current = currentIsDeleting;
   }, [isDeleting, showDeleteDialog]);
 
@@ -174,47 +174,34 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   };
 
   const openDeleteDialog = (item: SiteAssessment | string[]) => {
-    console.log('=== Opening delete dialog ===');
-    console.log('Item to delete:', item);
-    console.log('Current isDeleting state:', isDeleting);
+    console.log('Opening delete dialog for:', item);
     
     if (Array.isArray(item)) {
       if (item.length === 0) {
         console.log('No assessments selected for deletion');
         return;
       }
-      console.log('Setting up bulk deletion for IDs:', item);
       setIdsToDelete(item);
     } else {
-      console.log('Setting up single deletion for assessment:', item.id);
       setIdsToDelete([item.id]);
     }
     
-    console.log('Opening delete dialog');
     setShowDeleteDialog(true);
   };
 
   const confirmDelete = () => {
-    console.log('=== Confirming delete ===');
-    console.log('IDs to delete:', idsToDelete);
-    console.log('Current isDeleting state:', isDeleting);
+    console.log('Confirming delete for IDs:', idsToDelete);
     
-    if (idsToDelete.length === 0) {
-      console.log('No assessments to delete - aborting');
+    if (idsToDelete.length === 0 || isDeleting) {
+      console.log('Aborting delete - no IDs or already deleting');
       return;
     }
     
-    if (isDeleting) {
-      console.log('Already deleting - aborting to prevent double deletion');
-      return;
-    }
-    
-    console.log('Calling onDeleteCommit with IDs:', idsToDelete);
     onDeleteCommit(idsToDelete);
   };
 
   const cancelDelete = () => {
-    console.log('=== Canceling delete ===');
+    console.log('Canceling delete dialog');
     setShowDeleteDialog(false);
     setIdsToDelete([]);
   };
@@ -228,12 +215,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     refetchDocuments();
   };
 
-  // Debug the delete dialog state
-  console.log('Delete dialog state:', {
+  console.log('Table state:', {
     showDeleteDialog,
     idsToDelete,
     isDeleting,
-    selectedAssessmentIds,
+    selectedCount: selectedAssessmentIds.length,
     assessmentsCount: assessmentsData.length
   });
 
@@ -266,10 +252,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => {
-              console.log('Delete selected button clicked with IDs:', selectedAssessmentIds);
-              openDeleteDialog(selectedAssessmentIds);
-            }}
+            onClick={() => openDeleteDialog(selectedAssessmentIds)}
             disabled={isDeleting}
           >
             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
@@ -287,10 +270,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
         onSelectRow={handleSelectRow}
         onViewDetails={onViewDetails}
         onEdit={onEdit}
-        onDelete={(assessment) => {
-          console.log('Single delete clicked for assessment:', assessment.id);
-          openDeleteDialog(assessment);
-        }}
+        onDelete={(assessment) => openDeleteDialog(assessment)}
         onAttachmentsClick={handleAttachmentsClick}
         isDeleting={isDeleting}
         assessmentToDelete={null}
@@ -300,9 +280,8 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
       <AlertDialog 
         open={showDeleteDialog} 
         onOpenChange={(open) => {
-          console.log('AlertDialog onOpenChange called with:', open);
+          console.log('AlertDialog onOpenChange:', open);
           if (!open && !isDeleting) {
-            console.log('Closing dialog via onOpenChange');
             cancelDelete();
           }
         }}
@@ -319,19 +298,13 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel 
-              onClick={() => {
-                console.log('Cancel button clicked');
-                cancelDelete();
-              }} 
+              onClick={cancelDelete} 
               disabled={isDeleting}
             >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                console.log('Delete button clicked');
-                confirmDelete();
-              }}
+              onClick={confirmDelete}
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >

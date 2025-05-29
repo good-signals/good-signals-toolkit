@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3, PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import { getSiteAssessmentsForUser, deleteSiteAssessment } from '@/services/site
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
 
-// Define the AssessmentStep type
 export type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'assessmentDetails';
 
 const SESSION_STORAGE_KEYS = {
@@ -35,10 +35,8 @@ const SiteProspectorPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // State for forcing selection clear in child table
   const [clearSelectionsKey, setClearSelectionsKey] = useState(0);
 
-  // ... useEffect for session storage remains the same ...
   useEffect(() => {
     if (currentStep !== 'idle') {
       sessionStorage.setItem(SESSION_STORAGE_KEYS.CURRENT_STEP, currentStep);
@@ -53,11 +51,11 @@ const SiteProspectorPage = () => {
         sessionStorage.removeItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID);
       }
     } else {
-      // Clear all when back to idle
       Object.values(SESSION_STORAGE_KEYS).forEach(key => sessionStorage.removeItem(key));
     }
   }, [currentStep, activeAssessmentId, selectedMetricSetId]);
 
+  // Enhanced assessments query with better cache management
   const { 
     data: assessments = [], 
     isLoading: isLoadingAssessments, 
@@ -65,21 +63,32 @@ const SiteProspectorPage = () => {
     refetch: refetchAssessments,
   } = useQuery<SiteAssessment[], Error>({
     queryKey: ['siteAssessments', user?.id],
-    queryFn: () => {
+    queryFn: async () => {
+      console.log('Fetching site assessments for user:', user?.id);
       if (!user?.id) return Promise.resolve([]);
-      return getSiteAssessmentsForUser(user.id);
+      
+      try {
+        const result = await getSiteAssessmentsForUser(user.id);
+        console.log('Fetched assessments:', result.length, 'items');
+        return result;
+      } catch (error) {
+        console.error('Error fetching assessments:', error);
+        // Clear potentially stale cache on error
+        queryClient.removeQueries({ queryKey: ['siteAssessments'] });
+        throw error;
+      }
     },
     enabled: !!user?.id && currentStep === 'idle',
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 2 * 60 * 1000, // 2 minutes
   });
   
+  // Enhanced deletion mutation with better error handling and cache management
   const deleteMutation = useMutation({
     mutationFn: async (assessmentIds: string[]) => {
-      console.log('=== MUTATION STARTED ===');
-      console.log('Assessment IDs to delete:', assessmentIds);
-      console.log('User ID:', user?.id);
+      console.log('Starting deletion mutation for IDs:', assessmentIds);
       
       if (!user?.id) {
-        console.error('User not authenticated');
         throw new Error("User not authenticated");
       }
       
@@ -89,50 +98,50 @@ const SiteProspectorPage = () => {
 
       for (const assessmentId of assessmentIds) {
         try {
-          console.log(`Attempting to delete assessment: ${assessmentId}`);
+          console.log(`Deleting assessment: ${assessmentId}`);
           await deleteSiteAssessment(assessmentId, user.id);
-          console.log(`Successfully deleted assessment: ${assessmentId}`);
+          console.log(`Successfully deleted: ${assessmentId}`);
           results.push({ id: assessmentId, success: true });
           successCount++;
         } catch (error) {
-          console.error(`Failed to delete assessment ${assessmentId}:`, error);
+          console.error(`Failed to delete ${assessmentId}:`, error);
           results.push({ id: assessmentId, success: false, error });
           failureCount++;
         }
       }
 
-      console.log(`Deletion complete - Success: ${successCount}, Failures: ${failureCount}`);
+      console.log(`Deletion results - Success: ${successCount}, Failures: ${failureCount}`);
 
       if (failureCount > 0) {
         const errorMessage = `Failed to delete ${failureCount} out of ${results.length} assessments`;
-        console.error(errorMessage);
         throw new Error(errorMessage);
       }
 
       return { successCount, deletedIds: assessmentIds, results };
     },
     onSuccess: ({ successCount, deletedIds }) => { 
-      console.log('=== MUTATION SUCCESS ===');
-      console.log('Success count:', successCount);
-      console.log('Deleted IDs:', deletedIds);
+      console.log('Deletion mutation successful:', { successCount, deletedIds });
       
       toast({ 
         title: `Successfully deleted ${successCount} assessment${successCount > 1 ? 's' : ''}` 
       });
       
-      // Invalidate and refetch the assessments
-      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+      // Clear all related cache entries to ensure fresh data
+      queryClient.removeQueries({ queryKey: ['siteAssessments'] });
+      queryClient.removeQueries({ queryKey: ['assessmentDetails'] });
+      queryClient.removeQueries({ queryKey: ['assessmentDocuments'] });
+      
+      // Refetch assessments to ensure UI is up to date
+      refetchAssessments();
       setClearSelectionsKey(prev => prev + 1); 
       
-      // If the active assessment was deleted, cancel the process
       if (activeAssessmentId && deletedIds.includes(activeAssessmentId)) {
-        console.log('Deleted assessment was active, canceling process');
+        console.log('Active assessment was deleted, returning to idle');
         handleCancelAssessmentProcess(); 
       }
     },
     onError: (error) => {
-      console.log('=== MUTATION ERROR ===');
-      console.error('Deletion error:', error);
+      console.error('Deletion mutation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error deleting assessments",
@@ -141,34 +150,23 @@ const SiteProspectorPage = () => {
       });
     },
     onSettled: () => {
-      console.log('=== MUTATION SETTLED ===');
-      console.log('Mutation is now complete (success or error)');
+      console.log('Deletion mutation settled');
     }
   });
   
   const handleDeleteCommit = (idsToDelete: string[]) => {
-    console.log('=== handleDeleteCommit called ===');
-    console.log('IDs to delete:', idsToDelete);
-    console.log('Current mutation state - isPending:', deleteMutation.isPending);
+    console.log('handleDeleteCommit called with:', idsToDelete);
     
-    if (idsToDelete.length === 0) {
-      console.log('No assessments to delete - aborting');
+    if (idsToDelete.length === 0 || deleteMutation.isPending) {
+      console.log('Aborting delete - no IDs or already pending');
       return;
     }
     
-    if (deleteMutation.isPending) {
-      console.log('Mutation already pending - aborting to prevent double deletion');
-      return;
-    }
-    
-    console.log('Starting deletion mutation...');
     deleteMutation.mutate(idsToDelete);
   };
 
   const clearSessionStorageAssessmentState = () => {
-    sessionStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_STEP);
-    sessionStorage.removeItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID);
-    sessionStorage.removeItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID);
+    Object.values(SESSION_STORAGE_KEYS).forEach(key => sessionStorage.removeItem(key));
   };
 
   const handleStartNewAssessment = () => {
@@ -179,10 +177,10 @@ const SiteProspectorPage = () => {
   };
 
   const handleAddressStepCompleted = (assessmentId: string) => {
-    console.log('Address step completed for assessment:', assessmentId);
+    console.log('Address step completed for:', assessmentId);
     
     if (!assessmentId) {
-      console.error('No assessment ID provided to handleAddressStepCompleted');
+      console.error('No assessment ID provided');
       toast({
         title: "Error",
         description: "Failed to proceed to next step. Please try again.",
@@ -194,7 +192,8 @@ const SiteProspectorPage = () => {
     try {
       setActiveAssessmentId(assessmentId);
       setCurrentStep('selectMetrics');
-      refetchAssessments();
+      // Invalidate cache to ensure fresh data when returning to list
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
       console.log('Successfully moved to selectMetrics step');
     } catch (error) {
       console.error('Error in handleAddressStepCompleted:', error);
@@ -214,12 +213,16 @@ const SiteProspectorPage = () => {
   };
 
   const handleMetricValuesSubmitted = (assessmentId: string) => {
-    console.log('Metric values submitted for assessment:', assessmentId);
+    console.log('Metric values submitted for:', assessmentId);
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null); 
     setCurrentStep('idle');
     clearSessionStorageAssessmentState();
-    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] }); 
+    
+    // Clear all related cache entries to ensure fresh scores
+    queryClient.removeQueries({ queryKey: ['siteAssessments'] });
+    queryClient.removeQueries({ queryKey: ['assessmentDetails'] });
+    
     toast({
       title: "Assessment Updated",
       description: "Your site assessment has been successfully updated.",
@@ -232,7 +235,9 @@ const SiteProspectorPage = () => {
     setSelectedMetricSetId(null);
     setCurrentStep('idle');
     clearSessionStorageAssessmentState();
-    refetchAssessments(); 
+    
+    // Ensure fresh data when returning to list
+    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
   };
   
   const handleBackFromMetricSelection = () => {
@@ -282,11 +287,12 @@ const SiteProspectorPage = () => {
     }
   };
 
-  // Debug the current deletion state
-  console.log('SiteProspectorPage deletion state:', {
+  console.log('SiteProspectorPage state:', {
+    currentStep,
+    activeAssessmentId,
+    selectedMetricSetId,
     isPending: deleteMutation.isPending,
-    isError: deleteMutation.isError,
-    error: deleteMutation.error,
+    assessmentsCount: assessments.length,
     clearSelectionsKey
   });
 
@@ -327,7 +333,6 @@ const SiteProspectorPage = () => {
     );
   }
   
-  // Default view: List of assessments (idle state)
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="flex flex-col items-center text-center mb-8">

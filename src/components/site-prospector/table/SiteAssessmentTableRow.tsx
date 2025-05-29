@@ -44,6 +44,24 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
   isDeletingThis,
   documentCount,
 }) => {
+  // Ensure score is displayed as percentage (should be 0-100 from database)
+  const displayScore = assessment.site_signal_score !== null && assessment.site_signal_score !== undefined
+    ? Math.round(assessment.site_signal_score)
+    : null;
+
+  // Ensure completion is displayed as percentage (should be 0-100 from database)
+  const displayCompletion = assessment.completion_percentage !== null && assessment.completion_percentage !== undefined
+    ? Math.round(assessment.completion_percentage)
+    : null;
+
+  console.log('Table row display scores:', {
+    assessmentId: assessment.id,
+    rawScore: assessment.site_signal_score,
+    displayScore,
+    rawCompletion: assessment.completion_percentage,
+    displayCompletion
+  });
+
   return (
     <TableRow 
       data-state={isSelected ? "selected" : undefined}
@@ -69,17 +87,17 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
         </Badge>
       </TableCell>
       <TableCell className="text-center">
-        {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined ? (
-           <Badge variant={assessment.site_signal_score >= 75 ? "default" : assessment.site_signal_score >= 50 ? "secondary" : "destructive"}>
-            {assessment.site_signal_score}%
+        {displayScore !== null ? (
+           <Badge variant={displayScore >= 75 ? "default" : displayScore >= 50 ? "secondary" : "destructive"}>
+            {displayScore}%
            </Badge>
         ) : (
           <span className="text-xs text-muted-foreground">N/A</span>
         )}
       </TableCell>
       <TableCell className="text-center">
-        {assessment.completion_percentage !== null && assessment.completion_percentage !== undefined ? (
-          <span>{assessment.completion_percentage}%</span>
+        {displayCompletion !== null ? (
+          <span>{displayCompletion}%</span>
         ) : (
           <span className="text-xs text-muted-foreground">N/A</span>
         )}

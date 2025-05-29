@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
@@ -70,36 +69,45 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   console.log('SiteAssessmentDetailsView props:', { assessmentId, selectedMetricSetId });
 
-  // Improved query with better error handling and retry logic
+  // Enhanced query with better error handling and cache management
   const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError, refetch: refetchAssessment } = useQuery<SiteAssessment, Error>({
     queryKey: ['assessmentDetails', assessmentId],
     queryFn: async () => {
-      console.log('Query function called for assessment ID:', assessmentId);
+      console.log('Fetching assessment details for ID:', assessmentId);
       if (!assessmentId) {
         throw new Error('Assessment ID is required');
       }
+      
       try {
         const result = await getAssessmentDetails(assessmentId);
-        console.log('Assessment query result:', result);
+        console.log('Assessment details fetched successfully:', {
+          id: result.id,
+          name: result.assessment_name,
+          score: result.site_signal_score,
+          completion: result.completion_percentage,
+          metricValuesCount: result.assessment_metric_values?.length || 0
+        });
         return result;
       } catch (error) {
-        console.error('Assessment query error:', error);
-        // Invalidate related queries on error to force refresh
-        queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
+        console.error('Error fetching assessment details:', error);
+        // Clear potentially stale cache entries on error
+        queryClient.removeQueries({ queryKey: ['assessmentDetails', assessmentId] });
+        queryClient.removeQueries({ queryKey: ['siteAssessments'] });
         throw error;
       }
     },
     enabled: !!assessmentId,
     retry: (failureCount, error) => {
-      // Retry up to 3 times for network errors, but not for 404s
-      if (failureCount < 3 && error?.message?.includes('Failed to fetch')) {
+      console.log('Query retry attempt:', failureCount, error?.message);
+      // Retry up to 2 times for network errors, but not for 404s or auth errors
+      if (failureCount < 2 && error?.message?.includes('Failed to fetch')) {
         return true;
       }
       return false;
     },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    staleTime: 30 * 1000, // 30 seconds - shorter to ensure fresh data
+    gcTime: 2 * 60 * 1000, // 2 minutes
   });
 
   // Fetch documents separately with error handling
@@ -116,13 +124,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         return result;
       } catch (error) {
         console.error('Documents fetch error:', error);
-        // Return empty array instead of throwing to prevent blocking the main view
         return [];
       }
     },
     enabled: !!assessmentId,
     retry: 2,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
   // Fetch TargetMetricSet with improved error handling
@@ -146,7 +153,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     queryKey: ['userAdminAccounts', user?.id],
     queryFn: () => user ? fetchUserAccountsWithAdminRole(user.id) : Promise.resolve([]),
     enabled: !!user,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
   });
 
   const accountSettings = useMemo(() => {
@@ -156,18 +163,35 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     return null;
   }, [userAccounts]);
 
+  // Enhanced mutation with better cache invalidation
   const updateScoresMutation = useMutation({
-    mutationFn: (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => 
-      updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
+    mutationFn: (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => {
+      console.log('Updating scores via mutation:', params);
+      return updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage);
+    },
+    onSuccess: (updatedAssessment) => {
+      console.log('Scores updated successfully:', {
+        id: updatedAssessment.id,
+        newScore: updatedAssessment.site_signal_score,
+        newCompletion: updatedAssessment.completion_percentage
+      });
+      
+      // Invalidate and update cache with fresh data
+      queryClient.setQueryData(['assessmentDetails', assessmentId], updatedAssessment);
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
     },
     onError: (error: Error) => {
-      console.error("Score Update Failed", `Could not save updated scores: ${error.message}`);
+      console.error("Score update failed:", error);
+      toast({
+        title: "Score Update Failed",
+        description: `Could not save updated scores: ${error.message}`,
+        variant: "destructive"
+      });
     },
   });
 
+  // Enhanced mutation with better cache invalidation
   const generateSummaryMutation = useMutation({
     mutationFn: async () => {
       if (!assessment || !targetMetricSet || !user) {
@@ -216,10 +240,20 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const metricValues = useMemo(() => assessment?.assessment_metric_values || [], [assessment]);
   const siteVisitRatings = useMemo(() => assessment?.site_visit_ratings || [], [assessment]);
 
+  // Enhanced score calculation with better validation and logging
   const { overallSiteSignalScore, completionPercentage, detailedMetricScores } = useMemo(() => {
     if (!targetMetricSet || !metricValues) {
+      console.log('Missing data for score calculation:', { 
+        hasTargetMetricSet: !!targetMetricSet, 
+        hasMetricValues: !!metricValues 
+      });
       return { overallSiteSignalScore: null, completionPercentage: 0, detailedMetricScores: new Map() };
     }
+
+    console.log('Calculating scores with:', {
+      settingsCount: targetMetricSet.user_custom_metrics_settings?.length || 0,
+      metricValuesCount: metricValues.length
+    });
 
     const details = new Map<string, { score: number | null; enteredValue: any; targetValue: any; higherIsBetter: boolean; notes: string | null; imageUrl: string | null }>();
     (targetMetricSet.user_custom_metrics_settings || []).forEach(setting => {
@@ -251,38 +285,49 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     
     const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score));
 
+    console.log('Calculated scores:', {
+      overallScore,
+      completion,
+      numMetricsWithValues,
+      totalMetrics: targetMetricSet.user_custom_metrics_settings?.length || 0
+    });
+
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
   }, [targetMetricSet, metricValues]);
 
+  // Enhanced useEffect with better score comparison and logging
   useEffect(() => {
-    if (assessment && targetMetricSet && user) {
+    if (assessment && targetMetricSet && user && !updateScoresMutation.isPending) {
       const storedScore = assessment.site_signal_score;
       const storedCompletion = assessment.completion_percentage;
 
-      const isOverallScoreValid = typeof overallSiteSignalScore === 'number';
-      const isCompletionValid = typeof completionPercentage === 'number';
+      console.log('Score comparison check:', {
+        assessmentId: assessment.id,
+        calculatedScore: overallSiteSignalScore,
+        storedScore,
+        calculatedCompletion: completionPercentage,
+        storedCompletion,
+        scoresMatch: overallSiteSignalScore === storedScore,
+        completionMatches: completionPercentage === storedCompletion
+      });
 
-      const scoreChanged = isOverallScoreValid && overallSiteSignalScore !== storedScore;
-      const completionChanged = isCompletionValid && completionPercentage !== storedCompletion;
-      
-      const scoreNowNullButWasNumber = overallSiteSignalScore === null && typeof storedScore === 'number';
-      const completionNowNullButWasNumber = completionPercentage === null && typeof storedCompletion === 'number';
-      
-      const scoreNowNumberButWasNull = typeof overallSiteSignalScore === 'number' && storedScore === null;
-      const completionNowNumberButWasNull = typeof completionPercentage === 'number' && storedCompletion === null;
+      // Only update if there's a meaningful difference (avoiding floating point precision issues)
+      const scoresDiffer = overallSiteSignalScore !== storedScore;
+      const completionDiffers = completionPercentage !== storedCompletion;
 
-      if (scoreChanged || completionChanged || scoreNowNullButWasNumber || completionNowNullButWasNumber || scoreNowNumberButWasNull || completionNowNumberButWasNull) {
-        console.log("Recalculated scores differ or initialized, attempting to update DB.", {
+      if (scoresDiffer || completionDiffers) {
+        console.log("Scores differ from database, updating:", {
           assessmentId,
+          scoresDiffer,
+          completionDiffers,
           newScore: overallSiteSignalScore,
-          storedScore,
-          newCompletion: completionPercentage,
-          storedCompletion,
+          newCompletion: completionPercentage
         });
+        
         updateScoresMutation.mutate({ 
           assessmentId, 
-          overallSiteSignalScore: typeof overallSiteSignalScore === 'number' ? overallSiteSignalScore : null, 
-          completionPercentage: typeof completionPercentage === 'number' ? completionPercentage : null 
+          overallSiteSignalScore, 
+          completionPercentage 
         });
       }
     }
@@ -338,10 +383,20 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         <Alert variant="destructive" className="max-w-2xl mx-auto">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error Loading Assessment</AlertTitle>
-          <AlertDescription>{assessmentError.message}</AlertDescription>
+          <AlertDescription>
+            {assessmentError.message}
+            {assessmentError.message.includes('Failed to fetch') && (
+              <div className="mt-2 text-sm">
+                This may be due to a network issue or temporary data inconsistency. Please try refreshing.
+              </div>
+            )}
+          </AlertDescription>
         </Alert>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => refetchAssessment()}>
+          <Button variant="outline" onClick={() => {
+            console.log('Manual refetch triggered');
+            refetchAssessment();
+          }}>
             Try Again
           </Button>
           <Button variant="outline" onClick={onBackToList}>
