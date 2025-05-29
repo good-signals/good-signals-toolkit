@@ -25,6 +25,24 @@ const TerritoryTargeterPageContent = () => {
   const [executiveSummary, setExecutiveSummary] = useState<string>('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   
+  // Use the territory scoring hook
+  const {
+    isLoading,
+    currentAnalysis,
+    error,
+    analysisStartTime,
+    analysisMode,
+    estimatedDuration,
+    isRefreshing,
+    runScoring,
+    refreshColumn,
+    applyManualOverride,
+    toggleColumnInSignalScore,
+    deleteColumn,
+    clearAnalysis,
+    setAnalysisMode
+  } = useTerritoryScoring();
+  
   // Load saved statuses from localStorage on component mount
   useEffect(() => {
     try {
