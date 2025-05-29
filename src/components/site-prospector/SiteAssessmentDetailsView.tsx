@@ -67,6 +67,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isCalculatingScores, setIsCalculatingScores] = useState(false);
 
   console.log('SiteAssessmentDetailsView props:', { assessmentId, selectedMetricSetId });
 
@@ -107,8 +108,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
       return false;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
-    staleTime: 30 * 1000, // 30 seconds - shorter to ensure fresh data
-    gcTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 60 * 1000, // 1 minute - increase to reduce tab switching refetches
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch documents separately with error handling
@@ -163,6 +164,20 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     }
     return null;
   }, [userAccounts]);
+
+  // Store the database scores for fallback display
+  const storedScores = useMemo(() => {
+    if (!assessment) return null;
+    return {
+      overallScore: assessment.site_signal_score,
+      completion: assessment.completion_percentage,
+    };
+  }, [assessment]);
+
+  // Check if all required data is loaded for score calculation
+  const isDataReadyForCalculation = useMemo(() => {
+    return !!assessment && !!targetMetricSet && !isLoadingAccounts;
+  }, [assessment, targetMetricSet, isLoadingAccounts]);
 
   // Fixed mutation with proper return type handling
   const updateScoresMutation = useMutation({
@@ -244,14 +259,14 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   // Enhanced score calculation with better validation and logging
   const { overallSiteSignalScore, completionPercentage, detailedMetricScores } = useMemo(() => {
-    if (!targetMetricSet || !metricValues) {
-      console.log('Missing data for score calculation:', { 
-        hasTargetMetricSet: !!targetMetricSet, 
-        hasMetricValues: !!metricValues 
-      });
+    // Don't calculate if data isn't ready yet
+    if (!isDataReadyForCalculation) {
+      console.log('Data not ready for score calculation, returning nulls');
+      setIsCalculatingScores(true);
       return { overallSiteSignalScore: null, completionPercentage: 0, detailedMetricScores: new Map() };
     }
 
+    setIsCalculatingScores(false);
     console.log('Calculating scores with:', {
       settingsCount: targetMetricSet.user_custom_metrics_settings?.length || 0,
       metricValuesCount: metricValues.length
@@ -295,11 +310,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     });
 
     return { overallSiteSignalScore: overallScore, completionPercentage: completion, detailedMetricScores: details };
-  }, [targetMetricSet, metricValues]);
+  }, [isDataReadyForCalculation, targetMetricSet, metricValues]);
 
-  // Enhanced useEffect with better score comparison and logging
+  // Enhanced useEffect with debouncing and better score comparison
   useEffect(() => {
-    if (assessment && targetMetricSet && user && !updateScoresMutation.isPending) {
+    if (assessment && targetMetricSet && user && !updateScoresMutation.isPending && !isCalculatingScores) {
       const storedScore = assessment.site_signal_score;
       const storedCompletion = assessment.completion_percentage;
 
@@ -326,14 +341,19 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
           newCompletion: completionPercentage
         });
         
-        updateScoresMutation.mutate({ 
-          assessmentId, 
-          overallSiteSignalScore, 
-          completionPercentage 
-        });
+        // Debounce the update to prevent rapid fire updates
+        const timeoutId = setTimeout(() => {
+          updateScoresMutation.mutate({ 
+            assessmentId, 
+            overallSiteSignalScore, 
+            completionPercentage 
+          });
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
       }
     }
-  }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, updateScoresMutation, user]);
+  }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, updateScoresMutation, user, isCalculatingScores]);
 
   const overallSignalStatus = getSignalStatus(
     overallSiteSignalScore,
@@ -366,6 +386,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     isLoadingAccounts, 
     isLoadingTargetMetricSet,
     isLoadingDocuments,
+    isCalculatingScores,
     assessmentError: assessmentError?.message,
     targetMetricSetError: targetMetricSetError?.message,
     documentsError: documentsError?.message,
@@ -374,7 +395,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     documentsCount: documents?.length || 0
   });
 
-  if (isLoadingAssessment || isLoadingAccounts || isLoadingTargetMetricSet) {
+  if (isLoadingAssessment || isLoadingTargetMetricSet) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg">Loading assessment details...</p></div>;
   }
 
@@ -541,6 +562,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
             signalStatus={overallSignalStatus}
             isLoadingAccounts={isLoadingAccounts}
             accountSettings={accountSettings}
+            isCalculating={isCalculatingScores}
+            storedScores={storedScores}
           />
         </CardContent>
       </Card>
