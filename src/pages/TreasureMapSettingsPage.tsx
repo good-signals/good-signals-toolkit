@@ -25,7 +25,7 @@ const TreasureMapSettingsPage = () => {
     map_url: '',
     embed_code: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>('');
 
@@ -34,9 +34,11 @@ const TreasureMapSettingsPage = () => {
   }, [user]);
 
   const loadSettings = async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
-    setIsLoading(true);
     try {
       const accountId = await getUserAccountId(user.id);
       if (!accountId) {
@@ -45,6 +47,7 @@ const TreasureMapSettingsPage = () => {
           description: "Could not find account information.",
           variant: "destructive",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -61,21 +64,24 @@ const TreasureMapSettingsPage = () => {
           description: "Failed to load map settings.",
           variant: "destructive",
         });
+        setIsLoading(false);
         return;
       }
 
       if (data) {
-        setSettings({
+        const loadedSettings: TreasureMapSettings = {
           map_type: data.map_type as 'arcgis' | 'google_my_maps',
           map_url: data.map_url || '',
           embed_code: data.embed_code || ''
-        });
+        };
         
-        // Set preview URL
-        if (data.map_type === 'arcgis' && data.map_url) {
-          setPreviewUrl(data.map_url);
-        } else if (data.map_type === 'google_my_maps' && data.embed_code) {
-          const srcMatch = data.embed_code.match(/src="([^"]+)"/);
+        setSettings(loadedSettings);
+        
+        // Set preview URL based on loaded data
+        if (loadedSettings.map_type === 'arcgis' && loadedSettings.map_url) {
+          setPreviewUrl(loadedSettings.map_url);
+        } else if (loadedSettings.map_type === 'google_my_maps' && loadedSettings.embed_code) {
+          const srcMatch = loadedSettings.embed_code.match(/src="([^"]+)"/);
           if (srcMatch) {
             setPreviewUrl(srcMatch[1]);
           }
@@ -153,7 +159,7 @@ const TreasureMapSettingsPage = () => {
         description: "Map settings saved successfully!",
       });
 
-      // Update preview
+      // Update preview after successful save
       if (settings.map_type === 'arcgis' && settings.map_url) {
         setPreviewUrl(settings.map_url);
       } else if (settings.map_type === 'google_my_maps' && settings.embed_code) {
@@ -179,6 +185,7 @@ const TreasureMapSettingsPage = () => {
       ...prev,
       map_type: newType
     }));
+    // Clear preview when changing map type
     setPreviewUrl('');
   };
 
@@ -197,6 +204,13 @@ const TreasureMapSettingsPage = () => {
         });
       }
     }
+  };
+
+  const handleInputChange = (field: keyof TreasureMapSettings, value: string) => {
+    setSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   if (isLoading) {
@@ -252,8 +266,8 @@ const TreasureMapSettingsPage = () => {
                   id="map_url"
                   type="url"
                   placeholder="https://example.maps.arcgis.com/apps/..."
-                  value={settings.map_url}
-                  onChange={(e) => setSettings(prev => ({ ...prev, map_url: e.target.value }))}
+                  value={settings.map_url || ''}
+                  onChange={(e) => handleInputChange('map_url', e.target.value)}
                 />
                 <p className="text-sm text-muted-foreground">
                   Enter the full URL of your ArcGIS web map or web app.
@@ -267,8 +281,8 @@ const TreasureMapSettingsPage = () => {
                 <Textarea
                   id="embed_code"
                   placeholder='<iframe src="https://www.google.com/maps/d/embed?mid=..." width="640" height="480"></iframe>'
-                  value={settings.embed_code}
-                  onChange={(e) => setSettings(prev => ({ ...prev, embed_code: e.target.value }))}
+                  value={settings.embed_code || ''}
+                  onChange={(e) => handleInputChange('embed_code', e.target.value)}
                   rows={4}
                 />
                 <p className="text-sm text-muted-foreground">
