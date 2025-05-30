@@ -112,21 +112,23 @@ export const acceptInvitation = async (invitationToken: string): Promise<boolean
       return false;
     }
 
-    // Handle the response safely with type checking
-    if (data && typeof data === 'object' && 'success' in data) {
-      const response = data as AcceptInvitationResponse;
+    // Handle the response safely with proper type checking
+    if (data && typeof data === 'object') {
+      // Convert unknown data to our expected type safely
+      const response = data as unknown as AcceptInvitationResponse;
       
-      if (response.success) {
+      if ('success' in response && response.success) {
         toast.success(response.message || 'Successfully joined account!');
         return true;
-      } else {
+      } else if ('error' in response) {
         toast.error(response.error || 'Failed to accept invitation');
         return false;
       }
-    } else {
-      toast.error('Invalid response from server');
-      return false;
     }
+    
+    // Fallback for unexpected response format
+    toast.error('Invalid response from server');
+    return false;
   } catch (error: any) {
     console.error('Unexpected error accepting invitation:', error);
     toast.error('An unexpected error occurred');
