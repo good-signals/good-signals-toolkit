@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, PropsWithChildren, ReactElement } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Account } from '@/services/accountService';
 
@@ -13,11 +13,7 @@ interface SuperAdminContextType {
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
 
-interface SuperAdminProviderProps {
-  children: ReactNode;
-}
-
-export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children }) => {
+export function SuperAdminProvider(props: PropsWithChildren<{}>): ReactElement {
   const { user, isSuperAdmin } = useAuth();
   const [impersonatedAccount, setImpersonatedAccount] = useState<Account | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
@@ -53,10 +49,10 @@ export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children
 
   return (
     <SuperAdminContext.Provider value={contextValue}>
-      {children}
+      {props.children}
     </SuperAdminContext.Provider>
   );
-};
+}
 
 export const useSuperAdminContext = () => {
   const context = useContext(SuperAdminContext);
