@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -10,17 +11,7 @@ import { Building, ArrowLeft, Users, Calendar, MapPin, LogIn } from 'lucide-reac
 import { toast as sonnerToast } from 'sonner';
 import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
 import { useNavigate } from 'react-router-dom';
-
-interface Account {
-  id: string;
-  name: string;
-  category: string | null;
-  subcategory: string | null;
-  address: string | null;
-  created_at: string;
-  member_count: number;
-  admin_count: number;
-}
+import { Account } from '@/services/accountService';
 
 const SuperAdminAccountsPage: React.FC = () => {
   const { setActiveAccount } = useSuperAdminContext();
@@ -41,6 +32,8 @@ const SuperAdminAccountsPage: React.FC = () => {
           subcategory,
           address,
           created_at,
+          signal_good_threshold,
+          signal_bad_threshold,
           account_memberships!inner(
             role
           )
@@ -64,9 +57,11 @@ const SuperAdminAccountsPage: React.FC = () => {
           subcategory: account.subcategory,
           address: account.address,
           created_at: account.created_at,
+          signal_good_threshold: account.signal_good_threshold,
+          signal_bad_threshold: account.signal_bad_threshold,
           member_count: memberCount,
           admin_count: adminCount,
-        } as Account;
+        } as Account & { member_count: number; admin_count: number };
       });
 
       console.log('Processed accounts:', accountsWithCounts);
@@ -74,8 +69,20 @@ const SuperAdminAccountsPage: React.FC = () => {
     },
   });
 
-  const handleAccessAccount = (account: Account) => {
-    setActiveAccount(account);
+  const handleAccessAccount = (account: Account & { member_count: number; admin_count: number }) => {
+    // Create a proper Account object for the context
+    const accountForContext: Account = {
+      id: account.id,
+      name: account.name,
+      category: account.category,
+      subcategory: account.subcategory,
+      address: account.address,
+      created_at: account.created_at,
+      signal_good_threshold: account.signal_good_threshold,
+      signal_bad_threshold: account.signal_bad_threshold,
+    };
+    
+    setActiveAccount(accountForContext);
     navigate('/toolkit-hub');
   };
 
