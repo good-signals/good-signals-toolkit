@@ -1,224 +1,73 @@
 
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, User, LogOut, Settings, Shield, Map, Target, BarChart } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import UserAvatar from "@/components/auth/UserAvatar";
-import { useAuth } from "@/contexts/AuthContext";
-import { fetchUserAccountsWithAdminRole, Account } from "@/services/accountService";
+import React, { useState } from "react";
+import HeaderLogo from "./HeaderLogo";
+import HeaderNavigation from "./HeaderNavigation";
+import HeaderUserMenu from "./HeaderUserMenu";
+import HeaderMobileMenu from "./HeaderMobileMenu";
+import { useHeaderData } from "@/hooks/useHeaderData";
 
 const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [userAccount, setUserAccount] = useState<Account | null>(null);
-  const { user, isSuperAdmin, signOut, authLoading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchUserAccountsWithAdminRole(user.id)
-        .then(accounts => {
-          if (accounts && accounts.length > 0) {
-            setUserAccount(accounts[0]);
-          }
-        })
-        .catch(error => {
-          console.error("Failed to fetch user accounts for header:", error);
-        });
-    }
-  }, [user, authLoading]);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
+  const { user, userAccount, isSuperAdmin, signOut } = useHeaderData();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Determine what to show in the avatar: company logo first, then user avatar
-  const avatarUrl = userAccount?.logo_url || user?.user_metadata?.avatar_url;
-  const displayName = userAccount?.name || user?.user_metadata?.full_name || user?.email;
-
   return (
     <header className="bg-black shadow-sm border-b border-gray-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <Link to="/" className="text-2xl font-bold text-white">
-              GoodSignals
-            </Link>
-          </div>
+          <HeaderLogo />
+          
+          <HeaderNavigation user={user} isSuperAdmin={isSuperAdmin} />
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            {user && (
-              <>
-                <Link
-                  to="/toolkit-hub"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Toolkit Hub
-                </Link>
-                <Link
-                  to="/target-metric-sets"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Target Metrics
-                </Link>
-                {isSuperAdmin && (
-                  <Link
-                    to="/super-admin"
-                    className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
-                  >
-                    Super Admin
-                  </Link>
-                )}
-              </>
-            )}
-          </nav>
-
-          {/* User Menu */}
           <div className="flex items-center space-x-4">
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="relative h-8 w-8 rounded-full hover:bg-gray-800"
-                  >
-                    <UserAvatar 
-                      avatarUrl={avatarUrl} 
-                      fullName={displayName}
-                      size={8}
-                    />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <div className="flex items-center justify-start gap-2 p-2">
-                    <div className="flex flex-col space-y-1 leading-none">
-                      {user.email && (
-                        <p className="text-sm font-medium">{user.email}</p>
-                      )}
-                      {isSuperAdmin && (
-                        <div className="flex items-center gap-1">
-                          <Shield className="h-3 w-3 text-orange-600" />
-                          <span className="text-xs text-orange-600 font-medium">Super Admin</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/profile-settings" className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      Profile Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/account-management" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Account Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/treasure-map-settings" className="cursor-pointer">
-                      <Map className="mr-2 h-4 w-4" />
-                      Map Configuration
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/target-metric-sets" className="cursor-pointer">
-                      <Target className="mr-2 h-4 w-4" />
-                      Target Metrics
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/signal-settings" className="cursor-pointer">
-                      <BarChart className="mr-2 h-4 w-4" />
-                      Signal Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  {isSuperAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link to="/super-admin" className="cursor-pointer text-orange-600">
-                          <Shield className="mr-2 h-4 w-4" />
-                          Super Admin Dashboard
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button asChild className="bg-white text-black hover:bg-gray-100">
-                <Link to="/auth">Sign In</Link>
-              </Button>
-            )}
+            <HeaderUserMenu 
+              user={user}
+              userAccount={userAccount}
+              isSuperAdmin={isSuperAdmin}
+              signOut={signOut}
+            />
 
-            {/* Mobile menu button */}
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleMobileMenu}
-                aria-label="Toggle menu"
-                className="text-white hover:bg-gray-800"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </Button>
-            </div>
+            <HeaderMobileMenu
+              user={user}
+              isSuperAdmin={isSuperAdmin}
+              isMobileMenuOpen={isMobileMenuOpen}
+              toggleMobileMenu={toggleMobileMenu}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+            />
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Navigation Container */}
         {isMobileMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-800">
               {user && (
                 <>
-                  <Link
-                    to="/toolkit-hub"
+                  <a
+                    href="/toolkit-hub"
                     className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Toolkit Hub
-                  </Link>
-                  <Link
-                    to="/target-metric-sets"
+                  </a>
+                  <a
+                    href="/target-metric-sets"
                     className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Target Metrics
-                  </Link>
+                  </a>
                   {isSuperAdmin && (
-                    <Link
-                      to="/super-admin"
+                    <a
+                      href="/super-admin"
                       className="block px-3 py-2 text-base font-medium text-orange-400 hover:text-orange-300"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Super Admin
-                    </Link>
+                    </a>
                   )}
                 </>
               )}
