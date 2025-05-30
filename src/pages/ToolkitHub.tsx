@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'; // Assuming Card components exist
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, Search, BarChart3, Compass } from 'lucide-react';
 
@@ -9,21 +9,21 @@ const tools = [
   {
     title: 'Territory Targeter',
     description: 'AI-powered scoring to rank and compare U.S. markets based on prompt-driven criteria.',
-    icon: <Search size={32} className="text-gold" />,
+    icon: <Search size={32} className="text-primary" />,
     link: '/toolkit/territory-targeter',
     cta: 'Target Markets',
   },
   {
     title: 'Site Treasure Map',
     description: 'Map viewer embedding Google My Map or ArcGIS views for market clusters or overlays.',
-    icon: <MapPin size={32} className="text-gold" />,
+    icon: <MapPin size={32} className="text-primary" />,
     link: '/toolkit/site-treasure-map',
     cta: 'View Map',
   },
   {
     title: 'Site Prospector',
     description: 'Guided assessment tool to evaluate a specific site using brand-specific criteria.',
-    icon: <BarChart3 size={32} className="text-gold" />,
+    icon: <BarChart3 size={32} className="text-primary" />,
     link: '/toolkit/site-prospector',
     cta: 'Prospect Sites',
   },
@@ -31,31 +31,35 @@ const tools = [
 
 const ToolkitHub = () => {
   return (
-    <div className="py-8">
-      <div className="text-center mb-12">
-        <Compass size={48} className="text-primary mx-auto mb-4" />
-        <h1 className="text-4xl md:text-5xl font-bold mb-3 text-primary">Toolkit Hub</h1> {/* Removed font-serif */}
-        <p className="text-xl text-foreground/80 max-w-2xl mx-auto">
-          Your command center for unearthing valuable location insights. Select a tool to begin your expedition.
-        </p>
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="flex items-center mb-8">
+        <Compass size={48} className="text-primary mr-4" />
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Toolkit Hub</h1>
+          <p className="text-muted-foreground">Your command center for unearthing valuable location insights. Select a tool to begin your expedition.</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tools.map((tool) => (
-          <Card key={tool.title} className="shadow-xl hover:shadow-2xl transition-shadow duration-300 border-gold/30 bg-card">
-            <CardHeader className="items-center text-center">
-              <div className="p-3 bg-primary/10 rounded-full mb-4">
-                {tool.icon}
-              </div>
-              <CardTitle className="text-2xl text-primary">{tool.title}</CardTitle> {/* Removed font-serif from CardTitle default in Card component, so no change needed here explicitly unless CardTitle itself had font-serif */}
-              <CardDescription className="text-foreground/70">{tool.description}</CardDescription>
+          <Card key={tool.title} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <div className="p-3 bg-primary/10 rounded-full mr-3">
+                  {tool.icon}
+                </div>
+                {tool.title}
+              </CardTitle>
+              <CardDescription>
+                {tool.description}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-center">
-              <Link to={tool.link}>
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link to={tool.link}>
                   {tool.cta}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         ))}
