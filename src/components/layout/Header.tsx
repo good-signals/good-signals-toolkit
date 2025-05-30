@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button'; 
-import { LogIn, Settings, LogOut, Briefcase, ListChecks, BarChart3 } from 'lucide-react'; // Added BarChart3
+import { LogIn, Settings, LogOut, Briefcase, ListChecks, BarChart3, MapPin } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/components/auth/UserAvatar';
 import {
@@ -102,6 +103,10 @@ const Header = () => {
                 <DropdownMenuItem onClick={() => navigate('/account-management')} className="cursor-pointer">
                   <Briefcase className="mr-2 h-4 w-4" />
                   <span>Account Management</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/treasure-map-settings')} className="cursor-pointer">
+                  <MapPin className="mr-2 h-4 w-4" />
+                  <span>Treasure Map Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/target-metric-sets')} className="cursor-pointer">
                   <ListChecks className="mr-2 h-4 w-4" />

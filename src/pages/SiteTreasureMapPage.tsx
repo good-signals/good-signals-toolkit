@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Settings, ExternalLink } from 'lucide-react';
+import { MapPin, Upload, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserAccountId } from '@/services/targetMetrics/accountHelpers';
@@ -87,10 +86,6 @@ const SiteTreasureMapPage = () => {
     }
   };
 
-  const handleConfigureMap = () => {
-    navigate('/treasure-map-settings');
-  };
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -99,82 +94,58 @@ const SiteTreasureMapPage = () => {
     );
   }
 
-  return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <MapPin size={48} className="text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Site Treasure Map</h1>
-            <p className="text-lg text-foreground/80">
-              Explore your organization's strategic location insights
-            </p>
-          </div>
-        </div>
-        
-        <Button onClick={handleConfigureMap} variant="outline" className="flex items-center gap-2">
-          <Settings className="h-4 w-4" />
-          Configure Map
+  if (!settings || !mapUrl) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center p-6">
+        <MapPin className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-3xl font-bold text-center mb-4">No Treasure Map Configured</h1>
+        <p className="text-lg text-muted-foreground text-center mb-8 max-w-md">
+          Upload your first treasure map to start exploring strategic location insights
+        </p>
+        <Button onClick={() => navigate('/treasure-map-upload')} size="lg" className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload Treasure Map
         </Button>
       </div>
+    );
+  }
 
-      {settings && mapUrl ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>
-                {settings.map_type === 'arcgis' ? 'ArcGIS Map' : 'Google My Maps'}
-              </span>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ExternalLink className="h-4 w-4" />
-                <a 
-                  href={mapUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="hover:underline"
-                >
-                  Open in new tab
-                </a>
-              </div>
-            </CardTitle>
-            <CardDescription>
-              Interactive map showing strategic locations and insights
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <iframe
-              src={mapUrl}
-              width="100%"
-              height="600"
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              className="rounded-b-lg"
-              title="Site Treasure Map"
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Map Configured</CardTitle>
-            <CardDescription>
-              Configure your treasure map to start exploring strategic location insights
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center py-12">
-            <MapPin className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg text-muted-foreground mb-6">
-              Set up your ArcGIS map or Google My Maps to visualize your data
-            </p>
-            <Button onClick={handleConfigureMap} className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Configure Treasure Map
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+  return (
+    <div className="h-screen flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-background">
+        <div className="flex items-center gap-3">
+          <MapPin className="h-6 w-6 text-primary" />
+          <h1 className="text-xl font-bold text-primary">Site Treasure Map</h1>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <a 
+            href={mapUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:underline"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open in new tab
+          </a>
+        </div>
+      </div>
+
+      {/* Map Display */}
+      <div className="flex-1 w-full">
+        <iframe
+          src={mapUrl}
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          title="Site Treasure Map"
+          className="w-full h-full"
+        />
+      </div>
     </div>
   );
 };

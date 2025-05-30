@@ -14,6 +14,7 @@ import SiteProspectorPage from "./pages/SiteProspectorPage";
 import TerritoryTargeterPage from "./pages/TerritoryTargeterPage";
 import SiteTreasureMapPage from "./pages/SiteTreasureMapPage";
 import TreasureMapSettingsPage from "./pages/TreasureMapSettingsPage";
+import TreasureMapUploadPage from "./pages/TreasureMapUploadPage";
 import AuthPage from "./pages/AuthPage"; 
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
@@ -73,6 +74,10 @@ const AppContent = () => {
           <Route 
             path="treasure-map-settings" 
             element={<ProtectedRoute><TreasureMapSettingsPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="treasure-map-upload" 
+            element={<ProtectedRoute><TreasureMapUploadPage /></ProtectedRoute>} 
           />
           <Route 
             path="profile-settings" 
