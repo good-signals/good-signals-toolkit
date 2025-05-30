@@ -1,14 +1,18 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
+import { supabase } from '@/integrations/supabase/client';
 
 const SignInForm: React.FC = () => {
   const { signInWithEmail } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,8 +33,29 @@ const SignInForm: React.FC = () => {
       await signInWithEmail(email, password);
       console.log('SignInForm: signInWithEmail completed successfully');
       
-      // Success - let the auth state change handle the redirect
-      // Don't manually set isSubmitting to false here as the component may unmount
+      // After successful sign-in, check if user has metrics and redirect accordingly
+      // Get the session to get the user ID
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        try {
+          const hasSetMetrics = await hasUserSetAnyMetrics(session.user.id);
+          
+          if (hasSetMetrics) {
+            console.log('SignInForm: User has metrics, redirecting to toolkit hub');
+            toast.success("Welcome back! Redirecting to Toolkit Hub...");
+            navigate('/toolkit-hub', { replace: true });
+          } else {
+            console.log('SignInForm: New user, redirecting to target selection');
+            toast.success("Welcome! Let's set up your target metrics...");
+            navigate('/target-selection', { replace: true });
+          }
+        } catch (error) {
+          console.error("SignInForm: Error checking user metrics:", error);
+          // On error, default to toolkit hub
+          toast.error("Error checking setup. Redirecting to Toolkit Hub...");
+          navigate('/toolkit-hub', { replace: true });
+        }
+      }
       
     } catch (error) {
       console.error('SignInForm: Sign in error:', error);

@@ -1,63 +1,16 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
-import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
 
 const AuthPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { user: currentUser, session: currentSession, authLoading } = useAuth();
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const { user, session, authLoading } = useAuth();
 
-  useEffect(() => {
-    const checkUserAndRedirect = async () => {
-      // Don't process if still loading auth or already redirecting
-      if (authLoading || isRedirecting) {
-        console.log('AuthPage: Waiting for auth or already redirecting', { authLoading, isRedirecting });
-        return;
-      }
-
-      // Only proceed if we have both user and session
-      if (!currentUser || !currentSession) {
-        console.log('AuthPage: No user or session, staying on auth page');
-        return;
-      }
-
-      console.log('AuthPage: User authenticated, checking redirect path');
-      setIsRedirecting(true);
-
-      try {
-        // Check if the user has already set target metrics
-        const hasSetMetrics = await hasUserSetAnyMetrics(currentUser.id);
-        
-        if (hasSetMetrics) {
-          console.log('AuthPage: User has metrics, redirecting to toolkit hub');
-          toast.success("Welcome back! Redirecting to Toolkit Hub...");
-          navigate('/toolkit-hub', { replace: true });
-        } else {
-          console.log('AuthPage: New user, redirecting to target selection');
-          toast.success("Welcome! Let's set up your target metrics...");
-          navigate('/target-selection', { replace: true });
-        }
-      } catch (error) {
-        console.error("AuthPage: Error checking user metrics:", error);
-        // On error, default to toolkit hub
-        toast.error("Error checking setup. Redirecting to Toolkit Hub...");
-        navigate('/toolkit-hub', { replace: true });
-      } finally {
-        // Reset redirecting state after a delay to prevent loops
-        setTimeout(() => setIsRedirecting(false), 1000);
-      }
-    };
-    
-    checkUserAndRedirect();
-  }, [currentUser, currentSession, authLoading, navigate, isRedirecting]);
-
-  // Show loading state while auth is loading or redirecting
+  // Show loading state while auth is loading
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -68,16 +21,19 @@ const AuthPage: React.FC = () => {
     );
   }
 
-  if (isRedirecting) {
+  // If user is already authenticated, they shouldn't be on this page
+  // But don't redirect here - let the app routing handle it
+  if (user && session) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <p className="text-lg">Redirecting...</p>
+          <p className="text-lg">You are already signed in. Please navigate to the desired page.</p>
         </div>
       </div>
     );
   }
 
+  // Show the sign-in/sign-up forms for unauthenticated users
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <Tabs defaultValue="signup" className="w-[400px] md:w-[550px]">
