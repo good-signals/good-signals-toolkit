@@ -7,7 +7,7 @@ import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 const SuperAdminAccountIndicator: React.FC = () => {
-  const { activeAccount, exitImpersonation, isImpersonating } = useSuperAdminContext();
+  const { activeAccount, stopImpersonation, isImpersonating } = useSuperAdminContext();
   const { isSuperAdmin } = useAuth();
 
   if (!isSuperAdmin || !isImpersonating || !activeAccount) {
@@ -26,7 +26,7 @@ const SuperAdminAccountIndicator: React.FC = () => {
       <Button
         variant="ghost"
         size="sm"
-        onClick={exitImpersonation}
+        onClick={stopImpersonation}
         className="text-white hover:bg-orange-600 h-auto p-1"
       >
         <X className="h-4 w-4" />

@@ -52,6 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
+        console.log('User is not a super admin:', error.message);
         setIsSuperAdmin(false);
         return;
       }
@@ -96,6 +97,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        
         if (!mounted) return;
 
         setSession(session);
@@ -103,15 +106,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (session?.user) {
           // Load profile and check super admin status
-          await Promise.all([
-            loadUserProfile(session.user.id),
-            checkSuperAdmin(session.user.id)
-          ]);
+          try {
+            await Promise.all([
+              loadUserProfile(session.user.id),
+              checkSuperAdmin(session.user.id)
+            ]);
+          } catch (error) {
+            console.error('Error loading user data:', error);
+          }
         } else {
           // Clear all state when user signs out
           setProfile(null);
           setActiveAccount(null);
           setIsSuperAdmin(false);
+        }
+        
+        // Set loading to false after processing auth state
+        if (mounted) {
+          setAuthLoading(false);
         }
       }
     );
@@ -119,6 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Check for existing session
     const initializeAuth = async () => {
       try {
+        console.log('Initializing auth...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -127,19 +140,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (!mounted) return;
 
+        console.log('Initial session:', session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await Promise.all([
-            loadUserProfile(session.user.id),
-            checkSuperAdmin(session.user.id)
-          ]);
+          try {
+            await Promise.all([
+              loadUserProfile(session.user.id),
+              checkSuperAdmin(session.user.id)
+            ]);
+          } catch (error) {
+            console.error('Error loading initial user data:', error);
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
         if (mounted) {
+          console.log('Setting authLoading to false');
           setAuthLoading(false);
         }
       }
@@ -154,6 +173,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signInWithEmail = async (email: string, password: string) => {
+    console.log('AuthContext: signInWithEmail called');
     await signInWithEmailService(email, password);
   };
 
