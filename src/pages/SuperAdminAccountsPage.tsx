@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -7,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building, ArrowLeft, Users, Calendar, MapPin } from 'lucide-react';
+import { Building, ArrowLeft, Users, Calendar, MapPin, LogIn } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
+import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Account {
   id: string;
@@ -22,6 +23,9 @@ interface Account {
 }
 
 const SuperAdminAccountsPage: React.FC = () => {
+  const { setActiveAccount } = useSuperAdminContext();
+  const navigate = useNavigate();
+
   // Fetch all accounts with member counts
   const { data: accounts, isLoading, error } = useQuery({
     queryKey: ['superAdminAccounts'],
@@ -70,10 +74,9 @@ const SuperAdminAccountsPage: React.FC = () => {
     },
   });
 
-  const handleAccessAccount = (accountId: string, accountName: string) => {
-    // For now, we'll just show a toast. Later we'll implement the actual switching logic
-    sonnerToast.info(`Account access feature coming soon! Selected: ${accountName}`);
-    console.log('Accessing account:', accountId, accountName);
+  const handleAccessAccount = (account: Account) => {
+    setActiveAccount(account);
+    navigate('/toolkit-hub');
   };
 
   if (isLoading) {
@@ -186,8 +189,9 @@ const SuperAdminAccountsPage: React.FC = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleAccessAccount(account.id, account.name)}
+                        onClick={() => handleAccessAccount(account)}
                       >
+                        <LogIn className="mr-2 h-3 w-3" />
                         Access Account
                       </Button>
                     </TableCell>

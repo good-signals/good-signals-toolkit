@@ -1,11 +1,13 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
 import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
 
 export const useHeaderData = () => {
   const [userAccount, setUserAccount] = useState<Account | null>(null);
   const { user, isSuperAdmin, signOut, authLoading } = useAuth();
+  const { activeAccount, isImpersonating } = useSuperAdminContext();
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -21,9 +23,12 @@ export const useHeaderData = () => {
     }
   }, [user, authLoading]);
 
+  // Use the active account if super admin is impersonating, otherwise use user's own account
+  const displayAccount = isImpersonating ? activeAccount : userAccount;
+
   return {
     user,
-    userAccount,
+    userAccount: displayAccount,
     isSuperAdmin,
     signOut,
     authLoading,

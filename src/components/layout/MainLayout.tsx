@@ -1,26 +1,17 @@
 
-import React from 'react';
-import Header from './Header';
-import ErrorBoundary from '@/components/common/ErrorBoundary';
+import React from "react";
+import { Outlet } from "react-router-dom";
+import Header from "./Header";
+import SuperAdminAccountIndicator from "./SuperAdminAccountIndicator";
 
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
-
-const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+const MainLayout: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <div className="sticky top-0 z-50">
-        <Header />
-      </div>
-      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ErrorBoundary>
-          {children}
-        </ErrorBoundary>
+    <div className="min-h-screen bg-background">
+      <SuperAdminAccountIndicator />
+      <Header />
+      <main>
+        <Outlet />
       </main>
-      <footer className="py-6 text-center text-muted-foreground text-sm">
-        © {new Date().getFullYear()} Good Signals. All rights reserved. Find your treasure.
-      </footer>
     </div>
   );
 };
