@@ -533,6 +533,18 @@ export type Database = {
         Args: { p_user_id: string; p_account_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_users_for_super_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          created_at: string
+          last_sign_in_at: string
+          full_name: string
+          global_roles: Json
+          account_memberships: Json
+        }[]
+      }
       is_super_admin: {
         Args: { p_user_id: string }
         Returns: boolean

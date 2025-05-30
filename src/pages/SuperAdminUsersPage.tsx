@@ -17,15 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Define more specific types for the data structure
+// Define types for the data structure returned by our database function
 interface UserWithDetails {
   id: string;
   email: string;
   created_at: string;
   last_sign_in_at: string | null;
-  profile: {
-    full_name: string | null;
-  } | null;
+  full_name: string | null;
   global_roles: Array<{
     role: string;
   }>;
@@ -41,40 +39,31 @@ const SuperAdminUsersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  // Fetch all users with their details
+  // Fetch all users using our secure database function
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['superAdminUsers'],
     queryFn: async () => {
-      // Update the query to properly handle the data structure
+      console.log('Fetching users using RPC function...');
+      
       const { data, error } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          created_at,
-          last_sign_in_at,
-          profiles:profiles(full_name),
-          global_roles:user_global_roles(role),
-          account_memberships:account_memberships(
-            role,
-            account:accounts(name)
-          )
-        `);
+        .rpc('get_users_for_super_admin');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
 
-      // Transform the data to match our interface
+      console.log('Raw data from RPC:', data);
+
+      // Transform the JSONB data to match our interface
       return (data || []).map(user => ({
         id: user.id,
         email: user.email || '',
         created_at: user.created_at || '',
         last_sign_in_at: user.last_sign_in_at || null,
-        profile: user.profiles || { full_name: null },
-        global_roles: (user.global_roles as Array<{ role: string }>) || [],
-        account_memberships: (user.account_memberships as Array<{
-          role: string;
-          account: { name: string };
-        }>) || []
+        full_name: user.full_name || null,
+        global_roles: Array.isArray(user.global_roles) ? user.global_roles : [],
+        account_memberships: Array.isArray(user.account_memberships) ? user.account_memberships : []
       })) as UserWithDetails[];
     },
   });
@@ -82,6 +71,8 @@ const SuperAdminUsersPage: React.FC = () => {
   // Mutation to update global roles
   const updateGlobalRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string | null }) => {
+      console.log('Updating role for user:', userId, 'to:', role);
+      
       if (role === null) {
         // Remove super admin role
         const { error } = await supabase
@@ -108,6 +99,7 @@ const SuperAdminUsersPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['superAdminUsers'] });
     },
     onError: (err: Error) => {
+      console.error('Error updating user role:', err);
       sonnerToast.error(`Failed to update user role: ${err.message}`);
     },
   });
@@ -122,10 +114,12 @@ const SuperAdminUsersPage: React.FC = () => {
   }
 
   if (error) {
+    console.error('Query error:', error);
     return <div className="container mx-auto p-4 text-center text-destructive">Error loading users: {error.message}</div>;
   }
 
   const userList = users || [];
+  console.log('Final user list:', userList);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -180,7 +174,7 @@ const SuperAdminUsersPage: React.FC = () => {
                             <Mail className="h-4 w-4 text-primary" />
                           </div>
                           <span className="font-medium">
-                            {user.profile?.full_name || 'No name set'}
+                            {user.full_name || 'No name set'}
                           </span>
                         </div>
                       </TableCell>
