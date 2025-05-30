@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Define more specific types for the data structure
 interface UserWithDetails {
   id: string;
   email: string;
@@ -41,22 +42,19 @@ const SuperAdminUsersPage: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   // Fetch all users with their details
-  const { data: users, isLoading, error } = useQuery<UserWithDetails[], Error>({
+  const { data: users, isLoading, error } = useQuery({
     queryKey: ['superAdminUsers'],
     queryFn: async () => {
+      // Update the query to properly handle the data structure
       const { data, error } = await supabase
-        .from('profiles')
+        .from('users')
         .select(`
           id,
-          full_name,
-          users:id (
-            email,
-            created_at,
-            last_sign_in_at
-          ),
-          global_roles:user_global_roles(
-            role
-          ),
+          email,
+          created_at,
+          last_sign_in_at,
+          profiles:profiles(full_name),
+          global_roles:user_global_roles(role),
           account_memberships:account_memberships(
             role,
             account:accounts(name)
@@ -66,17 +64,18 @@ const SuperAdminUsersPage: React.FC = () => {
       if (error) throw error;
 
       // Transform the data to match our interface
-      return data?.map(profile => ({
-        id: profile.id,
-        email: profile.users?.email || '',
-        created_at: profile.users?.created_at || '',
-        last_sign_in_at: profile.users?.last_sign_in_at || null,
-        profile: {
-          full_name: profile.full_name
-        },
-        global_roles: profile.global_roles || [],
-        account_memberships: profile.account_memberships || []
-      })) || [];
+      return (data || []).map(user => ({
+        id: user.id,
+        email: user.email || '',
+        created_at: user.created_at || '',
+        last_sign_in_at: user.last_sign_in_at || null,
+        profile: user.profiles || { full_name: null },
+        global_roles: (user.global_roles as Array<{ role: string }>) || [],
+        account_memberships: (user.account_memberships as Array<{
+          role: string;
+          account: { name: string };
+        }>) || []
+      })) as UserWithDetails[];
     },
   });
 
@@ -93,12 +92,12 @@ const SuperAdminUsersPage: React.FC = () => {
         
         if (error) throw error;
       } else {
-        // Add super admin role
+        // Add super admin role - explicitly cast the role to the proper enum type
         const { error } = await supabase
           .from('user_global_roles')
           .upsert({
             user_id: userId,
-            role: role
+            role: role as "super_admin" | "account_admin" | "account_user"
           });
         
         if (error) throw error;
@@ -126,6 +125,8 @@ const SuperAdminUsersPage: React.FC = () => {
     return <div className="container mx-auto p-4 text-center text-destructive">Error loading users: {error.message}</div>;
   }
 
+  const userList = users || [];
+
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between mb-8">
@@ -147,13 +148,13 @@ const SuperAdminUsersPage: React.FC = () => {
         <CardHeader>
           <CardTitle>System Users</CardTitle>
           <CardDescription>
-            {users && users.length > 0 
-              ? `${users.length} user${users.length === 1 ? '' : 's'} in the system.` 
+            {userList.length > 0 
+              ? `${userList.length} user${userList.length === 1 ? '' : 's'} in the system.` 
               : "No users found in the system."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {users && users.length > 0 ? (
+          {userList.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -167,7 +168,7 @@ const SuperAdminUsersPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => {
+                {userList.map((user) => {
                   const hasGlobalRole = user.global_roles.length > 0;
                   const globalRole = hasGlobalRole ? user.global_roles[0].role : 'none';
                   
