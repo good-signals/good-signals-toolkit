@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, X, User, LogOut, Settings, Shield, Map, Target, BarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import UserAvatar from "@/components/auth/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchUserAccountsWithAdminRole, Account } from "@/services/accountService";
 
 const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isSuperAdmin, signOut } = useAuth();
+  const [userAccount, setUserAccount] = useState<Account | null>(null);
+  const { user, isSuperAdmin, signOut, authLoading } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      fetchUserAccountsWithAdminRole(user.id)
+        .then(accounts => {
+          if (accounts && accounts.length > 0) {
+            setUserAccount(accounts[0]);
+          }
+        })
+        .catch(error => {
+          console.error("Failed to fetch user accounts for header:", error);
+        });
+    }
+  }, [user, authLoading]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -26,6 +42,10 @@ const Header: React.FC = () => {
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  // Determine what to show in the avatar: company logo first, then user avatar
+  const avatarUrl = userAccount?.logo_url || user?.user_metadata?.avatar_url;
+  const displayName = userAccount?.name || user?.user_metadata?.full_name || user?.email;
 
   return (
     <header className="bg-black shadow-sm border-b border-gray-800">
@@ -76,8 +96,8 @@ const Header: React.FC = () => {
                     className="relative h-8 w-8 rounded-full hover:bg-gray-800"
                   >
                     <UserAvatar 
-                      avatarUrl={user.user_metadata?.avatar_url} 
-                      fullName={user.user_metadata?.full_name || user.email}
+                      avatarUrl={avatarUrl} 
+                      fullName={displayName}
                       size={8}
                     />
                   </Button>
