@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +19,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: UserProfile | null;
+  isSuperAdmin: boolean;
   authLoading: boolean; // Renamed from 'loading'
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (
@@ -49,6 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true); // Renamed
 
   const fetchProfileAndUpdateContext = async (userId: string) => {
@@ -64,6 +65,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const checkSuperAdminStatus = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_global_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'super_admin')
+        .single();
+
+      if (error) {
+        setIsSuperAdmin(false);
+        return;
+      }
+      
+      setIsSuperAdmin(!!data);
+    } catch (error) {
+      setIsSuperAdmin(false);
+    }
+  };
+
   useEffect(() => {
     setAuthLoading(true);
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
@@ -71,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(currentSession?.user ?? null);
       if (currentSession?.user) {
         await fetchProfileAndUpdateContext(currentSession.user.id);
+        await checkSuperAdminStatus(currentSession.user.id);
       }
       setAuthLoading(false);
     });
@@ -82,10 +104,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (newSession?.user) {
         setTimeout(async () => {
             await fetchProfileAndUpdateContext(newSession.user.id);
+            await checkSuperAdminStatus(newSession.user.id);
             setAuthLoading(false);
         }, 0);
       } else {
         setProfile(null);
+        setIsSuperAdmin(false);
         setAuthLoading(false);
       }
     });
@@ -194,6 +218,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     user,
     profile,
+    isSuperAdmin,
     authLoading, // Renamed
     signInWithEmail,
     signUpWithEmail,
