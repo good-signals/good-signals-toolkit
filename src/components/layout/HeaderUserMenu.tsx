@@ -50,13 +50,19 @@ const HeaderUserMenu: React.FC<HeaderUserMenuProps> = ({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="relative h-8 w-8 rounded-full hover:bg-gray-800"
+          className="relative flex items-center space-x-2 h-10 px-2 rounded-full hover:bg-gray-800"
         >
           <UserAvatar 
             avatarUrl={avatarUrl} 
             fullName={displayName}
             size={8}
+            className="ring-2 ring-white"
           />
+          {userAccount?.name && (
+            <span className="text-white text-sm font-medium max-w-[120px] truncate">
+              {userAccount.name}
+            </span>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
