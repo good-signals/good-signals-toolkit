@@ -2,18 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProfileDetailsForm from '@/components/settings/ProfileDetailsForm';
-// AvatarUpload is removed as we are no longer uploading personal avatars here
-import UserAvatar from '@/components/auth/UserAvatar'; // To display company logo
+import CompanyLogoDisplay from '@/components/settings/CompanyLogoDisplay';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Briefcase, Building } from 'lucide-react'; // Added Building icon
+import { Briefcase } from 'lucide-react';
 import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const ProfileSettingsPage: React.FC = () => {
-  const { user, profile, authLoading } = useAuth(); // Added profile for user's name fallback
+  const { user, authLoading } = useAuth();
   const [displayAccount, setDisplayAccount] = useState<Account | null>(null);
   const [isLoadingAccount, setIsLoadingAccount] = useState(false);
 
@@ -50,41 +47,10 @@ const ProfileSettingsPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <ProfileDetailsForm />
-            <Separator />
-            <div>
-              <h3 className="text-lg font-medium mb-2">Company Logo</h3>
-              {isLoadingAccount && !displayAccount ? (
-                <div className="flex items-center space-x-4">
-                  <Skeleton className="h-20 w-20 rounded-full border-2 border-muted" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-48" />
-                  </div>
-                </div>
-              ) : displayAccount?.logo_url ? (
-                <div className="flex items-center space-x-4">
-                  <UserAvatar 
-                    avatarUrl={displayAccount.logo_url} 
-                    fullName={displayAccount.name} 
-                    size={20} // h-20 w-20
-                    className="border-2 border-muted"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">{displayAccount.name}</p>
-                    <p className="text-xs text-muted-foreground">This is your primary company logo.</p>
-                    <p className="text-xs text-muted-foreground mt-1">To change the logo, go to Account Management.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-3 p-4 border border-dashed rounded-md bg-muted/50">
-                  <Building className="h-10 w-10 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">No company logo has been set.</p>
-                    <p className="text-xs text-muted-foreground">You can upload one in Account Management.</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <CompanyLogoDisplay 
+              displayAccount={displayAccount}
+              isLoadingAccount={isLoadingAccount}
+            />
           </CardContent>
         </Card>
         
