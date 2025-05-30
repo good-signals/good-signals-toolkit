@@ -91,9 +91,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -113,21 +117,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await Promise.all([
-          loadUserProfile(session.user.id),
-          checkSuperAdmin(session.user.id)
-        ]);
-      }
-      
-      setAuthLoading(false);
-    });
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+        }
 
-    return () => subscription.unsubscribe();
+        if (!mounted) return;
+
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await Promise.all([
+            loadUserProfile(session.user.id),
+            checkSuperAdmin(session.user.id)
+          ]);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (mounted) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signInWithEmail = async (email: string, password: string) => {

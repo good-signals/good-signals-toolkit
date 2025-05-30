@@ -8,11 +8,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 
 const SignInForm: React.FC = () => {
-  const { signInWithEmail, authLoading } = useAuth(); // Updated: authLoading
+  const { signInWithEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,10 +19,15 @@ const SignInForm: React.FC = () => {
       toast.error("Please enter both email and password for sign in.");
       return;
     }
+    
     setIsSubmitting(true);
-    await signInWithEmail(email, password);
-    setIsSubmitting(false);
-    // Toasts for success/failure are handled by signInWithEmailService / AuthContext
+    try {
+      await signInWithEmail(email, password);
+    } catch (error) {
+      console.error('Sign in error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -59,8 +63,8 @@ const SignInForm: React.FC = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
-            {isSubmitting || authLoading ? 'Signing In...' : 'Sign In'}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? 'Signing In...' : 'Sign In'}
           </Button>
         </CardFooter>
       </form>
