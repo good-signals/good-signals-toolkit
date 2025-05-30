@@ -25,6 +25,7 @@ import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
 import SignalSettingsPage from "./pages/SignalSettingsPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import StandardMetricsManagement from "./pages/StandardMetricsManagement";
+import SuperAdminUsersPage from "./pages/SuperAdminUsersPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -128,6 +129,10 @@ const AppContent = () => {
           <Route 
             path="super-admin" 
             element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} 
+          />
+          <Route 
+            path="super-admin/users" 
+            element={<SuperAdminRoute><SuperAdminUsersPage /></SuperAdminRoute>} 
           />
           <Route 
             path="super-admin/standard-metrics" 
