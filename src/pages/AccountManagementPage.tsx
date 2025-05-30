@@ -17,16 +17,28 @@ const AccountManagementPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('AccountManagementPage: Effect running', { user: user?.id, authLoading, activeAccount: activeAccount?.id });
+    
     if (user && !authLoading) {
       setIsLoading(true);
+      setError(null);
+      console.log('AccountManagementPage: Fetching accounts for user:', user.id);
+      
       fetchUserAccountsWithAdminRole(user.id)
         .then(fetchedAccounts => {
+          console.log('AccountManagementPage: Fetched accounts:', fetchedAccounts.length);
           setAccounts(fetchedAccounts);
           // Use active account if available, otherwise use first account
           const accountToSelect = activeAccount || fetchedAccounts[0] || null;
+          console.log('AccountManagementPage: Selected account:', accountToSelect?.id);
           setSelectedAccount(accountToSelect);
+        })
+        .catch(err => {
+          console.error('AccountManagementPage: Error fetching accounts:', err);
+          setError('Failed to load accounts. Please try refreshing the page.');
         })
         .finally(() => setIsLoading(false));
     } else if (!authLoading) {
@@ -35,6 +47,7 @@ const AccountManagementPage: React.FC = () => {
   }, [user, authLoading, activeAccount]);
 
   const handleAccountUpdate = (updatedAccount: Account) => {
+    console.log('AccountManagementPage: Account updated:', updatedAccount.id);
     setSelectedAccount(updatedAccount);
     setAccounts(prevAccounts => 
       prevAccounts.map(acc => acc.id === updatedAccount.id ? updatedAccount : acc)
@@ -43,6 +56,7 @@ const AccountManagementPage: React.FC = () => {
 
   const handleLogoUpdate = (newLogoUrl: string | null) => {
     if (selectedAccount) {
+      console.log('AccountManagementPage: Logo updated for account:', selectedAccount.id);
       setSelectedAccount(prev => prev ? { ...prev, logo_url: newLogoUrl } : null);
        setAccounts(prevAccounts => 
         prevAccounts.map(acc => acc.id === selectedAccount.id ? {...acc, logo_url: newLogoUrl} : acc)
@@ -81,6 +95,22 @@ const AccountManagementPage: React.FC = () => {
           <AlertDescription>
             You must be logged in to manage account settings. Please <Link to="/auth" className="font-bold hover:underline">sign in</Link>.
           </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-4xl">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-primary">Account Management</h1>
+          <p className="text-muted-foreground">Manage your company settings.</p>
+        </div>
+        <Alert variant="destructive">
+          <Terminal className="h-4 w-4" />
+          <AlertTitle>Error Loading Data</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
     );

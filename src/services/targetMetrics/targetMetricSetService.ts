@@ -31,15 +31,15 @@ export async function createTargetMetricSet(userId: string, name: string, active
 }
 
 export async function getTargetMetricSets(userId: string, activeAccount?: Account | null): Promise<TargetMetricSet[]> {
-  console.log('Getting target metric sets for user:', userId);
+  console.log('getTargetMetricSets: Getting target metric sets for user:', userId);
   
   const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
-    console.log('No account ID found for user, returning empty array');
+    console.log('getTargetMetricSets: No account ID found for user, returning empty array');
     return [];
   }
 
-  console.log('Querying metric sets for account:', accountId);
+  console.log('getTargetMetricSets: Querying metric sets for account:', accountId);
   
   const { data, error } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
@@ -48,20 +48,20 @@ export async function getTargetMetricSets(userId: string, activeAccount?: Accoun
     .order('name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching target metric sets:', error);
+    console.error('getTargetMetricSets: Error fetching target metric sets:', error);
     throw error;
   }
   
-  console.log('Found metric sets:', data?.length || 0);
+  console.log('getTargetMetricSets: Found metric sets:', data?.length || 0);
   return z.array(TargetMetricSetSchema).parse(data || []);
 }
 
 export async function getTargetMetricSetById(metricSetId: string, userId: string, activeAccount?: Account | null): Promise<TargetMetricSet | null> {
-  console.log('Getting target metric set by ID:', metricSetId, 'for user:', userId);
+  console.log('getTargetMetricSetById: Getting target metric set by ID:', metricSetId, 'for user:', userId);
   
   const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
-    console.log('No account ID found for user');
+    console.log('getTargetMetricSetById: No account ID found for user');
     return null;
   }
 
@@ -74,10 +74,10 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
 
   if (metricSetError) {
     if (metricSetError.code === 'PGRST116') { // Not found
-      console.log('Metric set not found');
+      console.log('getTargetMetricSetById: Metric set not found');
       return null;
     }
-    console.error('Error fetching target metric set by ID:', metricSetError);
+    console.error('getTargetMetricSetById: Error fetching target metric set by ID:', metricSetError);
     throw metricSetError;
   }
 
@@ -92,7 +92,7 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
     .eq('metric_set_id', metricSetId);
 
   if (userMetricsError) {
-    console.error('Error fetching user custom metric settings for set:', userMetricsError);
+    console.error('getTargetMetricSetById: Error fetching user custom metric settings for set:', userMetricsError);
   }
 
   // Fetch account custom metrics to ensure all custom metrics are available
@@ -102,7 +102,7 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
     .eq('account_id', accountId);
 
   if (accountCustomMetricsError) {
-    console.error('Error fetching account custom metrics:', accountCustomMetricsError);
+    console.error('getTargetMetricSetById: Error fetching account custom metrics:', accountCustomMetricsError);
   }
 
   // Convert account custom metrics to user metric settings format for any that don't have settings yet
@@ -181,10 +181,15 @@ export async function deleteTargetMetricSet(metricSetId: string, userId: string,
 
 // Updated function to check if a user has any target metric sets
 export async function hasUserSetAnyMetrics(userId: string, activeAccount?: Account | null): Promise<boolean> {
+  console.log('hasUserSetAnyMetrics: Checking for user:', userId);
+  
   const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
+    console.log('hasUserSetAnyMetrics: No account ID found');
     return false;
   }
+
+  console.log('hasUserSetAnyMetrics: Checking for account:', accountId);
 
   const { count: setCounts, error: setError } = await supabase
     .from(METRIC_SETS_TABLE_NAME)
@@ -192,9 +197,12 @@ export async function hasUserSetAnyMetrics(userId: string, activeAccount?: Accou
     .eq('account_id', accountId);
 
   if (setError) {
-    console.error('Error checking for metric sets:', setError);
+    console.error('hasUserSetAnyMetrics: Error checking for metric sets:', setError);
     throw setError;
   }
+  
+  console.log('hasUserSetAnyMetrics: Found metric sets count:', setCounts);
+  
   if (setCounts !== null && setCounts > 0) {
     return true;
   }
