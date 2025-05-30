@@ -1,14 +1,39 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
+import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
+import { supabase } from '@/integrations/supabase/client';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
 
 const AuthPage: React.FC = () => {
   const { user, session, authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect authenticated users to the appropriate page
+  useEffect(() => {
+    const redirectAuthenticatedUser = async () => {
+      if (user && session && !authLoading) {
+        try {
+          const hasSetMetrics = await hasUserSetAnyMetrics(user.id);
+          
+          if (hasSetMetrics) {
+            navigate('/toolkit-hub', { replace: true });
+          } else {
+            navigate('/target-selection', { replace: true });
+          }
+        } catch (error) {
+          console.error("Error checking user metrics:", error);
+          // On error, default to toolkit hub
+          navigate('/toolkit-hub', { replace: true });
+        }
+      }
+    };
+
+    redirectAuthenticatedUser();
+  }, [user, session, authLoading, navigate]);
 
   // Show loading state while auth is loading
   if (authLoading) {
@@ -21,13 +46,12 @@ const AuthPage: React.FC = () => {
     );
   }
 
-  // If user is already authenticated, they shouldn't be on this page
-  // But don't redirect here - let the app routing handle it
+  // Don't show the forms if user is authenticated (they will be redirected)
   if (user && session) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <p className="text-lg">You are already signed in. Please navigate to the desired page.</p>
+          <p className="text-lg">Redirecting...</p>
         </div>
       </div>
     );
