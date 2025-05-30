@@ -373,6 +373,80 @@ export type Database = {
           },
         ]
       }
+      standard_target_metric_sets: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      standard_target_metric_settings: {
+        Row: {
+          category: string
+          created_at: string
+          higher_is_better: boolean
+          id: string
+          label: string
+          measurement_type: string | null
+          metric_identifier: string
+          standard_set_id: string
+          target_value: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          higher_is_better: boolean
+          id?: string
+          label: string
+          measurement_type?: string | null
+          metric_identifier: string
+          standard_set_id: string
+          target_value: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          higher_is_better?: boolean
+          id?: string
+          label?: string
+          measurement_type?: string | null
+          metric_identifier?: string
+          standard_set_id?: string
+          target_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standard_target_metric_settings_standard_set_id_fkey"
+            columns: ["standard_set_id"]
+            isOneToOne: false
+            referencedRelation: "standard_target_metric_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       target_metric_sets: {
         Row: {
           account_id: string
