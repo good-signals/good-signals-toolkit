@@ -24,18 +24,21 @@ export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children
 
   const startImpersonation = (account: Account) => {
     if (isSuperAdmin) {
+      console.log('Starting impersonation for account:', account.name);
       setImpersonatedAccount(account);
       setIsImpersonating(true);
     }
   };
 
   const stopImpersonation = () => {
+    console.log('Stopping impersonation');
     setImpersonatedAccount(null);
     setIsImpersonating(false);
   };
 
   const setActiveAccount = (account: Account | null) => {
     if (isImpersonating) {
+      console.log('Setting impersonated account:', account?.name);
       setImpersonatedAccount(account);
     }
   };

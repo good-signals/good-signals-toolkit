@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     let mounted = true;
+    let authStateProcessed = false;
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -100,6 +100,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Auth state changed:', event, session?.user?.id);
         
         if (!mounted) return;
+
+        // Prevent processing the same auth state multiple times
+        if (authStateProcessed && event === 'INITIAL_SESSION') {
+          console.log('Auth state already processed, skipping');
+          return;
+        }
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -123,7 +129,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Set loading to false after processing auth state
         if (mounted) {
+          console.log('Setting authLoading to false after auth state change');
           setAuthLoading(false);
+          authStateProcessed = true;
         }
       }
     );
@@ -158,7 +166,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Error initializing auth:', error);
       } finally {
         if (mounted) {
-          console.log('Setting authLoading to false');
+          console.log('Setting authLoading to false after initialization');
           setAuthLoading(false);
         }
       }
@@ -166,15 +174,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
 
+    // Add a timeout failsafe to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (mounted && authLoading) {
+        console.warn('Auth loading timeout reached, forcing authLoading to false');
+        setAuthLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
 
   const signInWithEmail = async (email: string, password: string) => {
     console.log('AuthContext: signInWithEmail called');
-    await signInWithEmailService(email, password);
+    try {
+      await signInWithEmailService(email, password);
+      console.log('AuthContext: signInWithEmailService completed');
+    } catch (error) {
+      console.error('AuthContext: signInWithEmail error:', error);
+      throw error; // Re-throw to let the form handle it
+    }
   };
 
   const signUpWithEmail = async (email: string, password: string, firstName: string, lastName: string, companyName: string, companyAddress?: string | null, companyCategory?: string | null, companySubcategory?: string | null) => {

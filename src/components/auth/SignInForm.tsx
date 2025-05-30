@@ -15,24 +15,27 @@ const SignInForm: React.FC = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!email || !password) {
       toast.error("Please enter both email and password for sign in.");
       return;
     }
     
-    console.log('Starting sign-in process...');
+    console.log('SignInForm: Starting sign-in process...');
     setIsSubmitting(true);
     
     try {
-      console.log('Calling signInWithEmail...');
+      console.log('SignInForm: Calling signInWithEmail...');
       await signInWithEmail(email, password);
-      console.log('signInWithEmail completed');
+      console.log('SignInForm: signInWithEmail completed successfully');
+      
+      // Success - let the auth state change handle the redirect
+      // Don't manually set isSubmitting to false here as the component may unmount
+      
     } catch (error) {
-      console.error('Sign in error:', error);
-      toast.error('Sign in failed. Please try again.');
-    } finally {
-      console.log('Setting isSubmitting to false');
-      setIsSubmitting(false);
+      console.error('SignInForm: Sign in error:', error);
+      toast.error('Sign in failed. Please check your credentials and try again.');
+      setIsSubmitting(false); // Only reset on error
     }
   };
 
@@ -54,6 +57,7 @@ const SignInForm: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              disabled={isSubmitting}
             />
           </div>
           <div className="space-y-2">
@@ -65,6 +69,7 @@ const SignInForm: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              disabled={isSubmitting}
             />
           </div>
         </CardContent>
