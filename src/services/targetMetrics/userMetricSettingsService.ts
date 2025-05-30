@@ -9,7 +9,8 @@ import {
   MeasurementType
 } from '@/types/targetMetrics';
 import { Database } from '@/integrations/supabase/types';
-import { getUserAccountId } from './accountHelpers';
+import { getSuperAdminAwareAccountId } from './accountHelpers';
+import { Account } from '@/services/accountService';
 
 const USER_METRICS_TABLE_NAME = 'user_custom_metrics_settings';
 
@@ -48,9 +49,10 @@ export async function getUserCustomMetricSettings(metricSetId: string): Promise<
 export async function saveUserCustomMetricSettings(
   userId: string,
   metricSetId: string,
-  formData: TargetMetricsFormData
+  formData: TargetMetricsFormData,
+  activeAccount?: Account | null
 ): Promise<UserCustomMetricSetting[]> {
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to save metric settings');
   }

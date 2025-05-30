@@ -2,14 +2,15 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { TargetMetricSet, TargetMetricSetSchema, UserCustomMetricSettingSchema } from '@/types/targetMetrics';
-import { getUserAccountId } from './accountHelpers';
+import { getSuperAdminAwareAccountId } from './accountHelpers';
+import { Account } from '@/services/accountService';
 
 const METRIC_SETS_TABLE_NAME = 'target_metric_sets';
 
-export async function createTargetMetricSet(userId: string, name: string): Promise<TargetMetricSet> {
+export async function createTargetMetricSet(userId: string, name: string, activeAccount?: Account | null): Promise<TargetMetricSet> {
   console.log('Creating target metric set for user:', userId, 'with name:', name);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to create metric sets');
   }
@@ -29,10 +30,10 @@ export async function createTargetMetricSet(userId: string, name: string): Promi
   return TargetMetricSetSchema.parse(data);
 }
 
-export async function getTargetMetricSets(userId: string): Promise<TargetMetricSet[]> {
+export async function getTargetMetricSets(userId: string, activeAccount?: Account | null): Promise<TargetMetricSet[]> {
   console.log('Getting target metric sets for user:', userId);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     console.log('No account ID found for user, returning empty array');
     return [];
@@ -55,10 +56,10 @@ export async function getTargetMetricSets(userId: string): Promise<TargetMetricS
   return z.array(TargetMetricSetSchema).parse(data || []);
 }
 
-export async function getTargetMetricSetById(metricSetId: string, userId: string): Promise<TargetMetricSet | null> {
+export async function getTargetMetricSetById(metricSetId: string, userId: string, activeAccount?: Account | null): Promise<TargetMetricSet | null> {
   console.log('Getting target metric set by ID:', metricSetId, 'for user:', userId);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     console.log('No account ID found for user');
     return null;
@@ -139,8 +140,8 @@ export async function getTargetMetricSetById(metricSetId: string, userId: string
   };
 }
 
-export async function updateTargetMetricSetName(metricSetId: string, userId: string, newName: string): Promise<TargetMetricSet> {
-  const accountId = await getUserAccountId(userId);
+export async function updateTargetMetricSetName(metricSetId: string, userId: string, newName: string, activeAccount?: Account | null): Promise<TargetMetricSet> {
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to update metric sets');
   }
@@ -160,8 +161,8 @@ export async function updateTargetMetricSetName(metricSetId: string, userId: str
   return TargetMetricSetSchema.parse(data);
 }
 
-export async function deleteTargetMetricSet(metricSetId: string, userId: string): Promise<void> {
-  const accountId = await getUserAccountId(userId);
+export async function deleteTargetMetricSet(metricSetId: string, userId: string, activeAccount?: Account | null): Promise<void> {
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to delete metric sets');
   }
@@ -179,8 +180,8 @@ export async function deleteTargetMetricSet(metricSetId: string, userId: string)
 }
 
 // Updated function to check if a user has any target metric sets
-export async function hasUserSetAnyMetrics(userId: string): Promise<boolean> {
-  const accountId = await getUserAccountId(userId);
+export async function hasUserSetAnyMetrics(userId: string, activeAccount?: Account | null): Promise<boolean> {
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     return false;
   }

@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getUserAccountId } from '@/services/targetMetrics/accountHelpers';
+import { getSuperAdminAwareAccountId } from '@/services/targetMetrics/accountHelpers';
 import { toast } from '@/hooks/use-toast';
 
 interface TreasureMapSettings {
@@ -13,6 +14,7 @@ interface TreasureMapSettings {
 
 export const useTreasureMapSettings = () => {
   const { user } = useAuth();
+  const { activeAccount } = useSuperAdminContext();
   const [settings, setSettings] = useState<TreasureMapSettings>({
     map_type: 'arcgis',
     map_url: '',
@@ -22,7 +24,7 @@ export const useTreasureMapSettings = () => {
 
   useEffect(() => {
     loadSettings();
-  }, [user]);
+  }, [user, activeAccount]);
 
   const loadSettings = async () => {
     if (!user) {
@@ -31,7 +33,7 @@ export const useTreasureMapSettings = () => {
     }
 
     try {
-      const accountId = await getUserAccountId(user.id);
+      const accountId = await getSuperAdminAwareAccountId(user.id, activeAccount);
       if (!accountId) {
         toast({
           title: "Error",
@@ -83,7 +85,7 @@ export const useTreasureMapSettings = () => {
     if (!user) return false;
 
     try {
-      const accountId = await getUserAccountId(user.id);
+      const accountId = await getSuperAdminAwareAccountId(user.id, activeAccount);
       if (!accountId) {
         toast({
           title: "Error",

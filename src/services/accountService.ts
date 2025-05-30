@@ -23,6 +23,33 @@ export interface AccountMembership {
   created_at?: string;
 }
 
+// Super admin aware function to get account ID
+export const getSuperAdminAwareAccountId = async (userId: string, activeAccount?: Account | null): Promise<string | null> => {
+  // If there's an active account (super admin impersonating), use that
+  if (activeAccount) {
+    return activeAccount.id;
+  }
+  
+  // Otherwise, get user's own account
+  try {
+    const { data: memberships, error } = await supabase
+      .from('account_memberships')
+      .select('account_id')
+      .eq('user_id', userId)
+      .eq('role', 'account_admin')
+      .limit(1);
+
+    if (error) {
+      console.error('Error fetching user account membership:', error);
+      return null;
+    }
+
+    return memberships?.[0]?.account_id || null;
+  } catch (error: any) {
+    console.error('Error in getSuperAdminAwareAccountId:', error);
+    return null;
+  }
+};
 
 export const fetchUserAccountsWithAdminRole = async (userId: string): Promise<Account[]> => {
   try {
@@ -59,6 +86,27 @@ export const fetchUserAccountsWithAdminRole = async (userId: string): Promise<Ac
     console.error('Catch Error fetching user accounts:', error);
     toast.error('An unexpected error occurred while fetching accounts.');
     return [];
+  }
+};
+
+// Super admin aware function to fetch account by ID
+export const fetchAccountById = async (accountId: string): Promise<Account | null> => {
+  try {
+    const { data: account, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('id', accountId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching account by ID:', error);
+      return null;
+    }
+
+    return account;
+  } catch (error: any) {
+    console.error('Error in fetchAccountById:', error);
+    return null;
   }
 };
 

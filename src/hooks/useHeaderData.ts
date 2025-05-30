@@ -10,7 +10,7 @@ export const useHeaderData = () => {
   const { activeAccount, isImpersonating } = useSuperAdminContext();
 
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && !isImpersonating) {
       fetchUserAccountsWithAdminRole(user.id)
         .then(accounts => {
           if (accounts && accounts.length > 0) {
@@ -21,7 +21,7 @@ export const useHeaderData = () => {
           console.error("Failed to fetch user accounts for header:", error);
         });
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, isImpersonating]);
 
   // Use the active account if super admin is impersonating, otherwise use user's own account
   const displayAccount = isImpersonating ? activeAccount : userAccount;
@@ -32,5 +32,7 @@ export const useHeaderData = () => {
     isSuperAdmin,
     signOut,
     authLoading,
+    isImpersonating,
+    activeAccount,
   };
 };

@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { getSuperAdminAwareAccountId, Account } from './accountService';
 
 // Schema for account custom metric
 export const AccountCustomMetricSchema = z.object({
@@ -29,30 +30,10 @@ export const CreateAccountCustomMetricSchema = z.object({
 });
 export type CreateAccountCustomMetricData = z.infer<typeof CreateAccountCustomMetricSchema>;
 
-// Helper function to get user's account ID
-async function getUserAccountId(userId: string): Promise<string | null> {
-  console.log('Getting account ID for user:', userId);
-  
-  const { data, error } = await supabase
-    .from('account_memberships')
-    .select('account_id')
-    .eq('user_id', userId)
-    .eq('role', 'account_admin')
-    .single();
-
-  if (error) {
-    console.error('Error fetching user account:', error);
-    return null;
-  }
-  
-  console.log('Found account ID:', data?.account_id);
-  return data?.account_id || null;
-}
-
-export async function getAccountCustomMetrics(userId: string): Promise<AccountCustomMetric[]> {
+export async function getAccountCustomMetrics(userId: string, activeAccount?: Account | null): Promise<AccountCustomMetric[]> {
   console.log('Getting account custom metrics for user:', userId);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     console.log('No account ID found for user, returning empty array');
     return [];
@@ -76,11 +57,12 @@ export async function getAccountCustomMetrics(userId: string): Promise<AccountCu
 
 export async function createAccountCustomMetric(
   userId: string, 
-  metricData: CreateAccountCustomMetricData
+  metricData: CreateAccountCustomMetricData,
+  activeAccount?: Account | null
 ): Promise<AccountCustomMetric> {
   console.log('Creating account custom metric for user:', userId, 'with data:', metricData);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to create custom metrics');
   }
@@ -115,11 +97,12 @@ export async function createAccountCustomMetric(
 export async function updateAccountCustomMetric(
   userId: string,
   metricId: string,
-  metricData: Partial<CreateAccountCustomMetricData>
+  metricData: Partial<CreateAccountCustomMetricData>,
+  activeAccount?: Account | null
 ): Promise<AccountCustomMetric> {
   console.log('Updating account custom metric:', metricId, 'with data:', metricData);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to update custom metrics');
   }
@@ -144,10 +127,10 @@ export async function updateAccountCustomMetric(
   return AccountCustomMetricSchema.parse(data);
 }
 
-export async function deleteAccountCustomMetric(userId: string, metricId: string): Promise<void> {
+export async function deleteAccountCustomMetric(userId: string, metricId: string, activeAccount?: Account | null): Promise<void> {
   console.log('Deleting account custom metric:', metricId);
   
-  const accountId = await getUserAccountId(userId);
+  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
   if (!accountId) {
     throw new Error('User must be an account admin to delete custom metrics');
   }
