@@ -20,12 +20,18 @@ const SignInForm: React.FC = () => {
       return;
     }
     
+    console.log('Starting sign-in process...');
     setIsSubmitting(true);
+    
     try {
+      console.log('Calling signInWithEmail...');
       await signInWithEmail(email, password);
+      console.log('signInWithEmail completed');
     } catch (error) {
       console.error('Sign in error:', error);
+      toast.error('Sign in failed. Please try again.');
     } finally {
+      console.log('Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };

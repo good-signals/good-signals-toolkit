@@ -1,13 +1,16 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export const signInWithEmailService = async (email: string, password: string) => {
+  console.log('authService: Starting sign-in with email:', email);
+  
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
+
+    console.log('authService: Supabase response:', { data, error });
 
     if (error) {
       console.error('Sign in error:', error);
@@ -19,15 +22,19 @@ export const signInWithEmailService = async (email: string, password: string) =>
       } else {
         toast.error(`Sign in failed: ${error.message}`);
       }
-      return;
+      throw error;
     }
 
     if (data.user) {
+      console.log('authService: Sign-in successful, user:', data.user.id);
       toast.success('Successfully signed in!');
     }
+
+    return data;
   } catch (error: any) {
     console.error('Unexpected sign in error:', error);
     toast.error('An unexpected error occurred during sign in.');
+    throw error;
   }
 };
 

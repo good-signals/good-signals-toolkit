@@ -1,14 +1,14 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Account } from '@/services/accountService';
-import { useAuth } from './AuthContext';
 
 interface SuperAdminContextType {
   activeAccount: Account | null;
   setActiveAccount: (account: Account | null) => void;
   isImpersonating: boolean;
-  setIsImpersonating: (impersonating: boolean) => void;
-  exitImpersonation: () => void;
+  startImpersonation: (account: Account) => void;
+  stopImpersonation: () => void;
 }
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
@@ -18,33 +18,38 @@ interface SuperAdminProviderProps {
 }
 
 export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children }) => {
-  const [activeAccount, setActiveAccount] = useState<Account | null>(null);
+  const { user, isSuperAdmin } = useAuth();
+  const [impersonatedAccount, setImpersonatedAccount] = useState<Account | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
-  const { isSuperAdmin } = useAuth();
 
-  // Clear impersonation state if user is no longer super admin
-  useEffect(() => {
-    if (!isSuperAdmin && isImpersonating) {
-      setActiveAccount(null);
-      setIsImpersonating(false);
+  const startImpersonation = (account: Account) => {
+    if (isSuperAdmin) {
+      setImpersonatedAccount(account);
+      setIsImpersonating(true);
     }
-  }, [isSuperAdmin, isImpersonating]);
+  };
 
-  const exitImpersonation = () => {
-    setActiveAccount(null);
+  const stopImpersonation = () => {
+    setImpersonatedAccount(null);
     setIsImpersonating(false);
   };
 
+  const setActiveAccount = (account: Account | null) => {
+    if (isImpersonating) {
+      setImpersonatedAccount(account);
+    }
+  };
+
+  const contextValue: SuperAdminContextType = {
+    activeAccount: impersonatedAccount,
+    setActiveAccount,
+    isImpersonating,
+    startImpersonation,
+    stopImpersonation,
+  };
+
   return (
-    <SuperAdminContext.Provider
-      value={{
-        activeAccount,
-        setActiveAccount,
-        isImpersonating,
-        setIsImpersonating,
-        exitImpersonation,
-      }}
-    >
+    <SuperAdminContext.Provider value={contextValue}>
       {children}
     </SuperAdminContext.Provider>
   );
