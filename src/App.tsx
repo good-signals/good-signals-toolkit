@@ -1,4 +1,3 @@
-
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -26,6 +25,7 @@ import SignalSettingsPage from "./pages/SignalSettingsPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import StandardMetricsManagement from "./pages/StandardMetricsManagement";
 import SuperAdminUsersPage from "./pages/SuperAdminUsersPage";
+import SuperAdminAccountsPage from "./pages/SuperAdminAccountsPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -145,6 +145,10 @@ const AppContent = () => {
           <Route 
             path="super-admin/standard-metrics/builder/:metricSetId" 
             element={<SuperAdminRoute><TargetMetricsBuilderPage /></SuperAdminRoute>} 
+          />
+          <Route 
+            path="super-admin/accounts" 
+            element={<SuperAdminRoute><SuperAdminAccountsPage /></SuperAdminRoute>} 
           />
         </Route>
         <Route path="*" element={<NotFound />} />
