@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, User, LogOut, Settings, Shield } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, Shield, Map, Target, BarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,12 +28,12 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-black shadow-sm border-b border-gray-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link to="/" className="text-2xl font-bold text-primary">
+            <Link to="/" className="text-2xl font-bold text-white">
               GoodSignals
             </Link>
           </div>
@@ -44,20 +44,20 @@ const Header: React.FC = () => {
               <>
                 <Link
                   to="/toolkit-hub"
-                  className="text-gray-700 hover:text-primary transition-colors"
+                  className="text-gray-300 hover:text-white transition-colors"
                 >
                   Toolkit Hub
                 </Link>
                 <Link
                   to="/target-metric-sets"
-                  className="text-gray-700 hover:text-primary transition-colors"
+                  className="text-gray-300 hover:text-white transition-colors"
                 >
                   Target Metrics
                 </Link>
                 {isSuperAdmin && (
                   <Link
                     to="/super-admin"
-                    className="text-orange-600 hover:text-orange-800 transition-colors font-medium"
+                    className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
                   >
                     Super Admin
                   </Link>
@@ -73,7 +73,7 @@ const Header: React.FC = () => {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="relative h-8 w-8 rounded-full"
+                    className="relative h-8 w-8 rounded-full hover:bg-gray-800"
                   >
                     <UserAvatar 
                       avatarUrl={user.user_metadata?.avatar_url} 
@@ -109,6 +109,25 @@ const Header: React.FC = () => {
                       Account Settings
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/treasure-map-settings" className="cursor-pointer">
+                      <Map className="mr-2 h-4 w-4" />
+                      Map Configuration
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/target-metric-sets" className="cursor-pointer">
+                      <Target className="mr-2 h-4 w-4" />
+                      Target Metrics
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/signal-settings" className="cursor-pointer">
+                      <BarChart className="mr-2 h-4 w-4" />
+                      Signal Settings
+                    </Link>
+                  </DropdownMenuItem>
                   {isSuperAdmin && (
                     <>
                       <DropdownMenuSeparator />
@@ -128,7 +147,7 @@ const Header: React.FC = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild>
+              <Button asChild className="bg-white text-black hover:bg-gray-100">
                 <Link to="/auth">Sign In</Link>
               </Button>
             )}
@@ -140,6 +159,7 @@ const Header: React.FC = () => {
                 size="icon"
                 onClick={toggleMobileMenu}
                 aria-label="Toggle menu"
+                className="text-white hover:bg-gray-800"
               >
                 {isMobileMenuOpen ? (
                   <X className="h-6 w-6" />
@@ -154,19 +174,19 @@ const Header: React.FC = () => {
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-800">
               {user && (
                 <>
                   <Link
                     to="/toolkit-hub"
-                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary"
+                    className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Toolkit Hub
                   </Link>
                   <Link
                     to="/target-metric-sets"
-                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary"
+                    className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Target Metrics
@@ -174,7 +194,7 @@ const Header: React.FC = () => {
                   {isSuperAdmin && (
                     <Link
                       to="/super-admin"
-                      className="block px-3 py-2 text-base font-medium text-orange-600 hover:text-orange-800"
+                      className="block px-3 py-2 text-base font-medium text-orange-400 hover:text-orange-300"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Super Admin

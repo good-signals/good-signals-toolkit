@@ -85,11 +85,17 @@ export const useAnalysisState = () => {
       console.log('Saving CBSA data to localStorage:', storedCBSAData.length, 'items');
       safeStorage.setItem(CBSA_DATA_KEY, JSON.stringify(storedCBSAData));
     } else {
-      safeStorage.removeItem(CBSA_DATA_KEY);
+      console.log('No CBSA data to save or clearing CBSA data');
+      // Only remove if explicitly set to empty, not if it's just uninitialized
+      const saved = safeStorage.getItem(CBSA_DATA_KEY);
+      if (saved && storedCBSAData.length === 0) {
+        safeStorage.removeItem(CBSA_DATA_KEY);
+      }
     }
   }, [storedCBSAData]);
 
   const saveAnalysisState = (state: AnalysisState) => {
+    console.log('Saving analysis state:', state.id);
     safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(state));
   };
 
@@ -99,6 +105,7 @@ export const useAnalysisState = () => {
   };
 
   const clearAnalysisState = () => {
+    console.log('Clearing analysis state');
     safeStorage.removeItem(ANALYSIS_STATE_KEY);
   };
 
@@ -112,6 +119,7 @@ export const useAnalysisState = () => {
   };
 
   const setCBSAData = (data: CBSAData[]) => {
+    console.log('Setting CBSA data:', data.length, 'items');
     setStoredCBSAData(data);
   };
 

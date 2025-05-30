@@ -6,6 +6,8 @@ import InputMetricValuesStep from './InputMetricValuesStep';
 import SiteAssessmentDetailsView from './SiteAssessmentDetailsView';
 import { AssessmentStep } from '@/hooks/useSiteProspectorSession';
 import { toast } from "@/components/ui/use-toast";
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 interface StepRendererProps {
   currentStep: AssessmentStep;
@@ -75,6 +77,25 @@ const SiteProspectorStepRenderer: React.FC<StepRendererProps> = ({
         />
       );
     }
+
+    // Handle case where we have invalid state (e.g., missing assessment)
+    if (currentStep === 'assessmentDetails' && (!activeAssessmentId || !selectedMetricSetId)) {
+      console.error('Invalid state: missing assessment ID or metric set ID for details view');
+      return (
+        <div className="flex flex-col items-center justify-center p-8 space-y-4">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Assessment Not Found</h3>
+            <p className="text-gray-600 mb-4">
+              The requested assessment could not be loaded. It may have been deleted or you may not have access to it.
+            </p>
+            <Button onClick={onCancelAssessmentProcess} className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Assessments
+            </Button>
+          </div>
+        </div>
+      );
+    }
   } catch (error) {
     console.error('Error rendering step component:', error);
     toast({
@@ -82,7 +103,20 @@ const SiteProspectorStepRenderer: React.FC<StepRendererProps> = ({
       description: "An error occurred. Returning to the main view.",
       variant: "destructive"
     });
-    return null;
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Something went wrong</h3>
+          <p className="text-gray-600 mb-4">
+            An error occurred while loading this view. Please try again.
+          </p>
+          <Button onClick={onCancelAssessmentProcess} className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Assessments
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return null;
