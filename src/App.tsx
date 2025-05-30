@@ -19,6 +19,7 @@ import TreasureMapUploadPage from "./pages/TreasureMapUploadPage";
 import AuthPage from "./pages/AuthPage"; 
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
+import AccountSelectionPage from "./pages/AccountSelectionPage";
 import NotFound from "./pages/NotFound";
 import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
@@ -32,9 +33,9 @@ import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
-// ProtectedRoute component
+// ProtectedRoute component that also handles account selection
 const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
-  const { user, authLoading } = useAuth();
+  const { user, authLoading, activeAccount } = useAuth();
 
   if (authLoading) {
     return <div className="flex justify-center items-center h-screen"><p>Loading authentication state...</p></div>;
@@ -42,6 +43,11 @@ const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // If user is authenticated but no active account is selected, redirect to account selection
+  if (!activeAccount) {
+    return <Navigate to="/account-selection" replace />;
   }
 
   return children;
@@ -73,6 +79,7 @@ const AppContent = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/account-selection" element={<AccountSelectionPage />} />
         <Route path="/" element={<AppRoutes />}>
           <Route index element={<LandingPage />} />
           <Route 

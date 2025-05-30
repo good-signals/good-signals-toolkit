@@ -4,6 +4,7 @@ import HeaderLogo from "./HeaderLogo";
 import HeaderNavigation from "./HeaderNavigation";
 import HeaderUserMenu from "./HeaderUserMenu";
 import HeaderMobileMenu from "./HeaderMobileMenu";
+import AccountSwitcher from "./AccountSwitcher";
 import { useHeaderData } from "@/hooks/useHeaderData";
 
 const Header: React.FC = () => {
@@ -18,7 +19,10 @@ const Header: React.FC = () => {
     <header className="bg-black shadow-sm border-b border-gray-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <HeaderLogo />
+          <div className="flex items-center space-x-4">
+            <HeaderLogo />
+            <AccountSwitcher />
+          </div>
           
           <HeaderNavigation user={user} isSuperAdmin={isSuperAdmin} />
 

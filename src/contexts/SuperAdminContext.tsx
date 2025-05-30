@@ -1,13 +1,13 @@
 
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Account } from '@/services/accountService';
-import { toast } from 'sonner';
+import { useAuth } from './AuthContext';
 
 interface SuperAdminContextType {
   activeAccount: Account | null;
   setActiveAccount: (account: Account | null) => void;
   isImpersonating: boolean;
-  exitImpersonation: () => void;
+  setIsImpersonating: (impersonating: boolean) => void;
 }
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
@@ -17,37 +17,33 @@ interface SuperAdminProviderProps {
 }
 
 export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children }) => {
-  const [activeAccount, setActiveAccountState] = useState<Account | null>(null);
+  const [activeAccount, setActiveAccount] = useState<Account | null>(null);
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const { isSuperAdmin } = useAuth();
 
-  const setActiveAccount = (account: Account | null) => {
-    setActiveAccountState(account);
-    if (account) {
-      toast.success(`Now working in: ${account.name}`);
+  // Clear impersonation state if user is no longer super admin
+  useEffect(() => {
+    if (!isSuperAdmin && isImpersonating) {
+      setActiveAccount(null);
+      setIsImpersonating(false);
     }
-  };
-
-  const exitImpersonation = () => {
-    setActiveAccountState(null);
-    toast.info('Exited account context');
-  };
-
-  const isImpersonating = activeAccount !== null;
-
-  const value = {
-    activeAccount,
-    setActiveAccount,
-    isImpersonating,
-    exitImpersonation,
-  };
+  }, [isSuperAdmin, isImpersonating]);
 
   return (
-    <SuperAdminContext.Provider value={value}>
+    <SuperAdminContext.Provider
+      value={{
+        activeAccount,
+        setActiveAccount,
+        isImpersonating,
+        setIsImpersonating,
+      }}
+    >
       {children}
     </SuperAdminContext.Provider>
   );
 };
 
-export const useSuperAdminContext = (): SuperAdminContextType => {
+export const useSuperAdminContext = () => {
   const context = useContext(SuperAdminContext);
   if (context === undefined) {
     throw new Error('useSuperAdminContext must be used within a SuperAdminProvider');

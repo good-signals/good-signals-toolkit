@@ -59,6 +59,53 @@ export type Database = {
           },
         ]
       }
+      account_invitations: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invitation_token: string
+          invited_by: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_invitations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_memberships: {
         Row: {
           account_id: string
@@ -603,6 +650,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { invitation_token: string }
+        Returns: Json
+      }
       get_account_role: {
         Args: { p_user_id: string; p_account_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
