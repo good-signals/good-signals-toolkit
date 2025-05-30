@@ -8,6 +8,7 @@ interface SuperAdminContextType {
   setActiveAccount: (account: Account | null) => void;
   isImpersonating: boolean;
   setIsImpersonating: (impersonating: boolean) => void;
+  exitImpersonation: () => void;
 }
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
@@ -29,6 +30,11 @@ export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children
     }
   }, [isSuperAdmin, isImpersonating]);
 
+  const exitImpersonation = () => {
+    setActiveAccount(null);
+    setIsImpersonating(false);
+  };
+
   return (
     <SuperAdminContext.Provider
       value={{
@@ -36,6 +42,7 @@ export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({ children
         setActiveAccount,
         isImpersonating,
         setIsImpersonating,
+        exitImpersonation,
       }}
     >
       {children}

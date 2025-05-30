@@ -15,6 +15,12 @@ export interface AccountInvitation {
   updated_at: string;
 }
 
+interface AcceptInvitationResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 export const sendInvitation = async (
   accountId: string,
   email: string,
@@ -43,7 +49,7 @@ export const sendInvitation = async (
     }
 
     toast.success(`Invitation sent to ${email}`);
-    return data;
+    return data as AccountInvitation;
   } catch (error: any) {
     console.error('Unexpected error sending invitation:', error);
     toast.error('An unexpected error occurred while sending invitation');
@@ -65,7 +71,7 @@ export const fetchAccountInvitations = async (accountId: string): Promise<Accoun
       return [];
     }
 
-    return data || [];
+    return (data || []) as AccountInvitation[];
   } catch (error: any) {
     console.error('Unexpected error fetching invitations:', error);
     return [];
@@ -106,11 +112,13 @@ export const acceptInvitation = async (invitationToken: string): Promise<boolean
       return false;
     }
 
-    if (data?.success) {
-      toast.success(data.message || 'Successfully joined account!');
+    const response = data as AcceptInvitationResponse;
+    
+    if (response?.success) {
+      toast.success(response.message || 'Successfully joined account!');
       return true;
     } else {
-      toast.error(data?.error || 'Failed to accept invitation');
+      toast.error(response?.error || 'Failed to accept invitation');
       return false;
     }
   } catch (error: any) {
