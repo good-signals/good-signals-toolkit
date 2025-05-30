@@ -112,13 +112,19 @@ export const acceptInvitation = async (invitationToken: string): Promise<boolean
       return false;
     }
 
-    const response = data as AcceptInvitationResponse;
-    
-    if (response?.success) {
-      toast.success(response.message || 'Successfully joined account!');
-      return true;
+    // Handle the response safely with type checking
+    if (data && typeof data === 'object' && 'success' in data) {
+      const response = data as AcceptInvitationResponse;
+      
+      if (response.success) {
+        toast.success(response.message || 'Successfully joined account!');
+        return true;
+      } else {
+        toast.error(response.error || 'Failed to accept invitation');
+        return false;
+      }
     } else {
-      toast.error(response?.error || 'Failed to accept invitation');
+      toast.error('Invalid response from server');
       return false;
     }
   } catch (error: any) {

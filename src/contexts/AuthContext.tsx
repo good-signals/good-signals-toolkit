@@ -7,8 +7,7 @@ import { Account } from '@/services/accountService';
 
 export interface UserProfile {
   id: string;
-  first_name?: string;
-  last_name?: string;
+  full_name?: string;
   email: string;
   avatar_url?: string;
 }
@@ -21,11 +20,11 @@ interface AuthContextType {
   setActiveAccount: (account: Account | null) => void;
   isSuperAdmin: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, firstName: string, lastName: string, companyName: string, companyAddress?: string | null, companyCategory?: string | null, companySubcategory?: string | null) => Promise<void>;
   signOut: () => Promise<void>;
   authLoading: boolean;
   updateContextUserProfile: (updates: Partial<UserProfile>) => void;
-  uploadAvatarAndUpdateProfile: (file: File) => Promise<void>;
+  uploadAvatarAndUpdateProfile: (file: File) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,8 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data) {
         setProfile({
           id: data.id,
-          first_name: data.first_name,
-          last_name: data.last_name,
+          full_name: data.full_name,
           email: user?.email || '',
           avatar_url: data.avatar_url
         });
@@ -136,7 +134,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await signInWithEmailService(email, password);
   };
 
-  const signUpWithEmail = async (email: string, password: string, firstName: string, lastName: string) => {
+  const signUpWithEmail = async (email: string, password: string, firstName: string, lastName: string, companyName: string, companyAddress?: string | null, companyCategory?: string | null, companySubcategory?: string | null) => {
     await signUpWithEmailService(email, password, firstName, lastName);
   };
 
@@ -151,12 +149,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setProfile(prev => prev ? { ...prev, ...updates } : null);
   };
 
-  const uploadAvatarAndUpdateProfile = async (file: File) => {
-    if (!user) throw new Error('No user found');
+  const uploadAvatarAndUpdateProfile = async (file: File): Promise<boolean> => {
+    if (!user) return false;
 
     // Upload avatar implementation would go here
     // For now, just a placeholder
     console.log('Upload avatar functionality to be implemented');
+    return false;
   };
 
   return (

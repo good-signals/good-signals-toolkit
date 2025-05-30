@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import UserAvatar from '@/components/auth/UserAvatar';
 import { toast } from 'sonner';
-import { UploadCloud } from 'lucide-react'; // Removed CheckCircle, AlertCircle as they are not used
+import { UploadCloud } from 'lucide-react';
 
 interface AvatarUploadProps {
   displayImageUrl?: string | null;
@@ -48,14 +48,11 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ displayImageUrl, displayNam
     // This function updates the USER's avatar_url in the profiles table
     const success = await uploadAvatarAndUpdateProfile(selectedFile);
     if (success) {
-      // toast.success("Avatar updated successfully!"); // Handled by context
       setSelectedFile(null);
       setPreview(null);
       if(fileInputRef.current) {
         fileInputRef.current.value = ""; // Reset file input
       }
-    } else {
-      // toast.error("Failed to update avatar."); // Handled by context
     }
     setIsUploading(false);
   };
