@@ -13,7 +13,7 @@ import { TargetMetricsFormData } from '@/types/targetMetrics';
 // Get all standard metric sets (visible to all users)
 export async function getStandardTargetMetricSets(): Promise<StandardTargetMetricSet[]> {
   const { data, error } = await supabase
-    .from('standard_target_metric_sets')
+    .from('standard_target_metric_sets' as any)
     .select('*')
     .order('name', { ascending: true });
 
@@ -28,7 +28,7 @@ export async function getStandardTargetMetricSets(): Promise<StandardTargetMetri
 // Get a specific standard metric set with its settings
 export async function getStandardTargetMetricSetById(setId: string): Promise<StandardTargetMetricSet & { settings: StandardTargetMetricSetting[] }> {
   const { data: setData, error: setError } = await supabase
-    .from('standard_target_metric_sets')
+    .from('standard_target_metric_sets' as any)
     .select('*')
     .eq('id', setId)
     .single();
@@ -39,7 +39,7 @@ export async function getStandardTargetMetricSetById(setId: string): Promise<Sta
   }
 
   const { data: settingsData, error: settingsError } = await supabase
-    .from('standard_target_metric_settings')
+    .from('standard_target_metric_settings' as any)
     .select('*')
     .eq('standard_set_id', setId);
 
@@ -60,7 +60,7 @@ export async function getStandardTargetMetricSetById(setId: string): Promise<Sta
 // Create a new standard metric set (super admin only)
 export async function createStandardTargetMetricSet(userId: string, data: CreateStandardMetricSetData): Promise<StandardTargetMetricSet> {
   const { data: newSet, error } = await supabase
-    .from('standard_target_metric_sets')
+    .from('standard_target_metric_sets' as any)
     .insert({
       name: data.name,
       description: data.description,
@@ -125,7 +125,7 @@ export async function saveStandardTargetMetricSettings(
   });
 
   const { data, error } = await supabase
-    .from('standard_target_metric_settings')
+    .from('standard_target_metric_settings' as any)
     .upsert(settingsToUpsert, { 
       onConflict: 'standard_set_id, metric_identifier', 
       defaultToNull: false 
@@ -143,7 +143,7 @@ export async function saveStandardTargetMetricSettings(
 // Delete a standard metric set (super admin only)
 export async function deleteStandardTargetMetricSet(setId: string): Promise<void> {
   const { error } = await supabase
-    .from('standard_target_metric_sets')
+    .from('standard_target_metric_sets' as any)
     .delete()
     .eq('id', setId);
 
@@ -170,7 +170,7 @@ export async function cloneStandardMetricSet(
     const newUserSet = await createTargetMetricSet(userId, newName);
     
     // Convert standard settings to user metric format
-    const formData = {
+    const formData: any = {
       metric_set_id: newUserSet.id,
       metric_set_name: newName,
       predefined_metrics: standardSet.settings

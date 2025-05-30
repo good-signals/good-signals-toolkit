@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/auth/UserAvatar";
+import UserAvatar from "@/components/auth/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Header: React.FC = () => {
@@ -75,7 +75,11 @@ const Header: React.FC = () => {
                     variant="ghost"
                     className="relative h-8 w-8 rounded-full"
                   >
-                    <UserAvatar user={user} size="sm" />
+                    <UserAvatar 
+                      avatarUrl={user.user_metadata?.avatar_url} 
+                      fullName={user.user_metadata?.full_name || user.email}
+                      size={8}
+                    />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
