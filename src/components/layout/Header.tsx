@@ -21,7 +21,7 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
             <HeaderLogo />
-            <AccountSwitcher />
+            {user && <AccountSwitcher />}
           </div>
           
           <HeaderNavigation user={user} isSuperAdmin={isSuperAdmin} />
@@ -45,35 +45,31 @@ const Header: React.FC = () => {
         </div>
 
         {/* Mobile Navigation Container */}
-        {isMobileMenuOpen && (
+        {isMobileMenuOpen && user && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-800">
-              {user && (
-                <>
-                  <a
-                    href="/toolkit-hub"
-                    className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Toolkit Hub
-                  </a>
-                  <a
-                    href="/target-metric-sets"
-                    className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Target Metrics
-                  </a>
-                  {isSuperAdmin && (
-                    <a
-                      href="/super-admin"
-                      className="block px-3 py-2 text-base font-medium text-orange-400 hover:text-orange-300"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Super Admin
-                    </a>
-                  )}
-                </>
+              <a
+                href="/toolkit-hub"
+                className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Toolkit Hub
+              </a>
+              <a
+                href="/target-metric-sets"
+                className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Target Metrics
+              </a>
+              {isSuperAdmin && (
+                <a
+                  href="/super-admin"
+                  className="block px-3 py-2 text-base font-medium text-orange-400 hover:text-orange-300"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Super Admin
+                </a>
               )}
             </div>
           </div>
