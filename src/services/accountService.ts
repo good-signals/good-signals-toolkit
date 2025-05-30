@@ -51,6 +51,57 @@ export const getSuperAdminAwareAccountId = async (userId: string, activeAccount?
   }
 };
 
+export const fetchUserAccounts = async (userId: string): Promise<Account[]> => {
+  console.log('Fetching accounts for user:', userId);
+  
+  const { data, error } = await supabase
+    .from('account_memberships')
+    .select(`
+      account_id,
+      role,
+      accounts!inner (
+        id,
+        name,
+        category,
+        subcategory,
+        address,
+        logo_url,
+        created_at,
+        updated_at,
+        signal_good_threshold,
+        signal_bad_threshold
+      )
+    `)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error fetching user accounts:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    console.log('No accounts found for user:', userId);
+    return [];
+  }
+
+  const accounts: Account[] = data.map(membership => ({
+    id: membership.accounts.id,
+    name: membership.accounts.name,
+    category: membership.accounts.category,
+    subcategory: membership.accounts.subcategory,
+    address: membership.accounts.address,
+    logo_url: membership.accounts.logo_url,
+    created_at: membership.accounts.created_at,
+    updated_at: membership.accounts.updated_at,
+    signal_good_threshold: membership.accounts.signal_good_threshold,
+    signal_bad_threshold: membership.accounts.signal_bad_threshold,
+    user_role: membership.role,
+  }));
+
+  console.log('Fetched accounts:', accounts.length);
+  return accounts;
+};
+
 export const fetchUserAccountsWithAdminRole = async (userId: string): Promise<Account[]> => {
   try {
     const { data: memberships, error: membershipError } = await supabase

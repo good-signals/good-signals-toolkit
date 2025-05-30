@@ -1,8 +1,10 @@
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { signInWithEmailService, signUpWithEmailService, signOutService } from '@/services/authService';
-import { Account } from '@/services/accountService';
+import { Account, fetchUserAccounts } from '@/services/accountService';
+import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
 
 export interface UserProfile {
   id: string;
@@ -90,6 +92,49 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Initialize user account after authentication
+  const initializeUserAccount = async (userId: string) => {
+    try {
+      console.log('AuthContext: Initializing user account for:', userId);
+      const accounts = await fetchUserAccounts(userId);
+      
+      if (accounts.length > 0) {
+        console.log('AuthContext: Setting active account:', accounts[0].name);
+        setActiveAccount(accounts[0]);
+        
+        // Check if user has metrics and redirect accordingly
+        setTimeout(async () => {
+          try {
+            const hasSetMetrics = await hasUserSetAnyMetrics(userId);
+            
+            if (hasSetMetrics) {
+              console.log('AuthContext: User has metrics, redirecting to toolkit hub');
+              window.location.href = '/toolkit-hub';
+            } else {
+              console.log('AuthContext: New user, redirecting to target selection');
+              window.location.href = '/target-selection';
+            }
+          } catch (error) {
+            console.error("AuthContext: Error checking user metrics:", error);
+            // On error, default to toolkit hub
+            window.location.href = '/toolkit-hub';
+          }
+        }, 100);
+      } else {
+        console.log('AuthContext: No accounts found, redirecting to account selection');
+        setTimeout(() => {
+          window.location.href = '/account-selection';
+        }, 100);
+      }
+    } catch (error) {
+      console.error('AuthContext: Error initializing user account:', error);
+      // On error, redirect to account selection
+      setTimeout(() => {
+        window.location.href = '/account-selection';
+      }, 100);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     let authStateProcessed = false;
@@ -117,6 +162,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               loadUserProfile(session.user.id),
               checkSuperAdmin(session.user.id)
             ]);
+            
+            // Only initialize account on SIGNED_IN event (not INITIAL_SESSION)
+            if (event === 'SIGNED_IN') {
+              await initializeUserAccount(session.user.id);
+            }
           } catch (error) {
             console.error('Error loading user data:', error);
           }

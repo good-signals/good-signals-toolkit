@@ -1,39 +1,12 @@
 
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
-import { supabase } from '@/integrations/supabase/client';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
 
 const AuthPage: React.FC = () => {
   const { user, session, authLoading } = useAuth();
-  const navigate = useNavigate();
-
-  // Redirect authenticated users to the appropriate page
-  useEffect(() => {
-    const redirectAuthenticatedUser = async () => {
-      if (user && session && !authLoading) {
-        try {
-          const hasSetMetrics = await hasUserSetAnyMetrics(user.id);
-          
-          if (hasSetMetrics) {
-            navigate('/toolkit-hub', { replace: true });
-          } else {
-            navigate('/target-selection', { replace: true });
-          }
-        } catch (error) {
-          console.error("Error checking user metrics:", error);
-          // On error, default to toolkit hub
-          navigate('/toolkit-hub', { replace: true });
-        }
-      }
-    };
-
-    redirectAuthenticatedUser();
-  }, [user, session, authLoading, navigate]);
 
   // Show loading state while auth is loading
   if (authLoading) {
@@ -46,7 +19,7 @@ const AuthPage: React.FC = () => {
     );
   }
 
-  // Don't show the forms if user is authenticated (they will be redirected)
+  // Don't show the forms if user is authenticated (they will be redirected by the AuthContext)
   if (user && session) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
