@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
-import { companyCategoriesData, CompanySubcategory } from '@/data/companyCategories';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { signUpWithEmailService } from '@/services/authService';
+import { COMPANY_CATEGORIES } from '@/data/companyCategories';
 
 interface CompanySetupFormProps {
   userId: string;
@@ -18,124 +18,183 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyCategory, setCompanyCategory] = useState('');
   const [companySubcategory, setCompanySubcategory] = useState('');
-  const [availableSubcategories, setAvailableSubcategories] = useState<CompanySubcategory[]>([]);
 
-  const handleCategoryChange = (value: string) => {
-    setCompanyCategory(value);
-    const selectedCategoryData = companyCategoriesData.find(cat => cat.name === value);
-    setAvailableSubcategories(selectedCategoryData ? selectedCategoryData.subcategories : []);
-    setCompanySubcategory(""); 
-  };
-
-  const handleCompanySetup = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName) {
-      toast.error("Please enter your company name.");
+    
+    if (!email || !password || !firstName || !lastName || !companyName) {
+      toast.error("Please fill in all required fields.");
       return;
     }
-
+    
     setIsSubmitting(true);
     
     try {
-      // Call Edge Function to create account and membership
-      const { error: functionError } = await supabase.functions.invoke('create-account-and-admin', {
-        body: { 
-          userId,
-          companyName,
-          companyAddress: companyAddress || null,
-          companyCategory: companyCategory || null,
-          companySubcategory: companySubcategory || null
-        },
-      });
+      const { user, session, error } = await signUpWithEmailService(
+        email,
+        password,
+        firstName,
+        lastName,
+        companyName,
+        companyAddress || null,
+        companyCategory || null,
+        companySubcategory || null
+      );
 
-      if (functionError) {
-        throw functionError;
+      if (error) {
+        console.error('Company setup error:', error.message);
+        return;
       }
-      
-      toast.success('Company setup completed successfully!');
-      navigate('/target-selection');
+
+      if (session) {
+        // User is confirmed and signed in, redirect to target selection
+        toast.success('Company setup completed! Let\'s set up your target metrics...');
+        navigate('/target-selection');
+      } else {
+        // User needs email confirmation, still redirect to target selection
+        toast.success('Company setup completed! Please check your email to confirm your account, then set up your target metrics.');
+        navigate('/target-selection');
+      }
     } catch (error: any) {
-      console.error('Error setting up company:', error);
-      toast.error(`Failed to set up company: ${error.message}. Please contact support.`);
+      console.error('Error during company setup:', error);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const selectedCategory = COMPANY_CATEGORIES.find(cat => cat.name === companyCategory);
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-[400px] md:w-[550px]">
+    <div className="flex items-center justify-center min-h-screen bg-background p-4">
+      <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Company Setup</CardTitle>
-          <CardDescription>Set up your company information to complete registration.</CardDescription>
+          <CardTitle>Complete Your Company Setup</CardTitle>
+          <CardDescription>
+            Please provide your personal and company information to complete your account setup.
+          </CardDescription>
         </CardHeader>
-        <form onSubmit={handleCompanySetup}>
-          <CardContent className="space-y-4">
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name <span className="text-destructive">*</span></Label>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  autoComplete="given-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name <span className="text-destructive">*</span></Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="setup-companyname">Company Name <span className="text-destructive">*</span></Label>
+              <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
               <Input
-                id="setup-companyname"
+                id="email"
+                type="email"
+                placeholder="john@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Choose a secure password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Company Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="companyName"
                 type="text"
-                placeholder="Acme Corp"
+                placeholder="Your Company Name"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
                 autoComplete="organization"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="setup-companyaddress">Company Address</Label>
+              <Label htmlFor="companyAddress">Company Address</Label>
               <Input
-                id="setup-companyaddress"
+                id="companyAddress"
                 type="text"
-                placeholder="123 Main St, Anytown, USA"
+                placeholder="123 Main St, City, State, ZIP"
                 value={companyAddress}
                 onChange={(e) => setCompanyAddress(e.target.value)}
                 autoComplete="street-address"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="setup-companycategory">Category</Label>
-                <Select onValueChange={handleCategoryChange} value={companyCategory}>
-                  <SelectTrigger id="setup-companycategory">
+                <Label htmlFor="companyCategory">Company Category</Label>
+                <Select value={companyCategory} onValueChange={setCompanyCategory}>
+                  <SelectTrigger id="companyCategory">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Categories</SelectLabel>
-                      {companyCategoriesData.map((cat) => (
-                        <SelectItem key={cat.name} value={cat.name}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
+                    {COMPANY_CATEGORIES.map((category) => (
+                      <SelectItem key={category.name} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="setup-companysubcategory">Subcategory</Label>
+                <Label htmlFor="companySubcategory">Company Subcategory</Label>
                 <Select 
-                  onValueChange={setCompanySubcategory} 
-                  value={companySubcategory}
-                  disabled={!companyCategory || availableSubcategories.length === 0}
+                  value={companySubcategory} 
+                  onValueChange={setCompanySubcategory}
+                  disabled={!selectedCategory}
                 >
-                  <SelectTrigger id="setup-companysubcategory">
+                  <SelectTrigger id="companySubcategory">
                     <SelectValue placeholder="Select subcategory" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Subcategories</SelectLabel>
-                      {availableSubcategories.map((subcat) => (
-                        <SelectItem key={subcat.name} value={subcat.name}>
-                          {subcat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
+                    {selectedCategory?.subcategories.map((subcategory) => (
+                      <SelectItem key={subcategory} value={subcategory}>
+                        {subcategory}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -143,7 +202,7 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Setting up company...' : 'Complete Setup'}
+              {isSubmitting ? 'Setting up your company...' : 'Complete Setup'}
             </Button>
           </CardFooter>
         </form>
