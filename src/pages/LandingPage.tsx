@@ -10,7 +10,7 @@ const LandingPage = () => {
         <img 
           src="/lovable-uploads/5e1ae084-72d6-4010-b4ca-a2a23c917fbb.png" 
           alt="Good Signals mascot" 
-          className="w-16 h-16 mx-auto mb-6" 
+          className="w-48 h-48 mx-auto mb-6" 
         />
         <h1 className="text-5xl md:text-6xl font-bold mb-6 text-primary">
           Welcome to Good Signals
