@@ -31,7 +31,7 @@ interface AuthContextType {
     companySubcategory: string | null
   ) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  updatePassword: (newPassword: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateContextUserProfile: (updates: { full_name?: string; avatar_url?: string }) => Promise<boolean>;
   uploadAvatarAndUpdateProfile: (file: File) => Promise<boolean>;
