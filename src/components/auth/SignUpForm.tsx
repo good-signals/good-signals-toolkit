@@ -10,7 +10,7 @@ import { companyCategoriesData, CompanySubcategory } from '@/data/companyCategor
 import { toast } from 'sonner';
 
 const SignUpForm: React.FC = () => {
-  const { signUpWithEmail, authLoading } = useAuth();
+  const { signUpWithEmail, authLoading } = useAuth(); // Updated: authLoading
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [email, setEmail] = useState('');
@@ -48,6 +48,7 @@ const SignUpForm: React.FC = () => {
       companySubcategory || null
     );
     setIsSubmitting(false);
+    // Toasts handled by service/context
   };
 
   return (

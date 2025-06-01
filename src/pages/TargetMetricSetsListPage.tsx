@@ -1,12 +1,11 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetrics/targetMetricSetService';
-import { TargetMetricSet } from '@/types/targetMetrics';
+import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetricsService';
+import { TargetMetricSet } from '@/types/targetMetrics'; // Corrected import
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { PlusCircle, Edit3, Trash2, ListChecks } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,15 +22,15 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const TargetMetricSetsListPage: React.FC = () => {
-  const { user, authLoading, activeAccount } = useAuth();
+  const { user, authLoading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const { data: metricSets, isLoading, error } = useQuery<TargetMetricSet[], Error>({
-    queryKey: ['targetMetricSets', user?.id, activeAccount?.id],
+    queryKey: ['targetMetricSets', user?.id],
     queryFn: () => {
       if (!user?.id) return Promise.resolve([]);
-      return getTargetMetricSets(user.id, activeAccount);
+      return getTargetMetricSets(user.id);
     },
     enabled: !!user && !authLoading,
   });
@@ -39,11 +38,12 @@ const TargetMetricSetsListPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (metricSetId: string) => {
       if (!user?.id) throw new Error("User not authenticated.");
-      return deleteTargetMetricSet(metricSetId, user.id, activeAccount);
+      return deleteTargetMetricSet(metricSetId, user.id);
     },
     onSuccess: () => {
       sonnerToast.success("Metric set deleted successfully.");
-      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id, activeAccount?.id] });
+      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] }); // If this key is used
     },
     onError: (err: Error) => {
       sonnerToast.error(`Failed to delete metric set: ${err.message}`);
@@ -55,31 +55,11 @@ const TargetMetricSetsListPage: React.FC = () => {
   };
 
   if (isLoading || authLoading) {
-    return (
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center mb-8">
-          <ListChecks size={48} className="text-primary mr-4" />
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Your Target Metric Sets</h1>
-            <p className="text-muted-foreground">Loading metric sets...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="container mx-auto p-4 text-center">Loading metric sets...</div>;
   }
 
   if (error) {
-    return (
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center mb-8">
-          <ListChecks size={48} className="text-primary mr-4" />
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Your Target Metric Sets</h1>
-            <p className="text-muted-foreground text-destructive">Error loading metric sets: {error.message}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="container mx-auto p-4 text-center text-destructive">Error loading metric sets: {error.message}</div>;
   }
 
   return (

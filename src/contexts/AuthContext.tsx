@@ -1,49 +1,71 @@
-
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from "sonner";
 import { signInWithEmailService, signUpWithEmailService, signOutService } from '@/services/authService';
-import { Account, fetchUserAccounts } from '@/services/accountService';
-import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
+import { fetchProfileById, updateProfileService } from '@/services/profileService';
 
+// Define the shape of the profile data (can be moved to a types file later)
 export interface UserProfile {
   id: string;
-  full_name?: string;
-  email: string;
-  avatar_url?: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  updated_at: string | null;
+  // Add other profile fields here if needed
 }
 
+// Define the shape of the context
 interface AuthContextType {
-  user: User | null;
   session: Session | null;
+  user: User | null;
   profile: UserProfile | null;
-  activeAccount: Account | null;
-  setActiveAccount: (account: Account | null) => void;
   isSuperAdmin: boolean;
+  authLoading: boolean; // Renamed from 'loading'
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, firstName: string, lastName: string, companyName: string, companyAddress?: string | null, companyCategory?: string | null, companySubcategory?: string | null) => Promise<void>;
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    companyName: string,
+    companyAddress: string | null,
+    companyCategory: string | null,
+    companySubcategory: string | null
+  ) => Promise<void>;
   signOut: () => Promise<void>;
-  authLoading: boolean;
-  updateContextUserProfile: (updates: Partial<UserProfile>) => void;
+  updateContextUserProfile: (updates: { full_name?: string; avatar_url?: string }) => Promise<boolean>;
   uploadAvatarAndUpdateProfile: (file: File) => Promise<boolean>;
 }
 
+// Create the context with a default undefined value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Props for the AuthProvider
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [activeAccount, setActiveAccount] = useState<Account | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true); // Renamed
 
-  // Check if user is super admin
-  const checkSuperAdmin = async (userId: string) => {
+  const fetchProfileAndUpdateContext = async (userId: string) => {
+    const { data: profileData, error: profileError } = await fetchProfileById(userId);
+    if (profileError && !profileData) { // Allow profileData to be null if record doesn't exist (406)
+        toast.error('Error fetching profile details.');
+        setProfile(null);
+    } else if (profileData) {
+        setProfile(profileData);
+    } else {
+        // No profile data found, but no error (e.g. new user, profile not yet created by trigger)
+        setProfile(null);
+    }
+  };
+
+  const checkSuperAdminStatus = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('user_global_roles')
@@ -53,250 +75,163 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
-        console.log('User is not a super admin:', error.message);
         setIsSuperAdmin(false);
         return;
       }
       
       setIsSuperAdmin(!!data);
     } catch (error) {
-      console.log('User is not a super admin');
       setIsSuperAdmin(false);
     }
   };
 
-  // Load user profile
-  const loadUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error);
-        return;
-      }
-
-      if (data) {
-        setProfile({
-          id: data.id,
-          full_name: data.full_name,
-          email: user?.email || '',
-          avatar_url: data.avatar_url
-        });
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    }
-  };
-
-  // Initialize user account after authentication
-  const initializeUserAccount = async (userId: string) => {
-    try {
-      console.log('AuthContext: Initializing user account for:', userId);
-      const accounts = await fetchUserAccounts(userId);
-      
-      if (accounts.length > 0) {
-        console.log('AuthContext: Setting active account:', accounts[0].name);
-        setActiveAccount(accounts[0]);
-        
-        // Check if user has metrics and redirect accordingly
-        setTimeout(async () => {
-          try {
-            const hasSetMetrics = await hasUserSetAnyMetrics(userId);
-            
-            if (hasSetMetrics) {
-              console.log('AuthContext: User has metrics, redirecting to toolkit hub');
-              window.location.href = '/toolkit-hub';
-            } else {
-              console.log('AuthContext: New user, redirecting to target selection');
-              window.location.href = '/target-selection';
-            }
-          } catch (error) {
-            console.error("AuthContext: Error checking user metrics:", error);
-            // On error, default to toolkit hub
-            window.location.href = '/toolkit-hub';
-          }
-        }, 100);
-      } else {
-        console.log('AuthContext: No accounts found, redirecting to account selection');
-        setTimeout(() => {
-          window.location.href = '/account-selection';
-        }, 100);
-      }
-    } catch (error) {
-      console.error('AuthContext: Error initializing user account:', error);
-      // On error, redirect to account selection
-      setTimeout(() => {
-        window.location.href = '/account-selection';
-      }, 100);
-    }
-  };
-
   useEffect(() => {
-    let mounted = true;
-    let authStateProcessed = false;
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
-        
-        if (!mounted) return;
-
-        // Prevent processing the same auth state multiple times
-        if (authStateProcessed && event === 'INITIAL_SESSION') {
-          console.log('Auth state already processed, skipping');
-          return;
-        }
-
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Load profile and check super admin status
-          try {
-            await Promise.all([
-              loadUserProfile(session.user.id),
-              checkSuperAdmin(session.user.id)
-            ]);
-            
-            // Only initialize account on SIGNED_IN event (not INITIAL_SESSION)
-            if (event === 'SIGNED_IN') {
-              await initializeUserAccount(session.user.id);
-            }
-          } catch (error) {
-            console.error('Error loading user data:', error);
-          }
-        } else {
-          // Clear all state when user signs out
-          setProfile(null);
-          setActiveAccount(null);
-          setIsSuperAdmin(false);
-        }
-        
-        // Set loading to false after processing auth state
-        if (mounted) {
-          console.log('Setting authLoading to false after auth state change');
-          setAuthLoading(false);
-          authStateProcessed = true;
-        }
+    setAuthLoading(true);
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      if (currentSession?.user) {
+        await fetchProfileAndUpdateContext(currentSession.user.id);
+        await checkSuperAdminStatus(currentSession.user.id);
       }
-    );
+      setAuthLoading(false);
+    });
 
-    // Check for existing session
-    const initializeAuth = async () => {
-      try {
-        console.log('Initializing auth...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-        }
-
-        if (!mounted) return;
-
-        console.log('Initial session:', session?.user?.id);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          try {
-            await Promise.all([
-              loadUserProfile(session.user.id),
-              checkSuperAdmin(session.user.id)
-            ]);
-          } catch (error) {
-            console.error('Error loading initial user data:', error);
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        if (mounted) {
-          console.log('Setting authLoading to false after initialization');
-          setAuthLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    // Add a timeout failsafe to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      if (mounted && authLoading) {
-        console.warn('Auth loading timeout reached, forcing authLoading to false');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setAuthLoading(true);
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      if (newSession?.user) {
+        setTimeout(async () => {
+            await fetchProfileAndUpdateContext(newSession.user.id);
+            await checkSuperAdminStatus(newSession.user.id);
+            setAuthLoading(false);
+        }, 0);
+      } else {
+        setProfile(null);
+        setIsSuperAdmin(false);
         setAuthLoading(false);
       }
-    }, 10000); // 10 second timeout
+    });
 
     return () => {
-      mounted = false;
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 
   const signInWithEmail = async (email: string, password: string) => {
-    console.log('AuthContext: signInWithEmail called');
-    try {
-      await signInWithEmailService(email, password);
-      console.log('AuthContext: signInWithEmailService completed');
-    } catch (error) {
-      console.error('AuthContext: signInWithEmail error:', error);
-      throw error; // Re-throw to let the form handle it
-    }
+    setAuthLoading(true);
+    await signInWithEmailService(email, password);
+    // onAuthStateChange will handle state updates.
+    // Setting authLoading to false is tricky here as onAuthStateChange is async.
+    // For simplicity, we let onAuthStateChange handle the final authLoading(false).
+    // Or, we can optimistically set it false after a short delay if no immediate error.
+    // However, the service already shows toasts.
+    // The global authLoading primarily reflects the context's readiness.
+    // Let's ensure onAuthStateChange consistently sets authLoading false.
   };
 
-  const signUpWithEmail = async (email: string, password: string, firstName: string, lastName: string, companyName: string, companyAddress?: string | null, companyCategory?: string | null, companySubcategory?: string | null) => {
-    await signUpWithEmailService(email, password, firstName, lastName);
+  const signUpWithEmail = async (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    companyName: string,
+    companyAddress: string | null,
+    companyCategory: string | null,
+    companySubcategory: string | null
+  ) => {
+    setAuthLoading(true);
+    await signUpWithEmailService(
+      email, password, firstName, lastName, companyName, 
+      companyAddress, companyCategory, companySubcategory
+    );
+    // onAuthStateChange will handle state updates.
   };
 
   const signOut = async () => {
-    setActiveAccount(null);
-    setProfile(null);
-    setIsSuperAdmin(false);
+    setAuthLoading(true); // To show loading state during sign out process
     await signOutService();
+    // onAuthStateChange handles clearing session, user, profile and sets authLoading to false.
+    // Explicitly clear here for immediate UI feedback before onAuthStateChange if desired, but can lead to race conditions.
+    // Sticking to onAuthStateChange for consistency.
   };
-
-  const updateContextUserProfile = (updates: Partial<UserProfile>) => {
-    setProfile(prev => prev ? { ...prev, ...updates } : null);
+  
+  const updateContextUserProfile = async (updates: { full_name?: string; avatar_url?: string }) => {
+    if (!user) {
+      toast.error("You must be logged in to update your profile.");
+      return false;
+    }
+    // Potentially use a different loading state like 'isUpdatingProfile'
+    // For now, re-using authLoading might be okay if updates are quick
+    // Or introduce a new state: const [profileUpdating, setProfileUpdating] = useState(false);
+    setAuthLoading(true); // Or setProfileUpdating(true)
+    const { data: updatedProfile, error } = await updateProfileService(user.id, updates);
+    if (error || !updatedProfile) {
+      toast.error(error?.message || 'Failed to update profile.');
+      setAuthLoading(false); // Or setProfileUpdating(false)
+      return false;
+    }
+    setProfile(updatedProfile);
+    toast.success('Profile updated successfully!');
+    setAuthLoading(false); // Or setProfileUpdating(false)
+    return true;
   };
 
   const uploadAvatarAndUpdateProfile = async (file: File): Promise<boolean> => {
-    if (!user) return false;
+    if (!user) {
+      toast.error("You must be logged in to upload an avatar.");
+      return false;
+    }
+    setAuthLoading(true); // Or a specific 'isUploadingAvatar' state
 
-    // Upload avatar implementation would go here
-    // For now, just a placeholder
-    console.log('Upload avatar functionality to be implemented');
-    return false;
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Math.random()}.${fileExt}`; // user.id as folder
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true }); // upsert: true to overwrite if exists
+
+    if (uploadError) {
+      console.error('Error uploading avatar:', uploadError);
+      toast.error(uploadError.message || 'Failed to upload avatar.');
+      setAuthLoading(false);
+      return false;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+    if (!publicUrl) {
+        toast.error('Failed to get public URL for avatar.');
+        setAuthLoading(false);
+        return false;
+    }
+    
+    // Update profile with new avatar_url
+    const success = await updateContextUserProfile({ avatar_url: publicUrl });
+    // updateContextUserProfile already sets authLoading to false
+    return success;
+  };
+  
+  const value = {
+    session,
+    user,
+    profile,
+    isSuperAdmin,
+    authLoading, // Renamed
+    signInWithEmail,
+    signUpWithEmail,
+    signOut,
+    updateContextUserProfile, // Renamed from updateUserProfile
+    uploadAvatarAndUpdateProfile,
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        profile,
-        activeAccount,
-        setActiveAccount,
-        isSuperAdmin,
-        signInWithEmail,
-        signUpWithEmail,
-        signOut,
-        authLoading,
-        updateContextUserProfile,
-        uploadAvatarAndUpdateProfile,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
+// Custom hook to use the AuthContext
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');

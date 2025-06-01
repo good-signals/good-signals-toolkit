@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { UserProfile } from '@/contexts/AuthContext';
+import { UserProfile } from '@/contexts/AuthContext'; // We'll refine this dependency later if needed or define UserProfile here
 
 export const fetchProfileById = async (userId: string): Promise<{ data: UserProfile | null; error: Error | null }> => {
   try {
@@ -14,20 +14,7 @@ export const fetchProfileById = async (userId: string): Promise<{ data: UserProf
       console.error('Error fetching profile in service:', error);
       return { data: null, error };
     }
-
-    if (data) {
-      // Get user email from auth
-      const { data: user } = await supabase.auth.getUser();
-      const profile: UserProfile = {
-        id: data.id,
-        full_name: data.full_name,
-        avatar_url: data.avatar_url,
-        email: user.user?.email || ''
-      };
-      return { data: profile, error: null };
-    }
-
-    return { data: null, error: null };
+    return { data: data as UserProfile, error: null };
   } catch (error: any) {
     console.error('Catch Error fetching profile in service:', error);
     return { data: null, error };
@@ -47,20 +34,7 @@ export const updateProfileService = async (userId: string, updates: { full_name?
       console.error('Error updating profile in service:', error);
       return { data: null, error };
     }
-
-    if (data) {
-      // Get user email from auth
-      const { data: user } = await supabase.auth.getUser();
-      const profile: UserProfile = {
-        id: data.id,
-        full_name: data.full_name,
-        avatar_url: data.avatar_url,
-        email: user.user?.email || ''
-      };
-      return { data: profile, error: null };
-    }
-
-    return { data: null, error: null };
+    return { data: data as UserProfile, error: null };
   } catch (error: any) {
     console.error('Catch error updating profile in service:', error);
     return { data: null, error };
