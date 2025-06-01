@@ -23,6 +23,8 @@ import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
 import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import StandardMetricsListPage from "./pages/StandardMetricsListPage";
+import StandardMetricsBuilderPage from "./pages/StandardMetricsBuilderPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -100,6 +102,18 @@ const AppContent = () => {
           <Route 
             path="super-admin" 
             element={<ProtectedRoute><SuperAdminDashboard /></ProtectedRoute>} 
+          />
+          <Route 
+            path="super-admin/standard-metrics" 
+            element={<ProtectedRoute><StandardMetricsListPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="super-admin/standard-metrics/builder" 
+            element={<ProtectedRoute><StandardMetricsBuilderPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="super-admin/standard-metrics/builder/:metricSetId" 
+            element={<ProtectedRoute><StandardMetricsBuilderPage /></ProtectedRoute>} 
           />
         </Route>
         <Route path="*" element={<NotFound />} />

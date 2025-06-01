@@ -1,27 +1,228 @@
 
-// Stub file for backward compatibility
-// Standard metrics functionality has been removed
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  StandardTargetMetricSet, 
+  StandardTargetMetricSetting,
+  CreateStandardMetricSetData,
+  StandardMetricsFormData 
+} from '@/types/standardMetrics';
 
-export const getStandardMetrics = async () => {
-  return [];
+export const getStandardMetricSets = async (): Promise<StandardTargetMetricSet[]> => {
+  const { data, error } = await supabase
+    .from('standard_target_metric_sets')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching standard metric sets:', error);
+    throw error;
+  }
+  
+  return data || [];
 };
 
-export const createStandardMetric = async () => {
-  throw new Error('Standard metrics functionality has been removed');
+export const getStandardMetricSetById = async (id: string): Promise<StandardTargetMetricSet | null> => {
+  const { data, error } = await supabase
+    .from('standard_target_metric_sets')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching standard metric set:', error);
+    return null;
+  }
+  
+  return data;
 };
 
-export const updateStandardMetric = async () => {
-  throw new Error('Standard metrics functionality has been removed');
+export const getStandardMetricSettings = async (metricSetId: string): Promise<StandardTargetMetricSetting[]> => {
+  const { data, error } = await supabase
+    .from('standard_target_metric_settings')
+    .select('*')
+    .eq('metric_set_id', metricSetId);
+  
+  if (error) {
+    console.error('Error fetching standard metric settings:', error);
+    return [];
+  }
+  
+  return data || [];
 };
 
-export const deleteStandardMetric = async () => {
-  throw new Error('Standard metrics functionality has been removed');
+export const createStandardMetricSet = async (data: CreateStandardMetricSetData): Promise<StandardTargetMetricSet> => {
+  const { data: result, error } = await supabase
+    .from('standard_target_metric_sets')
+    .insert({
+      name: data.name,
+      description: data.description,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating standard metric set:', error);
+    throw error;
+  }
+
+  return result;
 };
 
-export const getStandardTargetMetricSets = async () => {
-  return [];
+export const updateStandardMetricSetName = async (setId: string, name: string, description?: string) => {
+  const updateData: any = { name };
+  if (description !== undefined) {
+    updateData.description = description;
+  }
+
+  const { data, error } = await supabase
+    .from('standard_target_metric_sets')
+    .update(updateData)
+    .eq('id', setId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating standard metric set:', error);
+    throw error;
+  }
+
+  return data;
 };
 
-export const deleteStandardTargetMetricSet = async () => {
-  throw new Error('Standard metrics functionality has been removed');
+export const deleteStandardMetricSet = async (setId: string) => {
+  const { error } = await supabase
+    .from('standard_target_metric_sets')
+    .delete()
+    .eq('id', setId);
+
+  if (error) {
+    console.error('Error deleting standard metric set:', error);
+    throw error;
+  }
+
+  return true;
+};
+
+export const saveStandardMetricSettings = async (metricSetId: string, formData: StandardMetricsFormData) => {
+  // First delete existing settings for this metric set
+  await supabase
+    .from('standard_target_metric_settings')
+    .delete()
+    .eq('metric_set_id', metricSetId);
+
+  // Prepare all metrics to insert
+  const metricsToInsert = [];
+
+  // Add predefined metrics
+  formData.predefined_metrics.forEach(metric => {
+    metricsToInsert.push({
+      metric_set_id: metricSetId,
+      metric_identifier: metric.metric_identifier,
+      label: metric.label,
+      category: metric.category,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      is_custom: false,
+    });
+  });
+
+  // Add custom metrics
+  formData.custom_metrics.forEach(metric => {
+    metricsToInsert.push({
+      metric_set_id: metricSetId,
+      metric_identifier: metric.metric_identifier,
+      label: metric.label,
+      category: metric.category,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      units: metric.units,
+      is_custom: true,
+    });
+  });
+
+  // Add visitor profile metrics
+  formData.visitor_profile_metrics.forEach(metric => {
+    metricsToInsert.push({
+      metric_set_id: metricSetId,
+      metric_identifier: metric.metric_identifier,
+      label: metric.label,
+      category: metric.category,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      measurement_type: metric.measurement_type,
+      is_custom: false,
+    });
+  });
+
+  // Insert all metrics
+  if (metricsToInsert.length > 0) {
+    const { error } = await supabase
+      .from('standard_target_metric_settings')
+      .insert(metricsToInsert);
+
+    if (error) {
+      console.error('Error saving standard metric settings:', error);
+      throw error;
+    }
+  }
+
+  return { success: true };
+};
+
+// Function to copy a standard metric set to an account's target metric sets
+export const copyStandardMetricSetToAccount = async (
+  standardSetId: string, 
+  accountId: string, 
+  userId: string,
+  newName?: string
+) => {
+  // Get the standard metric set
+  const standardSet = await getStandardMetricSetById(standardSetId);
+  if (!standardSet) {
+    throw new Error('Standard metric set not found');
+  }
+
+  // Get the standard metric settings
+  const standardSettings = await getStandardMetricSettings(standardSetId);
+
+  // Create a new target metric set for the account
+  const { data: newTargetSet, error: createError } = await supabase
+    .from('target_metric_sets')
+    .insert({
+      name: newName || `${standardSet.name} (Copy)`,
+      account_id: accountId,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating target metric set from standard:', createError);
+    throw createError;
+  }
+
+  // Copy the settings to user_custom_metrics_settings
+  const userSettingsToInsert = standardSettings.map(setting => ({
+    user_id: userId,
+    account_id: accountId,
+    metric_set_id: newTargetSet.id,
+    metric_identifier: setting.metric_identifier,
+    label: setting.label,
+    category: setting.category,
+    target_value: setting.target_value,
+    higher_is_better: setting.higher_is_better,
+    measurement_type: setting.measurement_type,
+  }));
+
+  if (userSettingsToInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from('user_custom_metrics_settings')
+      .insert(userSettingsToInsert);
+
+    if (insertError) {
+      console.error('Error copying standard settings to user settings:', insertError);
+      throw insertError;
+    }
+  }
+
+  return newTargetSet;
 };
