@@ -31,7 +31,7 @@ const tools = [
 
 const ToolkitHub = () => {
   return (
-    <div className="py-8">
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-12">
         <Compass size={48} className="text-primary mx-auto mb-4" />
         <h1 className="text-4xl md:text-5xl font-bold mb-3 text-primary">Toolkit Hub</h1> {/* Removed font-serif */}
