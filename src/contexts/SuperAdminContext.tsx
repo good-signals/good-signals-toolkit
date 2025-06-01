@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, PropsWithChildren, ReactElement } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Account } from '@/services/accountService';
@@ -13,6 +12,7 @@ interface SuperAdminContextType {
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
 
+// Force TypeScript recompilation with PropsWithChildren
 export function SuperAdminProvider(props: PropsWithChildren<{}>): ReactElement {
   const { user, isSuperAdmin } = useAuth();
   const [impersonatedAccount, setImpersonatedAccount] = useState<Account | null>(null);
