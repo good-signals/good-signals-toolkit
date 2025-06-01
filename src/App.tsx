@@ -1,183 +1,82 @@
 
-import { AuthProvider } from "@/contexts/AuthContext"; 
-import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom"; 
-import React from "react";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { SuperAdminProvider } from '@/contexts/SuperAdminContext';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 
-import MainLayout from "./components/layout/MainLayout";
-import LandingPage from "./pages/LandingPage";
-import ToolkitHub from "./pages/ToolkitHub";
-import SiteProspectorPage from "./pages/SiteProspectorPage";
-import TerritoryTargeterPage from "./pages/TerritoryTargeterPage";
-import SiteTreasureMapPage from "./pages/SiteTreasureMapPage";
-import TreasureMapSettingsPage from "./pages/TreasureMapSettingsPage";
-import TreasureMapUploadPage from "./pages/TreasureMapUploadPage";
-import AuthPage from "./pages/AuthPage"; 
-import ProfileSettingsPage from "./pages/ProfileSettingsPage";
-import AccountManagementPage from "./pages/AccountManagementPage";
-import AccountSelectionPage from "./pages/AccountSelectionPage";
-import NotFound from "./pages/NotFound";
-import TargetSelectionPage from "./pages/TargetSelectionPage";
-import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
-import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
-import SignalSettingsPage from "./pages/SignalSettingsPage";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
-import StandardMetricsManagement from "./pages/StandardMetricsManagement";
-import SuperAdminUsersPage from "./pages/SuperAdminUsersPage";
-import SuperAdminAccountsPage from "./pages/SuperAdminAccountsPage";
-import { useAuth } from "./contexts/AuthContext";
+// Pages
+import LandingPage from '@/pages/LandingPage';
+import AuthPage from '@/pages/AuthPage';
+import ToolkitHub from '@/pages/ToolkitHub';
+import AccountSelectionPage from '@/pages/AccountSelectionPage';
+import TargetSelectionPage from '@/pages/TargetSelectionPage';
+import TargetMetricsBuilderPage from '@/pages/TargetMetricsBuilderPage';
+import TargetMetricSetsListPage from '@/pages/TargetMetricSetsListPage';
+import StandardMetricsManagement from '@/pages/StandardMetricsManagement';
+import TerritoryTargeterPage from '@/pages/TerritoryTargeterPage';
+import SiteProspectorPage from '@/pages/SiteProspectorPage';
+import SiteTreasureMapPage from '@/pages/SiteTreasureMapPage';
+import TreasureMapSettingsPage from '@/pages/TreasureMapSettingsPage';
+import TreasureMapUploadPage from '@/pages/TreasureMapUploadPage';
+import AccountManagementPage from '@/pages/AccountManagementPage';
+import ProfileSettingsPage from '@/pages/ProfileSettingsPage';
+import SignalSettingsPage from '@/pages/SignalSettingsPage';
+import SuperAdminDashboard from '@/pages/SuperAdminDashboard';
+import SuperAdminUsersPage from '@/pages/SuperAdminUsersPage';
+import SuperAdminAccountsPage from '@/pages/SuperAdminAccountsPage';
+import NotFound from '@/pages/NotFound';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
-// ProtectedRoute component that also handles account selection
-const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
-  const { user, authLoading, activeAccount } = useAuth();
-
-  if (authLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading authentication state...</p></div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  // If user is authenticated but no active account is selected, redirect to account selection
-  if (!activeAccount) {
-    return <Navigate to="/account-selection" replace />;
-  }
-
-  return children;
-};
-
-// Super Admin Protected Route
-const SuperAdminRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
-  const { user, isSuperAdmin, authLoading } = useAuth();
-
-  if (authLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading authentication state...</p></div>;
-  }
-
-  if (!user || !isSuperAdmin) {
-    return <Navigate to="/toolkit-hub" replace />;
-  }
-
-  return children;
-};
-
-const AppRoutes = () => (
-  <MainLayout>
-    <Outlet />
-  </MainLayout>
-);
-
-const AppContent = () => {
+function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/account-selection" element={<AccountSelectionPage />} />
-        <Route path="/" element={<AppRoutes />}>
-          <Route index element={<LandingPage />} />
-          <Route 
-            path="toolkit-hub" 
-            element={<ProtectedRoute><ToolkitHub /></ProtectedRoute>} 
-          />
-          <Route 
-            path="toolkit/site-prospector" 
-            element={<ProtectedRoute><SiteProspectorPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="toolkit/territory-targeter" 
-            element={<ProtectedRoute><TerritoryTargeterPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="toolkit/site-treasure-map" 
-            element={<ProtectedRoute><SiteTreasureMapPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="treasure-map-settings" 
-            element={<ProtectedRoute><TreasureMapSettingsPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="treasure-map-upload" 
-            element={<ProtectedRoute><TreasureMapUploadPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="profile-settings" 
-            element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="account-management"
-            element={<ProtectedRoute><AccountManagementPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="target-selection" 
-            element={<ProtectedRoute><TargetSelectionPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="target-metrics-builder" 
-            element={<ProtectedRoute><TargetMetricsBuilderPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="target-metrics-builder/:metricSetId" 
-            element={<ProtectedRoute><TargetMetricsBuilderPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="target-metric-sets" 
-            element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="signal-settings"
-            element={<ProtectedRoute><SignalSettingsPage /></ProtectedRoute>}
-          />
-          {/* Super Admin Routes */}
-          <Route 
-            path="super-admin" 
-            element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/users" 
-            element={<SuperAdminRoute><SuperAdminUsersPage /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/standard-metrics" 
-            element={<SuperAdminRoute><StandardMetricsManagement /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/standard-metrics/builder" 
-            element={<SuperAdminRoute><TargetMetricsBuilderPage /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/standard-metrics/builder/:metricSetId" 
-            element={<SuperAdminRoute><TargetMetricsBuilderPage /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/accounts" 
-            element={<SuperAdminRoute><SuperAdminAccountsPage /></SuperAdminRoute>} 
-          />
-        </Route>
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SuperAdminProvider>
+            <Router>
+              <div className="min-h-screen bg-background">
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/toolkit-hub" element={<ToolkitHub />} />
+                  <Route path="/account-selection" element={<AccountSelectionPage />} />
+                  <Route path="/target-selection" element={<TargetSelectionPage />} />
+                  <Route path="/target-metrics-builder" element={<TargetMetricsBuilderPage />} />
+                  <Route path="/target-metric-sets" element={<TargetMetricSetsListPage />} />
+                  <Route path="/standard-metrics" element={<StandardMetricsManagement />} />
+                  <Route path="/territory-targeter" element={<TerritoryTargeterPage />} />
+                  <Route path="/site-prospector" element={<SiteProspectorPage />} />
+                  <Route path="/site-treasure-map" element={<SiteTreasureMapPage />} />
+                  <Route path="/treasure-map-settings" element={<TreasureMapSettingsPage />} />
+                  <Route path="/treasure-map-upload" element={<TreasureMapUploadPage />} />
+                  <Route path="/account-management" element={<AccountManagementPage />} />
+                  <Route path="/profile-settings" element={<ProfileSettingsPage />} />
+                  <Route path="/signal-settings" element={<SignalSettingsPage />} />
+                  <Route path="/super-admin" element={<SuperAdminDashboard />} />
+                  <Route path="/super-admin/users" element={<SuperAdminUsersPage />} />
+                  <Route path="/super-admin/accounts" element={<SuperAdminAccountsPage />} />
+                  <Route path="/404" element={<NotFound />} />
+                  <Route path="*" element={<Navigate to="/404" replace />} />
+                </Routes>
+              </div>
+              <Toaster />
+            </Router>
+          </SuperAdminProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <SuperAdminProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </TooltipProvider>
-      </SuperAdminProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
 
 export default App;
