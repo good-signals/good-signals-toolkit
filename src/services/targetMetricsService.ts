@@ -1,9 +1,11 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
   UserCustomMetricSetting, 
   TargetMetricSet,
-  CreateTargetMetricSetData 
+  CreateTargetMetricSetData,
+  TargetMetricsFormData
 } from '@/types/targetMetrics';
 import { getAccountForUser } from './targetMetrics/accountHelpers';
 
@@ -68,12 +70,11 @@ export const deleteTargetMetricSet = async (id: string) => {
   }
 };
 
-export const getUserCustomMetricSettings = async (userId: string, accountId: string) => {
+export const getUserCustomMetricSettings = async (metricSetId: string) => {
   const { data, error } = await supabase
     .from('user_custom_metrics_settings')
     .select('*')
-    .eq('user_id', userId)
-    .eq('account_id', accountId);
+    .eq('metric_set_id', metricSetId);
   
   if (error) {
     console.error('Error fetching user custom metric settings:', error);
@@ -83,16 +84,96 @@ export const getUserCustomMetricSettings = async (userId: string, accountId: str
   return data || [];
 };
 
-export const saveUserCustomMetricSettings = async (settings: any[]) => {
-  // Implementation for saving user custom metric settings
-  console.log('Saving user custom metric settings:', settings);
+export const saveUserCustomMetricSettings = async (userId: string, metricSetId: string, formData: TargetMetricsFormData) => {
+  // First delete existing settings for this metric set
+  await supabase
+    .from('user_custom_metrics_settings')
+    .delete()
+    .eq('user_id', userId)
+    .eq('metric_set_id', metricSetId);
+
+  // Get account for user
+  const accountId = await getAccountForUser(userId);
+  if (!accountId) {
+    throw new Error('No account found for user');
+  }
+
+  // Prepare all metrics to insert
+  const metricsToInsert = [];
+
+  // Add predefined metrics
+  formData.predefined_metrics.forEach(metric => {
+    metricsToInsert.push({
+      user_id: userId,
+      account_id: accountId,
+      metric_set_id: metricSetId,
+      metric_identifier: metric.metric_identifier,
+      label: metric.label,
+      category: metric.category,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      measurement_type: null
+    });
+  });
+
+  // Add custom metrics
+  formData.custom_metrics.forEach(metric => {
+    metricsToInsert.push({
+      user_id: userId,
+      account_id: accountId,
+      metric_set_id: metricSetId,
+      metric_identifier: metric.metric_identifier,
+      label: metric.label,
+      category: metric.category,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      measurement_type: null
+    });
+  });
+
+  // Add visitor profile metrics
+  formData.visitor_profile_metrics.forEach(metric => {
+    metricsToInsert.push({
+      user_id: userId,
+      account_id: accountId,
+      metric_set_id: metricSetId,
+      metric_identifier: metric.metric_identifier,
+      label: metric.label,
+      category: metric.category,
+      target_value: metric.target_value,
+      higher_is_better: metric.higher_is_better,
+      measurement_type: metric.measurement_type
+    });
+  });
+
+  // Insert all metrics
+  if (metricsToInsert.length > 0) {
+    const { error } = await supabase
+      .from('user_custom_metrics_settings')
+      .insert(metricsToInsert);
+
+    if (error) {
+      console.error('Error saving user custom metric settings:', error);
+      throw error;
+    }
+  }
+
   return { success: true };
 };
 
-export const createTargetMetricSet = async (data: CreateTargetMetricSetData) => {
+export const createTargetMetricSet = async (userId: string, name: string) => {
+  // Get account for user
+  const accountId = await getAccountForUser(userId);
+  if (!accountId) {
+    throw new Error('No account found for user');
+  }
+
   const { data: result, error } = await supabase
     .from('target_metric_sets')
-    .insert(data)
+    .insert({
+      name: name,
+      account_id: accountId,
+    })
     .select()
     .single();
   
@@ -117,6 +198,31 @@ export const updateTargetMetricSet = async (setId: string, data: { name: string 
 
   if (error) {
     console.error('Error updating target metric set:', error);
+    throw error;
+  }
+
+  return result;
+};
+
+export const updateTargetMetricSetName = async (setId: string, userId: string, name: string) => {
+  // Get account for user
+  const accountId = await getAccountForUser(userId);
+  if (!accountId) {
+    throw new Error('No account found for user');
+  }
+
+  const { data: result, error } = await supabase
+    .from('target_metric_sets')
+    .update({
+      name: name,
+    })
+    .eq('id', setId)
+    .eq('account_id', accountId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating target metric set name:', error);
     throw error;
   }
 
