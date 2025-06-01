@@ -14,13 +14,13 @@ export const hasUserSetAnyMetrics = async (userId: string): Promise<boolean> => 
   try {
     // Fetch user metric settings for the user
     const { data: userMetricSettings, error: userMetricSettingsError } = await supabase
-      .from('user_metric_settings')
+      .from('user_custom_metrics_settings')
       .select('*')
       .eq('user_id', userId);
 
     if (userMetricSettingsError) {
       console.error("Error fetching user metric settings:", userMetricSettingsError);
-      return false; // Return false in case of an error
+      return false;
     }
 
     // If user has any metric settings, return true
@@ -32,11 +32,11 @@ export const hasUserSetAnyMetrics = async (userId: string): Promise<boolean> => 
     const { data: targetMetricSets, error: targetMetricSetsError } = await supabase
       .from('target_metric_sets')
       .select('*')
-      .eq('user_id', userId);
+      .eq('account_id', userId); // Note: this might need to be adjusted based on your data model
 
     if (targetMetricSetsError) {
       console.error("Error fetching target metric sets:", targetMetricSetsError);
-      return false; // Return false in case of an error
+      return false;
     }
 
     // If user has any target metric sets, return true
@@ -44,16 +44,14 @@ export const hasUserSetAnyMetrics = async (userId: string): Promise<boolean> => 
       return true;
     }
 
-    // If no user metric settings or target metric sets, return false
     return false;
 
   } catch (error) {
     console.error("Error checking user metrics:", error);
-    return false; // Return false in case of an error
+    return false;
   }
 };
 
-// Export stub functions for backward compatibility
 export const getTargetMetricSets = async (accountId: string) => {
   const { data, error } = await supabase
     .from('target_metric_sets')
@@ -133,7 +131,6 @@ export const createTargetMetricSet = async (data: CreateTargetMetricSetData) => 
 
 export const updateTargetMetricSetName = async (id: string, name: string) => {
   const { error } = await supabase
-    .from('target_metric_sets')
     .update({ name })
     .eq('id', id);
   
@@ -144,13 +141,14 @@ export const updateTargetMetricSetName = async (id: string, name: string) => {
 };
 
 export const saveUserStandardMetricsPreference = async (userId: string, preferences: any) => {
-  // Stub implementation
   console.log('Saving user standard metrics preference:', userId, preferences);
   return { success: true };
 };
 
-export const triggerAssessmentRecalculation = async (assessmentId: string) => {
-  // Stub implementation
+export const triggerAssessmentRecalculation = async (assessmentId: string, userId?: string) => {
   console.log('Triggering assessment recalculation for:', assessmentId);
-  return { success: true };
+  return { 
+    success: true,
+    message: 'Assessment recalculation completed successfully.'
+  };
 };

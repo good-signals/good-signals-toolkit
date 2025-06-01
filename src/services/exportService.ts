@@ -4,15 +4,27 @@ import { CBSAData } from '@/types/territoryTargeterTypes';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { getAccountSignalThresholds } from './targetMetrics/accountHelpers';
 
-// Add missing type exports
+// Fix ExportData interface to match component usage
 export interface ExportData {
-  name: string;
-  value: any;
+  assessment: SiteAssessment;
+  targetMetricSet?: {
+    id: string;
+    name: string;
+    account_id: string;
+    created_at: string;
+    updated_at: string;
+  };
+  accountSettings?: any;
+  detailedMetricScores?: Map<string, number>;
+  overallSiteSignalScore?: number;
+  completionPercentage?: number;
 }
 
 export interface ExportOptions {
-  format: 'csv' | 'pdf';
+  format?: 'csv' | 'pdf';
   includeImages?: boolean;
+  pageOrientation?: 'portrait' | 'landscape';
+  imageQuality?: 'high' | 'medium' | 'low';
 }
 
 export const exportCBSADataToCSV = async (
@@ -87,7 +99,7 @@ export const exportSiteAssessmentsToCSV = async (
 
   for (const assessment of assessments) {
     const values = [
-      `"${assessment.assessment_name.replace(/"/g, '""')}"`,
+      `"${assessment.assessment_name?.replace(/"/g, '""') || ''}"`,
       `"${assessment.address_line1?.replace(/"/g, '""') || ''}"`,
       `"${assessment.city?.replace(/"/g, '""') || ''}"`,
       `"${assessment.state_province?.replace(/"/g, '""') || ''}"`,
@@ -105,7 +117,7 @@ export const exportSiteAssessmentsToCSV = async (
           return 'Neutral';
         }
       })(),
-      `"${assessment.completion_percentage}"`,
+      `"${assessment.completion_percentage || 0}"`,
       `"${assessment.site_status?.replace(/"/g, '""') || ''}"`
     ];
     csvRows.push(values.join(','));
@@ -124,9 +136,9 @@ export const exportSiteAssessmentsToCSV = async (
   window.URL.revokeObjectURL(url);
 };
 
-export const exportAssessmentToPDF = async (assessment: SiteAssessment, options: ExportOptions = { format: 'pdf' }) => {
+export const exportAssessmentToPDF = async (exportData: ExportData, options: ExportOptions = { format: 'pdf' }) => {
   // Stub implementation for PDF export
-  console.log('Exporting assessment to PDF:', assessment.id);
+  console.log('Exporting assessment to PDF:', exportData.assessment.id);
   return { success: true };
 };
 
