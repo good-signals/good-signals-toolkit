@@ -28,10 +28,13 @@ const SignUpForm: React.FC = () => {
     
     try {
       const fullName = `${firstName} ${lastName}`.trim();
+      const redirectUrl = `${window.location.origin}/auth`;
+      
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
           },

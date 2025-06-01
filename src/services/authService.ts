@@ -25,10 +25,13 @@ export const signUpWithEmailService = async (
   companySubcategory: string | null
 ) => {
   const fullName = `${firstName} ${lastName}`.trim();
+  const redirectUrl = `${window.location.origin}/auth`;
+  
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: redirectUrl,
       data: {
         full_name: fullName,
         // avatar_url is handled by profile creation trigger or separate upload
