@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, PropsWithChildren, ReactElement } from 'react';
+
+import React, { createContext, useContext, useState, ReactNode, ReactElement } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Account } from '@/services/accountService';
 
@@ -10,10 +11,13 @@ interface SuperAdminContextType {
   stopImpersonation: () => void;
 }
 
+interface SuperAdminProviderProps {
+  children: ReactNode;
+}
+
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
 
-// Force TypeScript recompilation with PropsWithChildren
-export function SuperAdminProvider(props: PropsWithChildren<{}>): ReactElement {
+export function SuperAdminProvider({ children }: SuperAdminProviderProps): ReactElement {
   const { user, isSuperAdmin } = useAuth();
   const [impersonatedAccount, setImpersonatedAccount] = useState<Account | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
@@ -49,7 +53,7 @@ export function SuperAdminProvider(props: PropsWithChildren<{}>): ReactElement {
 
   return (
     <SuperAdminContext.Provider value={contextValue}>
-      {props.children}
+      {children}
     </SuperAdminContext.Provider>
   );
 }
