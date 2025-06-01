@@ -1,4 +1,3 @@
-
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -27,6 +26,7 @@ import StandardMetricsListPage from "./pages/StandardMetricsListPage";
 import StandardMetricsBuilderPage from "./pages/StandardMetricsBuilderPage";
 import UpdatePasswordForm from "./components/auth/UpdatePasswordForm";
 import { useAuth } from "./contexts/AuthContext";
+import CompanySetupPage from "./pages/CompanySetupPage";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +51,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/auth/update-password" element={<UpdatePasswordForm />} />
+        <Route path="/company-setup" element={<CompanySetupPage />} />
         <Route path="/" element={<MainLayout />}>
           <Route index element={<LandingPage />} />
           <Route 

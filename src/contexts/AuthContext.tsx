@@ -20,16 +20,6 @@ interface AuthContextType {
   profile: UserProfile | null;
   authLoading: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-    companyName: string,
-    companyAddress: string | null,
-    companyCategory: string | null,
-    companySubcategory: string | null
-  ) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -97,23 +87,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithEmail = async (email: string, password: string) => {
     setAuthLoading(true);
     await signInWithEmailService(email, password);
-  };
-
-  const signUpWithEmail = async (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-    companyName: string,
-    companyAddress: string | null,
-    companyCategory: string | null,
-    companySubcategory: string | null
-  ) => {
-    setAuthLoading(true);
-    await signUpWithEmailService(
-      email, password, firstName, lastName, companyName, 
-      companyAddress, companyCategory, companySubcategory
-    );
   };
 
   const resetPassword = async (email: string) => {
@@ -187,7 +160,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     profile,
     authLoading,
     signInWithEmail,
-    signUpWithEmail,
     resetPassword,
     updatePassword,
     signOut,
