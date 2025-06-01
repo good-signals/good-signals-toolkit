@@ -78,6 +78,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
   
   const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
   const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
+  const [hasInitializedForm, setHasInitializedForm] = useState(false);
 
   const form = useForm<StandardMetricsFormData>({
     resolver: zodResolver(StandardMetricsFormSchema),
@@ -103,7 +104,11 @@ const StandardMetricsBuilderPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentMetricSetId(routeMetricSetId);
-  }, [routeMetricSetId]);
+    // Reset initialization flag when metric set ID changes
+    if (routeMetricSetId !== currentMetricSetId) {
+      setHasInitializedForm(false);
+    }
+  }, [routeMetricSetId, currentMetricSetId]);
 
   const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
     queryKey: ['standardMetricSet', currentMetricSetId],
@@ -124,7 +129,8 @@ const StandardMetricsBuilderPage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined) {
+    // Only initialize form if we haven't done so already or if we're loading existing data
+    if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined && !hasInitializedForm) {
       console.log('Loading existing data:', { existingMetricSet, existingMetrics });
 
       // Initialize predefined metrics with either existing data or defaults
@@ -189,8 +195,9 @@ const StandardMetricsBuilderPage: React.FC = () => {
 
       console.log('Resetting form with data:', formData);
       form.reset(formData);
-    } else if (!currentMetricSetId) {
-      // Initialize form for new metric set with proper required fields
+      setHasInitializedForm(true);
+    } else if (!currentMetricSetId && !hasInitializedForm) {
+      // Initialize form for new metric set with proper required fields - only if not already initialized
       const defaultPredefinedMetrics = initialPredefinedMetricsConfig.map(config => {
         let targetValue;
         if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
@@ -221,8 +228,9 @@ const StandardMetricsBuilderPage: React.FC = () => {
       };
 
       form.reset(newFormData);
+      setHasInitializedForm(true);
     }
-  }, [currentMetricSetId, existingMetricSet, existingMetrics, form]);
+  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, hasInitializedForm]);
 
   const mutation = useMutation({
     mutationFn: async (formData: StandardMetricsFormData) => {
