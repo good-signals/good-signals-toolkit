@@ -99,8 +99,6 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
-          signal_bad_threshold: number
-          signal_good_threshold: number
           subcategory: string | null
           updated_at: string | null
         }
@@ -111,8 +109,6 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
-          signal_bad_threshold?: number
-          signal_good_threshold?: number
           subcategory?: string | null
           updated_at?: string | null
         }
@@ -123,8 +119,6 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
-          signal_bad_threshold?: number
-          signal_good_threshold?: number
           subcategory?: string | null
           updated_at?: string | null
         }
@@ -373,80 +367,6 @@ export type Database = {
           },
         ]
       }
-      standard_target_metric_sets: {
-        Row: {
-          created_at: string
-          created_by: string
-          description: string | null
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      standard_target_metric_settings: {
-        Row: {
-          category: string
-          created_at: string
-          higher_is_better: boolean
-          id: string
-          label: string
-          measurement_type: string | null
-          metric_identifier: string
-          standard_set_id: string
-          target_value: number
-          updated_at: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          higher_is_better: boolean
-          id?: string
-          label: string
-          measurement_type?: string | null
-          metric_identifier: string
-          standard_set_id: string
-          target_value: number
-          updated_at?: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          higher_is_better?: boolean
-          id?: string
-          label?: string
-          measurement_type?: string | null
-          metric_identifier?: string
-          standard_set_id?: string
-          target_value?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "standard_target_metric_settings_standard_set_id_fkey"
-            columns: ["standard_set_id"]
-            isOneToOne: false
-            referencedRelation: "standard_target_metric_sets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       target_metric_sets: {
         Row: {
           account_id: string
@@ -577,52 +497,12 @@ export type Database = {
           },
         ]
       }
-      user_global_roles: {
-        Row: {
-          created_at: string | null
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      get_account_role: {
-        Args: { p_user_id: string; p_account_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
-      get_users_for_super_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          id: string
-          email: string
-          created_at: string
-          last_sign_in_at: string
-          full_name: string
-          global_roles: Json
-          account_memberships: Json
-        }[]
-      }
-      is_super_admin: {
-        Args: { p_user_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       app_role: "super_admin" | "account_admin" | "account_user"

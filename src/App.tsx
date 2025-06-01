@@ -1,6 +1,5 @@
 
 import { AuthProvider } from "@/contexts/AuthContext"; 
-import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,10 +23,6 @@ import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
 import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
 import SignalSettingsPage from "./pages/SignalSettingsPage";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
-import StandardMetricsManagement from "./pages/StandardMetricsManagement";
-import SuperAdminUsersPage from "./pages/SuperAdminUsersPage";
-import SuperAdminAccountsPage from "./pages/SuperAdminAccountsPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -42,21 +37,6 @@ const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
-  }
-
-  return children;
-};
-
-// Super Admin Protected Route
-const SuperAdminRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
-  const { user, isSuperAdmin, authLoading } = useAuth();
-
-  if (authLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading authentication state...</p></div>;
-  }
-
-  if (!user || !isSuperAdmin) {
-    return <Navigate to="/toolkit-hub" replace />;
   }
 
   return children;
@@ -127,31 +107,6 @@ const AppContent = () => {
             path="signal-settings"
             element={<ProtectedRoute><SignalSettingsPage /></ProtectedRoute>}
           />
-          {/* Super Admin Routes */}
-          <Route 
-            path="super-admin" 
-            element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/users" 
-            element={<SuperAdminRoute><SuperAdminUsersPage /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/standard-metrics" 
-            element={<SuperAdminRoute><StandardMetricsManagement /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/standard-metrics/builder" 
-            element={<SuperAdminRoute><TargetMetricsBuilderPage /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/standard-metrics/builder/:metricSetId" 
-            element={<SuperAdminRoute><TargetMetricsBuilderPage /></SuperAdminRoute>} 
-          />
-          <Route 
-            path="super-admin/accounts" 
-            element={<SuperAdminRoute><SuperAdminAccountsPage /></SuperAdminRoute>} 
-          />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -162,13 +117,11 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <SuperAdminProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </TooltipProvider>
-      </SuperAdminProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
+      </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

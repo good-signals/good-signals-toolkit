@@ -4,10 +4,9 @@ import { Link } from 'react-router-dom';
 
 interface HeaderNavigationProps {
   user: any;
-  isSuperAdmin: boolean;
 }
 
-const HeaderNavigation: React.FC<HeaderNavigationProps> = ({ user, isSuperAdmin }) => {
+const HeaderNavigation: React.FC<HeaderNavigationProps> = ({ user }) => {
   return (
     <nav className="hidden md:flex space-x-8">
       {user && (
@@ -24,14 +23,6 @@ const HeaderNavigation: React.FC<HeaderNavigationProps> = ({ user, isSuperAdmin 
           >
             Target Metrics
           </Link>
-          {isSuperAdmin && (
-            <Link
-              to="/super-admin"
-              className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
-            >
-              Super Admin
-            </Link>
-          )}
         </>
       )}
     </nav>
