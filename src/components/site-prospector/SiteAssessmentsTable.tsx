@@ -62,7 +62,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
 
   const prevIsDeletingRef = useRef(isDeleting);
 
-  // Fetch account data for threshold values
+  // Default signal thresholds since they were removed from the database
+  const defaultGoodThreshold = 0.75;
+  const defaultBadThreshold = 0.50;
+
+  // Fetch account data for threshold values (kept for compatibility but using defaults)
   const { data: accountData } = useQuery({
     queryKey: ['userAccounts', user?.id],
     queryFn: async () => {
@@ -237,8 +241,8 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     selectedCount: selectedAssessmentIds.length,
     assessmentsCount: assessmentsData.length,
     accountThresholds: {
-      good: accountData?.signal_good_threshold,
-      bad: accountData?.signal_bad_threshold
+      good: defaultGoodThreshold,
+      bad: defaultBadThreshold
     }
   });
 
@@ -294,8 +298,8 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
         isDeleting={isDeleting}
         assessmentToDelete={null}
         documentCounts={documentCounts}
-        accountGoodThreshold={accountData?.signal_good_threshold}
-        accountBadThreshold={accountData?.signal_bad_threshold}
+        accountGoodThreshold={defaultGoodThreshold}
+        accountBadThreshold={defaultBadThreshold}
       />
 
       <AlertDialog 

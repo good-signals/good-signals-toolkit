@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
@@ -70,6 +69,10 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const [isCalculatingScores, setIsCalculatingScores] = useState(false);
 
   console.log('SiteAssessmentDetailsView props:', { assessmentId, selectedMetricSetId });
+
+  // Default signal thresholds since they were removed from the database
+  const defaultGoodThreshold = 0.75;
+  const defaultBadThreshold = 0.50;
 
   // Enhanced query with better error handling and cache management
   const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError, refetch: refetchAssessment } = useQuery<SiteAssessment, Error>({
@@ -357,8 +360,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   const overallSignalStatus = getSignalStatus(
     overallSiteSignalScore,
-    accountSettings?.signal_good_threshold,
-    accountSettings?.signal_bad_threshold
+    defaultGoodThreshold,
+    defaultBadThreshold
   );
 
   const handleDocumentsChange = () => {
@@ -484,8 +487,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
         const metricScoreStatus = getSignalStatus(
           metricDetail?.score ?? null,
-          accountSettings?.signal_good_threshold,
-          accountSettings?.signal_bad_threshold
+          defaultGoodThreshold,
+          defaultBadThreshold
         );
 
         return {

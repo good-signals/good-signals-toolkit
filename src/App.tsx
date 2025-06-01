@@ -41,18 +41,12 @@ const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
   return children;
 };
 
-const AppRoutes = () => (
-  <MainLayout>
-    <Outlet />
-  </MainLayout>
-);
-
 const AppContent = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/" element={<AppRoutes />}>
+        <Route path="/" element={<MainLayout />}>
           <Route index element={<LandingPage />} />
           <Route 
             path="toolkit-hub" 
