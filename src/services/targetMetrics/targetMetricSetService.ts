@@ -1,23 +1,92 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
-import { TargetMetricSet, TargetMetricSetSchema, UserCustomMetricSettingSchema } from '@/types/targetMetrics';
-import { getSuperAdminAwareAccountId } from './accountHelpers';
-import { Account } from '@/services/accountService';
+import { TargetMetricSet } from '@/types/targetMetrics';
+import { getAccountForUser } from './accountHelpers';
 
-const METRIC_SETS_TABLE_NAME = 'target_metric_sets';
+// Zod schema for TargetMetricSet
+export const TargetMetricSetSchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
 
-export async function createTargetMetricSet(userId: string, name: string, activeAccount?: Account | null): Promise<TargetMetricSet> {
-  console.log('Creating target metric set for user:', userId, 'with name:', name);
-  
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    throw new Error('User must be an account admin to create metric sets');
+// Zod schema for creating a TargetMetricSet
+export const CreateTargetMetricSetSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+});
+
+export type CreateTargetMetricSetData = z.infer<typeof CreateTargetMetricSetSchema>;
+
+// Function to fetch all target metric sets for a given user
+export async function getTargetMetricSets(userId: string): Promise<TargetMetricSet[]> {
+  console.log('Getting target metric sets for user:', userId);
+
+  const account = await getAccountForUser(userId);
+
+  if (!account) {
+    console.log('No account found for user, returning empty array');
+    return [];
   }
 
   const { data, error } = await supabase
-    .from(METRIC_SETS_TABLE_NAME)
-    .insert({ account_id: accountId, name: name })
+    .from('target_metric_sets')
+    .select('*')
+    .eq('account_id', account.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching target metric sets:', error);
+    throw error;
+  }
+
+  console.log('Found target metric sets:', data?.length || 0);
+  return z.array(TargetMetricSetSchema).parse(data || []);
+}
+
+// Function to fetch a single target metric set by ID
+export async function getTargetMetricSetById(metricSetId: string): Promise<TargetMetricSet | null> {
+  console.log('Getting target metric set by ID:', metricSetId);
+
+  const { data, error } = await supabase
+    .from('target_metric_sets')
+    .select('*')
+    .eq('id', metricSetId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching target metric set:', error);
+    throw error;
+  }
+
+  if (!data) {
+    console.log('Target metric set not found');
+    return null;
+  }
+
+  return TargetMetricSetSchema.parse(data);
+}
+
+// Function to create a new target metric set
+export async function createTargetMetricSet(userId: string, data: CreateTargetMetricSetData): Promise<TargetMetricSet> {
+  console.log('Creating target metric set for user:', userId, 'with data:', data);
+
+  const account = await getAccountForUser(userId);
+
+  if (!account) {
+    throw new Error('User must be part of an account to create target metric sets');
+  }
+
+  const { data: newMetricSet, error } = await supabase
+    .from('target_metric_sets')
+    .insert({
+      account_id: account.id,
+      name: data.name,
+      description: data.description,
+    })
     .select()
     .single();
 
@@ -25,178 +94,44 @@ export async function createTargetMetricSet(userId: string, name: string, active
     console.error('Error creating target metric set:', error);
     throw error;
   }
-  
-  console.log('Created target metric set:', data);
-  return TargetMetricSetSchema.parse(data);
+
+  console.log('Created target metric set:', newMetricSet);
+  return TargetMetricSetSchema.parse(newMetricSet);
 }
 
-export async function getTargetMetricSets(userId: string, activeAccount?: Account | null): Promise<TargetMetricSet[]> {
-  console.log('Getting target metric sets for user:', userId);
-  
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    console.log('No account ID found for user, returning empty array');
-    return [];
-  }
+// Function to update an existing target metric set
+export async function updateTargetMetricSet(metricSetId: string, data: Partial<CreateTargetMetricSetData>): Promise<TargetMetricSet> {
+  console.log('Updating target metric set:', metricSetId, 'with data:', data);
 
-  console.log('Querying metric sets for account:', accountId);
-  
-  const { data, error } = await supabase
-    .from(METRIC_SETS_TABLE_NAME)
-    .select('*')
-    .eq('account_id', accountId)
-    .order('name', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching target metric sets:', error);
-    throw error;
-  }
-  
-  console.log('Found metric sets:', data?.length || 0);
-  return z.array(TargetMetricSetSchema).parse(data || []);
-}
-
-export async function getTargetMetricSetById(metricSetId: string, userId: string, activeAccount?: Account | null): Promise<TargetMetricSet | null> {
-  console.log('Getting target metric set by ID:', metricSetId, 'for user:', userId);
-  
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    console.log('No account ID found for user');
-    return null;
-  }
-
-  const { data: metricSetData, error: metricSetError } = await supabase
-    .from(METRIC_SETS_TABLE_NAME)
-    .select('*')
+  const { data: updatedMetricSet, error } = await supabase
+    .from('target_metric_sets')
+    .update(data)
     .eq('id', metricSetId)
-    .eq('account_id', accountId)
-    .single();
-
-  if (metricSetError) {
-    if (metricSetError.code === 'PGRST116') { // Not found
-      console.log('Metric set not found');
-      return null;
-    }
-    console.error('Error fetching target metric set by ID:', metricSetError);
-    throw metricSetError;
-  }
-
-  if (!metricSetData) {
-    return null;
-  }
-
-  // Fetch associated user custom metrics settings
-  const { data: userMetricsData, error: userMetricsError } = await supabase
-    .from('user_custom_metrics_settings')
-    .select('*')
-    .eq('metric_set_id', metricSetId);
-
-  if (userMetricsError) {
-    console.error('Error fetching user custom metric settings for set:', userMetricsError);
-  }
-
-  // Fetch account custom metrics to ensure all custom metrics are available
-  const { data: accountCustomMetrics, error: accountCustomMetricsError } = await supabase
-    .from('account_custom_metrics')
-    .select('*')
-    .eq('account_id', accountId);
-
-  if (accountCustomMetricsError) {
-    console.error('Error fetching account custom metrics:', accountCustomMetricsError);
-  }
-
-  // Convert account custom metrics to user metric settings format for any that don't have settings yet
-  const existingMetricIdentifiers = new Set((userMetricsData || []).map(m => m.metric_identifier));
-  const missingCustomMetrics = (accountCustomMetrics || []).filter(
-    customMetric => !existingMetricIdentifiers.has(customMetric.metric_identifier)
-  );
-
-  // Create placeholder settings for custom metrics that don't have settings yet
-  const placeholderSettings = missingCustomMetrics.map(customMetric => ({
-    id: undefined,
-    user_id: userId,
-    account_id: accountId,
-    metric_set_id: metricSetId,
-    metric_identifier: customMetric.metric_identifier,
-    category: customMetric.category,
-    label: customMetric.name,
-    target_value: customMetric.default_target_value || 0,
-    measurement_type: null,
-    higher_is_better: customMetric.higher_is_better,
-    created_at: undefined,
-    updated_at: undefined,
-  }));
-
-  const allMetricsSettings = [
-    ...(userMetricsData ? z.array(UserCustomMetricSettingSchema).parse(userMetricsData) : []),
-    ...placeholderSettings
-  ];
-  
-  const parsedMetricSet = TargetMetricSetSchema.parse(metricSetData);
-  
-  return {
-    ...parsedMetricSet,
-    user_custom_metrics_settings: allMetricsSettings,
-  };
-}
-
-export async function updateTargetMetricSetName(metricSetId: string, userId: string, newName: string, activeAccount?: Account | null): Promise<TargetMetricSet> {
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    throw new Error('User must be an account admin to update metric sets');
-  }
-
-  const { data, error } = await supabase
-    .from(METRIC_SETS_TABLE_NAME)
-    .update({ name: newName, updated_at: new Date().toISOString() })
-    .eq('id', metricSetId)
-    .eq('account_id', accountId)
     .select()
     .single();
 
   if (error) {
-    console.error('Error updating target metric set name:', error);
+    console.error('Error updating target metric set:', error);
     throw error;
   }
-  return TargetMetricSetSchema.parse(data);
+
+  console.log('Updated target metric set:', updatedMetricSet);
+  return TargetMetricSetSchema.parse(updatedMetricSet);
 }
 
-export async function deleteTargetMetricSet(metricSetId: string, userId: string, activeAccount?: Account | null): Promise<void> {
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    throw new Error('User must be an account admin to delete metric sets');
-  }
+// Function to delete a target metric set
+export async function deleteTargetMetricSet(metricSetId: string): Promise<void> {
+  console.log('Deleting target metric set:', metricSetId);
 
   const { error } = await supabase
-    .from(METRIC_SETS_TABLE_NAME)
+    .from('target_metric_sets')
     .delete()
-    .eq('id', metricSetId)
-    .eq('account_id', accountId);
+    .eq('id', metricSetId);
 
   if (error) {
     console.error('Error deleting target metric set:', error);
     throw error;
   }
-}
 
-// Updated function to check if a user has any target metric sets
-export async function hasUserSetAnyMetrics(userId: string, activeAccount?: Account | null): Promise<boolean> {
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    return false;
-  }
-
-  const { count: setCounts, error: setError } = await supabase
-    .from(METRIC_SETS_TABLE_NAME)
-    .select('*', { count: 'exact', head: true })
-    .eq('account_id', accountId);
-
-  if (setError) {
-    console.error('Error checking for metric sets:', setError);
-    throw setError;
-  }
-  if (setCounts !== null && setCounts > 0) {
-    return true;
-  }
-  return false; 
+  console.log('Deleted target metric set:', metricSetId);
 }

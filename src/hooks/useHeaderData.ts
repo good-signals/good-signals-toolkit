@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
+import { useSuperAdmin } from './useSuperAdmin';
 
 export const useHeaderData = () => {
   const [userAccount, setUserAccount] = useState<Account | null>(null);
   const { user, signOut, authLoading } = useAuth();
+  const { isSuperAdmin } = useSuperAdmin();
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -26,5 +28,6 @@ export const useHeaderData = () => {
     userAccount,
     signOut,
     authLoading,
+    isSuperAdmin,
   };
 };

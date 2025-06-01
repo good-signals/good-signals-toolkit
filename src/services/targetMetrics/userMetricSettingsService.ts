@@ -1,139 +1,107 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
-  UserCustomMetricSetting, 
-  TargetMetricsFormData, 
-  VISITOR_PROFILE_CATEGORY,
-  UserCustomMetricSettingSchema,
-  MeasurementType
+  UserMetricSettings, 
+  CreateUserMetricSettingsData,
+  UpdateUserMetricSettingsData 
 } from '@/types/targetMetrics';
-import { Database } from '@/integrations/supabase/types';
-import { getSuperAdminAwareAccountId } from './accountHelpers';
-import { Account } from '@/services/accountService';
+import { getAccountForUser } from './accountHelpers';
 
-const USER_METRICS_TABLE_NAME = 'user_custom_metrics_settings';
+const UserMetricSettingsSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  metric_identifier: z.string(),
+  target_metric_set_id: z.string().uuid().nullable(),
+  target_value: z.number().nullable(),
+  weight: z.number().min(0).max(1),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
 
-// Type for inserting/upserting metrics
-type MetricForUpsert = Database['public']['Tables']['user_custom_metrics_settings']['Insert'];
+export async function getUserMetricSettings(userId: string): Promise<UserMetricSettings[]> {
+  console.log('Getting user metric settings for user:', userId);
 
-export async function getUserCustomMetricSettings(metricSetId: string): Promise<UserCustomMetricSetting[]> {
   const { data, error } = await supabase
-    .from(USER_METRICS_TABLE_NAME)
+    .from('user_metric_settings')
     .select('*')
-    .eq('metric_set_id', metricSetId);
+    .eq('user_id', userId);
 
   if (error) {
-    console.error('Error fetching user custom metric settings for set:', error);
+    console.error('Error fetching user metric settings:', error);
     throw error;
   }
-  
-  const typedData: UserCustomMetricSetting[] = data?.map(item => ({
-    id: item.id,
-    user_id: item.user_id,
-    account_id: item.account_id,
-    metric_set_id: item.metric_set_id,
-    metric_identifier: item.metric_identifier,
-    category: item.category,
-    label: item.label,
-    target_value: item.target_value,
-    measurement_type: item.measurement_type as UserCustomMetricSetting['measurement_type'],
-    higher_is_better: item.higher_is_better,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-  })) || [];
-  
-  return typedData;
+
+  console.log('Found user metric settings:', data?.length || 0);
+  return z.array(UserMetricSettingsSchema).parse(data || []);
 }
 
-export async function saveUserCustomMetricSettings(
+export async function createUserMetricSettings(
   userId: string,
-  metricSetId: string,
-  formData: TargetMetricsFormData,
-  activeAccount?: Account | null
-): Promise<UserCustomMetricSetting[]> {
-  const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-  if (!accountId) {
-    throw new Error('User must be an account admin to save metric settings');
-  }
-
-  const metricsToUpsert: MetricForUpsert[] = [];
-
-  // Handle predefined metrics
-  formData.predefined_metrics.forEach(metric => {
-    metricsToUpsert.push({
-      metric_set_id: metricSetId,
-      user_id: userId, 
-      account_id: accountId,
-      metric_identifier: metric.metric_identifier,
-      category: metric.category,
-      label: metric.label,
-      target_value: metric.target_value,
-      higher_is_better: metric.higher_is_better,
-      measurement_type: null,
-    });
-  });
-
-  // Handle custom metrics
-  formData.custom_metrics?.forEach(metric => {
-    metricsToUpsert.push({
-      metric_set_id: metricSetId,
-      user_id: userId,
-      account_id: accountId,
-      metric_identifier: metric.metric_identifier,
-      category: metric.category,
-      label: metric.label,
-      target_value: metric.target_value,
-      higher_is_better: metric.higher_is_better,
-      measurement_type: null,
-    });
-  });
-
-  // Handle visitor profile metrics
-  formData.visitor_profile_metrics.forEach(metric => {
-    metricsToUpsert.push({
-      metric_set_id: metricSetId,
-      user_id: userId,
-      account_id: accountId,
-      metric_identifier: metric.metric_identifier || `vp_${metric.label.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
-      category: VISITOR_PROFILE_CATEGORY,
-      label: metric.label,
-      target_value: metric.target_value,
-      measurement_type: metric.measurement_type as MeasurementType,
-      higher_is_better: metric.higher_is_better,
-    });
-  });
-  
-  if (metricsToUpsert.length === 0) {
-    console.log("No metrics to upsert for set:", metricSetId);
-  }
+  metricSettingsData: CreateUserMetricSettingsData
+): Promise<UserMetricSettings> {
+  console.log('Creating user metric settings for user:', userId, 'with data:', metricSettingsData);
 
   const { data, error } = await supabase
-    .from(USER_METRICS_TABLE_NAME)
-    .upsert(metricsToUpsert, { 
-      onConflict: 'metric_set_id, metric_identifier', 
-      defaultToNull: false 
+    .from('user_metric_settings')
+    .insert({
+      user_id: userId,
+      metric_identifier: metricSettingsData.metric_identifier,
+      target_metric_set_id: metricSettingsData.target_metric_set_id || null,
+      target_value: metricSettingsData.target_value || null,
+      weight: metricSettingsData.weight,
     })
-    .select();
+    .select()
+    .single();
 
   if (error) {
-    console.error('Error saving user custom metric settings for set:', error);
+    console.error('Error creating user metric settings:', error);
     throw error;
   }
 
-  // Update the metric set's updated_at timestamp to trigger cache invalidation
-  await supabase
-    .from('target_metric_sets')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', metricSetId);
-  
-  console.log('Updated metric set timestamp for cache invalidation');
-  
-  return z.array(UserCustomMetricSettingSchema).parse(data || []);
+  console.log('Created user metric settings:', data);
+  return UserMetricSettingsSchema.parse(data);
 }
 
-// Function to save preference for using standard metrics (conceptual)
-export async function saveUserStandardMetricsPreference(userId: string): Promise<void> {
-  console.log(`User ${userId} has chosen to use standard metrics. Consider saving this preference.`);
-  return;
+export async function updateUserMetricSettings(
+  userId: string,
+  metricId: string,
+  metricSettingsData: UpdateUserMetricSettingsData
+): Promise<UserMetricSettings> {
+  console.log('Updating user metric settings:', metricId, 'with data:', metricSettingsData);
+
+  const { data, error } = await supabase
+    .from('user_metric_settings')
+    .update({
+      ...metricSettingsData,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', metricId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating user metric settings:', error);
+    throw error;
+  }
+
+  console.log('Updated user metric settings:', data);
+  return UserMetricSettingsSchema.parse(data);
+}
+
+export async function deleteUserMetricSettings(userId: string, metricId: string): Promise<void> {
+  console.log('Deleting user metric settings:', metricId);
+
+  const { error } = await supabase
+    .from('user_metric_settings')
+    .delete()
+    .eq('id', metricId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error deleting user metric settings:', error);
+    throw error;
+  }
+
+  console.log('Deleted user metric settings:', metricId);
 }

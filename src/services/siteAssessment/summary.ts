@@ -1,90 +1,94 @@
 import { supabase } from '@/integrations/supabase/client';
-import { SiteAssessment, SiteAssessmentUpdate } from '@/types/siteAssessmentTypes';
-import { Account } from '@/services/accountService';
-import { TargetMetricSet } from '@/types/targetMetrics';
+import { SiteAssessment } from '@/types/siteAssessmentTypes';
+import { getAccountSignalThresholds } from '../targetMetrics/accountHelpers';
 
-export const generateExecutiveSummaryForAssessment = async (
-  assessment: SiteAssessment,
-  detailedMetricScores: Map<string, { score: number | null; enteredValue: any; targetValue: any; higherIsBetter: boolean; notes?: string | null; imageUrl?: string | null }>,
-  siteVisitRatingsWithLabels: Array<{ criterion_key: string; rating_grade: string; notes?: string | null; rating_description?: string | null; label: string }>,
-  accountSettings: Account | null,
-  targetMetricSet: TargetMetricSet | null,
-  metricCategories: string[]
-): Promise<string> => {
-  if (!assessment || !targetMetricSet) {
-    throw new Error("Assessment data or target metric set is missing for summary generation.");
-  }
-
-  // Convert Map to a plain object for JSON serialization
-  const detailedMetricScoresObject = Object.fromEntries(detailedMetricScores);
-
-  const payload = {
-    assessmentName: assessment.assessment_name,
-    address: assessment.address_line1,
-    overallSiteSignalScore: assessment.site_signal_score,
-    completionPercentage: assessment.completion_percentage,
-    detailedMetricScores: detailedMetricScoresObject,
-    siteVisitRatings: siteVisitRatingsWithLabels,
-    accountSignalGoodThreshold: accountSettings?.signal_good_threshold,
-    accountSignalBadThreshold: accountSettings?.signal_bad_threshold,
-    metricCategories: metricCategories,
-    targetMetricSet: {
-        name: targetMetricSet.name, // Add the target metric set name
-        user_custom_metrics_settings: targetMetricSet.user_custom_metrics_settings?.map(s => ({
-            metric_identifier: s.metric_identifier,
-            label: s.label,
-            category: s.category
-        })) || []
-    }
-  };
-
-  console.log("Invoking generate-executive-summary function with payload:", JSON.stringify(payload, null, 2));
-
-  const { data, error } = await supabase.functions.invoke('generate-executive-summary', {
-    body: payload,
-  });
-
-  if (error) {
-    console.error('Error invoking generate-executive-summary function:', error);
-    throw new Error(`Failed to generate executive summary: ${error.message}`);
-  }
-
-  if (!data || !data.executiveSummary) {
-    console.error('No summary content returned from edge function:', data);
-    throw new Error('Executive summary generation did not return content.');
-  }
-
-  return data.executiveSummary;
-};
-
-export const updateSiteAssessmentSummary = async (
+export const generateExecutiveSummary = async (
   assessmentId: string,
-  executiveSummary: string,
-  userId: string
-): Promise<SiteAssessment> => {
-  const updates: SiteAssessmentUpdate = {
-    executive_summary: executiveSummary,
-    last_summary_generated_at: new Date().toISOString(),
-  };
+  account: any = null
+): Promise<{ success: boolean; summary?: string; error?: string }> => {
+  const { goodThreshold, badThreshold } = getAccountSignalThresholds(account);
 
-  const { data, error } = await supabase
-    .from('site_assessments')
-    .update(updates)
-    .eq('id', assessmentId)
-    .select(`
-      *,
-      assessment_metric_values(*),
-      assessment_site_visit_ratings(*)
-    `)
-    .single();
+  try {
+    const { data: assessment, error: assessmentError } = await supabase
+      .from('site_assessments')
+      .select('*')
+      .eq('id', assessmentId)
+      .single();
 
-  if (error) {
-    console.error('Error updating site assessment with executive summary:', error);
-    throw error;
+    if (assessmentError) {
+      console.error("Error fetching site assessment:", assessmentError);
+      return { success: false, error: 'Failed to fetch site assessment.' };
+    }
+
+    if (!assessment) {
+      return { success: false, error: 'Site assessment not found.' };
+    }
+
+    const { data: metricValues, error: metricValuesError } = await supabase
+      .from('site_assessment_metric_values')
+      .select('*')
+      .eq('site_assessment_id', assessmentId);
+
+    if (metricValuesError) {
+      console.error("Error fetching metric values:", metricValuesError);
+      return { success: false, error: 'Failed to fetch metric values.' };
+    }
+
+    const { data: siteVisitRatings, error: siteVisitRatingsError } = await supabase
+      .from('site_visit_ratings')
+      .select('*')
+      .eq('site_assessment_id', assessmentId);
+
+    if (siteVisitRatingsError) {
+      console.error("Error fetching site visit ratings:", siteVisitRatingsError);
+      return { success: false, error: 'Failed to fetch site visit ratings.' };
+    }
+
+    // Calculate overall site signal score
+    const overallSiteSignalScore = assessment.site_signal_score || 0;
+
+    // Determine site signal status based on thresholds
+    let siteSignalStatus = 'Neutral';
+    if (overallSiteSignalScore >= goodThreshold) {
+      siteSignalStatus = 'Good';
+    } else if (overallSiteSignalScore <= badThreshold) {
+      siteSignalStatus = 'Bad';
+    }
+
+    // Generate summary
+    let summary = `Executive Summary for ${assessment.assessment_name}:\n\n`;
+    summary += `Overall Site Signal Score: ${overallSiteSignalScore.toFixed(2)} (${siteSignalStatus})\n\n`;
+    summary += "Key Findings:\n";
+
+    // Summarize top 3 positive and negative metrics
+    const sortedMetrics = metricValues.sort((a, b) => b.normalized_value - a.normalized_value);
+    const topPositiveMetrics = sortedMetrics.slice(0, 3);
+    const topNegativeMetrics = sortedMetrics.slice(-3).reverse();
+
+    summary += "Top Positive Metrics:\n";
+    topPositiveMetrics.forEach(metric => {
+      summary += `- ${metric.metric_identifier}: ${metric.normalized_value.toFixed(2)}\n`;
+    });
+
+    summary += "\nTop Negative Metrics:\n";
+    topNegativeMetrics.forEach(metric => {
+      summary += `- ${metric.metric_identifier}: ${metric.normalized_value.toFixed(2)}\n`;
+    });
+
+    // Summarize site visit ratings
+    summary += "\nSite Visit Ratings Summary:\n";
+    if (siteVisitRatings.length === 0) {
+      summary += "No site visit ratings available.\n";
+    } else {
+      siteVisitRatings.forEach(rating => {
+        summary += `- ${rating.category}: ${rating.rating}\n`;
+      });
+    }
+
+    return { success: true, summary };
+
+  } catch (error) {
+    console.error("Error generating executive summary:", error);
+    return { success: false, error: 'Failed to generate executive summary.' };
   }
-   return {
-    ...data,
-    assessment_metric_values: data.assessment_metric_values || [],
-    site_visit_ratings: data.assessment_site_visit_ratings || [] 
-  } as SiteAssessment;
 };

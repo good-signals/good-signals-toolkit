@@ -22,6 +22,7 @@ import NotFound from "./pages/NotFound";
 import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
 import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -95,6 +96,10 @@ const AppContent = () => {
           <Route 
             path="target-metric-sets" 
             element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="super-admin" 
+            element={<ProtectedRoute><SuperAdminDashboard /></ProtectedRoute>} 
           />
         </Route>
         <Route path="*" element={<NotFound />} />

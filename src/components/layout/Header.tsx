@@ -8,7 +8,7 @@ import { useHeaderData } from "@/hooks/useHeaderData";
 
 const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, userAccount, signOut } = useHeaderData();
+  const { user, userAccount, signOut, isSuperAdmin } = useHeaderData();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -26,13 +26,13 @@ const Header: React.FC = () => {
             <HeaderUserMenu 
               user={user}
               userAccount={userAccount}
-              isSuperAdmin={false}
+              isSuperAdmin={isSuperAdmin}
               signOut={signOut}
             />
 
             <HeaderMobileMenu
               user={user}
-              isSuperAdmin={false}
+              isSuperAdmin={isSuperAdmin}
               isMobileMenuOpen={isMobileMenuOpen}
               toggleMobileMenu={toggleMobileMenu}
               setIsMobileMenuOpen={setIsMobileMenuOpen}
@@ -60,6 +60,15 @@ const Header: React.FC = () => {
                   >
                     Target Metrics
                   </a>
+                  {isSuperAdmin && (
+                    <a
+                      href="/super-admin"
+                      className="block px-3 py-2 text-base font-medium text-orange-400 hover:text-orange-300"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Super Admin
+                    </a>
+                  )}
                 </>
               )}
             </div>

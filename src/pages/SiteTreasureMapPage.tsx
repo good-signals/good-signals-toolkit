@@ -1,150 +1,140 @@
-
 import React, { useState, useEffect } from 'react';
-import { MapPin, Upload, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { getUserAccountId } from '@/services/targetMetrics/accountHelpers';
-import { useNavigate } from 'react-router-dom';
-import { toast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import MapTypeSelector from '@/components/treasure-map/MapTypeSelector';
+import MapInputFields from '@/components/treasure-map/MapInputFields';
+import MapPreview from '@/components/treasure-map/MapPreview';
+import { getAccountSignalThresholds } from '@/services/targetMetrics/accountHelpers';
 
-interface TreasureMapSettings {
-  map_type: 'arcgis' | 'google_my_maps';
-  map_url?: string;
-  embed_code?: string;
-}
-
-const SiteTreasureMapPage = () => {
+const SiteTreasureMapPage: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [settings, setSettings] = useState<TreasureMapSettings | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [mapUrl, setMapUrl] = useState<string>('');
+  const [mapType, setMapType] = useState<'site' | 'territory'>('site');
+  const [mapInputs, setMapInputs] = useState({
+    address: '',
+    radius: 5,
+    cbsaCode: '',
+    cbsaName: '',
+  });
+  const [mapUrl, setMapUrl] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadMapSettings();
-  }, [user]);
+  // Get account signal thresholds
+  const { goodThreshold, badThreshold } = getAccountSignalThresholds(null);
 
-  const loadMapSettings = async () => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
+  const handleMapTypeChange = (type: 'site' | 'territory') => {
+    setMapType(type);
+    setMapUrl(null);
+    setError(null);
+  };
+
+  const handleInputChange = (name: string, value: string | number) => {
+    setMapInputs(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setMapUrl(null);
+    setError(null);
+  };
+
+  const generateMap = async () => {
+    setIsGenerating(true);
+    setError(null);
 
     try {
-      const accountId = await getUserAccountId(user.id);
-      if (!accountId) {
-        setIsLoading(false);
-        return;
+      // Validate inputs
+      if (mapType === 'site' && !mapInputs.address) {
+        throw new Error('Please enter a valid address');
+      }
+      if (mapType === 'territory' && !mapInputs.cbsaCode) {
+        throw new Error('Please select a valid CBSA');
       }
 
-      const { data, error } = await supabase
-        .from('treasure_map_settings')
-        .select('*')
-        .eq('account_id', accountId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error loading treasure map settings:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load map settings.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
+      // This would normally call an API to generate the map
+      // For now, we'll simulate a delay and return a placeholder URL
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const baseUrl = 'https://maps.googleapis.com/maps/api/staticmap';
+      const apiKey = 'YOUR_API_KEY'; // This would be replaced with an environment variable
+      
+      let mapUrlValue = '';
+      if (mapType === 'site') {
+        // Generate a site-specific map URL
+        mapUrlValue = `${baseUrl}?center=${encodeURIComponent(mapInputs.address)}&zoom=14&size=600x400&key=${apiKey}`;
+      } else {
+        // Generate a territory map URL (this is a placeholder)
+        mapUrlValue = `${baseUrl}?center=${encodeURIComponent(mapInputs.cbsaName)}&zoom=10&size=600x400&key=${apiKey}`;
       }
-
-      if (data) {
-        const mapSettings: TreasureMapSettings = {
-          map_type: data.map_type as 'arcgis' | 'google_my_maps',
-          map_url: data.map_url || undefined,
-          embed_code: data.embed_code || undefined
-        };
-        
-        setSettings(mapSettings);
-
-        // Extract URL for display
-        if (mapSettings.map_type === 'arcgis' && mapSettings.map_url) {
-          setMapUrl(mapSettings.map_url);
-        } else if (mapSettings.map_type === 'google_my_maps' && mapSettings.embed_code) {
-          const srcMatch = mapSettings.embed_code.match(/src="([^"]+)"/);
-          if (srcMatch) {
-            setMapUrl(srcMatch[1]);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading map settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load map settings.",
-        variant: "destructive",
-      });
+      
+      setMapUrl(mapUrlValue);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <p>Loading treasure map...</p>
-      </div>
-    );
-  }
-
-  if (!settings || !mapUrl) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center p-6">
-        <MapPin className="h-24 w-24 text-muted-foreground mb-6" />
-        <h1 className="text-3xl font-bold text-center mb-4">No Treasure Map Configured</h1>
-        <p className="text-lg text-muted-foreground text-center mb-8 max-w-md">
-          Upload your first treasure map to start exploring strategic location insights
-        </p>
-        <Button onClick={() => navigate('/treasure-map-upload')} size="lg" className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          Upload Treasure Map
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-background">
-        <div className="flex items-center gap-3">
-          <MapPin className="h-6 w-6 text-primary" />
-          <h1 className="text-xl font-bold text-primary">Site Treasure Map</h1>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <a 
-            href={mapUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:underline"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Open in new tab
-          </a>
-        </div>
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-primary mb-4">Site Treasure Map</h1>
+        <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
+          Generate detailed maps for site analysis and territory visualization.
+        </p>
       </div>
 
-      {/* Map Display */}
-      <div className="flex-1 w-full">
-        <iframe
-          src={mapUrl}
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          title="Site Treasure Map"
-          className="w-full h-full"
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Map Configuration</CardTitle>
+              <CardDescription>
+                Select map type and enter location details
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <MapTypeSelector 
+                mapType={mapType} 
+                onChange={handleMapTypeChange} 
+              />
+              
+              <MapInputFields 
+                mapType={mapType}
+                inputs={mapInputs}
+                onChange={handleInputChange}
+                onGenerate={generateMap}
+                isGenerating={isGenerating}
+              />
+              
+              {error && (
+                <div className="text-sm text-destructive mt-2">
+                  {error}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Map Preview</CardTitle>
+              <CardDescription>
+                {mapUrl 
+                  ? `${mapType === 'site' ? 'Site' : 'Territory'} map for ${mapType === 'site' ? mapInputs.address : mapInputs.cbsaName}`
+                  : 'Configure your map settings and generate a preview'
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MapPreview 
+                mapUrl={mapUrl} 
+                isLoading={isGenerating}
+                mapType={mapType}
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
