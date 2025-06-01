@@ -61,7 +61,7 @@ const OverallScoreDisplay: React.FC<OverallScoreDisplayProps> = ({
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           A measure of overall site suitability based on your targets.
-          ({isLoadingAccounts ? 'Loading thresholds...' : accountSettings ? 'Using custom thresholds.' : 'Using default thresholds.'})
+          ({isLoadingAccounts ? 'Loading thresholds...' : 'Using default thresholds.'})
         </p>
       </div>
       <div>

@@ -1,12 +1,11 @@
+
 import { useState, useEffect } from 'react';
-import { fetchAccountById, getSuperAdminAwareAccountId, Account } from '@/services/accountService';
-import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
+import { fetchAccountById, Account } from '@/services/accountService';
 import { toast } from '@/hooks/use-toast';
 
 export const useAccountSettings = (userId?: string) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
-  const { activeAccount, isImpersonating } = useSuperAdminContext();
 
   useEffect(() => {
     const loadAccounts = async () => {
@@ -16,23 +15,9 @@ export const useAccountSettings = (userId?: string) => {
       }
 
       try {
-        // If super admin is impersonating, use the active account
-        if (isImpersonating && activeAccount) {
-          setAccounts([activeAccount]);
-        } else {
-          // Otherwise get the account ID and fetch the account
-          const accountId = await getSuperAdminAwareAccountId(userId, activeAccount);
-          if (accountId) {
-            const account = await fetchAccountById(accountId);
-            if (account) {
-              setAccounts([account]);
-            } else {
-              setAccounts([]);
-            }
-          } else {
-            setAccounts([]);
-          }
-        }
+        // For the simplified version, we'll just use default thresholds
+        // since signal thresholds were removed from the accounts table
+        setAccounts([]);
       } catch (error) {
         console.error('Failed to fetch user accounts:', error);
         toast({
@@ -47,12 +32,12 @@ export const useAccountSettings = (userId?: string) => {
     };
 
     loadAccounts();
-  }, [userId, activeAccount, isImpersonating]);
+  }, [userId]);
 
-  // Get account signal thresholds (use first account's thresholds or defaults)
+  // Use default thresholds since signal thresholds were removed
   const currentAccount = accounts.length > 0 ? accounts[0] : null;
-  const accountGoodThreshold = currentAccount?.signal_good_threshold ?? 0.75;
-  const accountBadThreshold = currentAccount?.signal_bad_threshold ?? 0.50;
+  const accountGoodThreshold = 0.75;
+  const accountBadThreshold = 0.50;
 
   return {
     accounts,

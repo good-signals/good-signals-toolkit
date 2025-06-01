@@ -1,9 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSuperAdminContext } from '@/contexts/SuperAdminContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getSuperAdminAwareAccountId } from '@/services/targetMetrics/accountHelpers';
 import { toast } from '@/hooks/use-toast';
 
 interface TreasureMapSettings {
@@ -14,7 +12,6 @@ interface TreasureMapSettings {
 
 export const useTreasureMapSettings = () => {
   const { user } = useAuth();
-  const { activeAccount } = useSuperAdminContext();
   const [settings, setSettings] = useState<TreasureMapSettings>({
     map_type: 'arcgis',
     map_url: '',
@@ -24,7 +21,7 @@ export const useTreasureMapSettings = () => {
 
   useEffect(() => {
     loadSettings();
-  }, [user, activeAccount]);
+  }, [user]);
 
   const loadSettings = async () => {
     if (!user) {
@@ -33,8 +30,15 @@ export const useTreasureMapSettings = () => {
     }
 
     try {
-      const accountId = await getSuperAdminAwareAccountId(user.id, activeAccount);
-      if (!accountId) {
+      // For simplified version, we'll need to get account ID differently
+      // Since we removed the complex account helpers, we'll use a simple approach
+      const { data: memberships } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (!memberships || memberships.length === 0) {
         toast({
           title: "Error",
           description: "Could not find account information.",
@@ -43,6 +47,8 @@ export const useTreasureMapSettings = () => {
         setIsLoading(false);
         return;
       }
+
+      const accountId = memberships[0].account_id;
 
       const { data, error } = await supabase
         .from('treasure_map_settings')
@@ -85,8 +91,13 @@ export const useTreasureMapSettings = () => {
     if (!user) return false;
 
     try {
-      const accountId = await getSuperAdminAwareAccountId(user.id, activeAccount);
-      if (!accountId) {
+      const { data: memberships } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (!memberships || memberships.length === 0) {
         toast({
           title: "Error",
           description: "Could not find account information.",
@@ -94,6 +105,8 @@ export const useTreasureMapSettings = () => {
         });
         return false;
       }
+
+      const accountId = memberships[0].account_id;
 
       const dataToSave = {
         account_id: accountId,

@@ -22,7 +22,6 @@ import NotFound from "./pages/NotFound";
 import TargetSelectionPage from "./pages/TargetSelectionPage";
 import TargetMetricsBuilderPage from "./pages/TargetMetricsBuilderPage";
 import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
-import SignalSettingsPage from "./pages/SignalSettingsPage";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -102,10 +101,6 @@ const AppContent = () => {
           <Route 
             path="target-metric-sets" 
             element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
-          />
-          <Route 
-            path="signal-settings"
-            element={<ProtectedRoute><SignalSettingsPage /></ProtectedRoute>}
           />
         </Route>
         <Route path="*" element={<NotFound />} />

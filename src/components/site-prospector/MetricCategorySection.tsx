@@ -20,7 +20,7 @@ interface MetricCategorySectionProps {
   category: string;
   metricsForCategory: ProcessedMetric[];
   categoryImage?: string | null;
-  accountSettings: Account | null; // Needed for getSignalStatus thresholds
+  accountSettings: Account | null;
 }
 
 const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
@@ -62,8 +62,8 @@ const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
             {metricsForCategory.map(metric => {
                 const individualMetricStatus = getSignalStatus(
                     metric.score ?? null,
-                    accountSettings?.signal_good_threshold,
-                    accountSettings?.signal_bad_threshold
+                    0.75, // Default good threshold
+                    0.50  // Default bad threshold
                 );
               return (
                 <TableRow key={metric.label}>
