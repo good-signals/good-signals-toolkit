@@ -28,13 +28,6 @@ const LandingPage = () => {
           <h2 className="text-3xl md:text-4xl font-semibold text-center mb-12 text-primary">Our Toolkit</h2>
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
-              <Target size={48} className="text-primary mx-auto mb-4" />
-              <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Site Prospector</h3>
-              <p className="text-card-foreground/80">
-                Discover optimal locations based on demographics, competition, and custom criteria.
-              </p>
-            </div>
-            <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
               <Map size={48} className="text-primary mx-auto mb-4" />
               <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Territory Targeter</h3>
               <p className="text-card-foreground/80">
@@ -46,6 +39,13 @@ const LandingPage = () => {
               <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Site Treasure Map</h3>
               <p className="text-card-foreground/80">
                 Visualize key site data and opportunities on an interactive map.
+              </p>
+            </div>
+            <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
+              <Target size={48} className="text-primary mx-auto mb-4" />
+              <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Site Prospector</h3>
+              <p className="text-card-foreground/80">
+                Discover optimal locations based on demographics, competition, and custom criteria.
               </p>
             </div>
           </div>
