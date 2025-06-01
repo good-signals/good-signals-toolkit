@@ -1,11 +1,12 @@
+
 import React from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { getSignalStatus } from '@/lib/assessmentDisplayUtils';
 import { formatPopulationGrowth, getGrowthColor, getScorePillClasses } from '@/lib/cbsaTableUtils';
-import { CriteriaColumn } from '@/types/territoryTargeterTypes';
+import { CriteriaColumn, CBSAStatus } from '@/types/territoryTargeterTypes';
 import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
-import CBSAStatusSelector, { CBSAStatus } from './CBSAStatusSelector';
+import CBSAStatusSelector from './CBSAStatusSelector';
 
 interface CBSATableRowData {
   id: string;

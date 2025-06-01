@@ -14,6 +14,8 @@ export interface CBSAData {
   // Add other properties as needed
 }
 
+export type CBSAStatus = 'Active' | 'Pipeline' | 'Priority' | 'Hold' | 'Avoid';
+
 export interface CBSATableRowData {
   id: string;
   name: string;
@@ -35,13 +37,16 @@ export interface CriteriaColumn {
   isIncludedInSignalScore: boolean;
   isManuallyOverridden: { [market: string]: boolean };
   logicSummary?: string;
+  createdAt?: Date;
 }
 
 export interface TerritoryAnalysis {
   id: string;
-  name: string;
+  name?: string;
   criteriaColumns: CriteriaColumn[];
   includedColumns: string[];
+  marketSignalScore?: number;
+  createdAt?: Date;
 }
 
 export interface ManualScoreOverride {
@@ -49,4 +54,26 @@ export interface ManualScoreOverride {
   marketName: string;
   score: number | null;
   reasoning?: string;
+}
+
+export interface AIScoreResponse {
+  suggested_title: string;
+  prompt_summary: string;
+  scores: {
+    market: string;
+    score: number;
+    reasoning?: string;
+    sources?: string[];
+  }[];
+}
+
+export interface CBSAScore {
+  market: string;
+  score: number;
+  reasoning?: string;
+  sources?: string[];
+}
+
+export interface ColumnToggleSettings {
+  [columnId: string]: boolean;
 }

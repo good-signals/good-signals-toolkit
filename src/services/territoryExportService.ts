@@ -1,11 +1,10 @@
-
-import { CBSAData, CBSAScore, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
+import { CBSAData, TerritoryAnalysis } from '@/types/territoryTargeterTypes';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 export interface TerritoryExportData {
   cbsaData: CBSAData[];
-  scores: CBSAScore[];
+  scores: any[];
   analysis: TerritoryAnalysis;
   executiveSummary?: string;
 }
@@ -48,7 +47,7 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
   csvContent.push('');
   
   // Header section with metadata
-  csvContent.push(`Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`);
+  csvContent.push(`Territory Analysis Export - ${format(analysis.createdAt || new Date(), 'MMM dd, yyyy')}`);
   csvContent.push(`Criteria Count: ${analysis.criteriaColumns.length}`);
   csvContent.push(`Analysis Summary: ${analysis.criteriaColumns.map(c => c.title).join(', ')}`);
   csvContent.push('');
@@ -119,7 +118,7 @@ export const exportTerritoryAnalysisToCSV = (exportData: TerritoryExportData): v
   if (link.download !== undefined) {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `territory_analysis_${format(analysis.createdAt, 'yyyy-MM-dd')}.csv`);
+    link.setAttribute('download', `territory_analysis_${format(analysis.createdAt || new Date(), 'yyyy-MM-dd')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -140,7 +139,7 @@ export const exportTerritoryAnalysisToExcel = (exportData: TerritoryExportData):
       ['Website: https://www.goodsignals.ai'],
       ['AI-Powered Territory Analysis Platform'],
       [''],
-      [`Territory Analysis Export - ${format(analysis.createdAt, 'MMM dd, yyyy')}`],
+      [`Territory Analysis Export - ${format(analysis.createdAt || new Date(), 'MMM dd, yyyy')}`],
       [`Criteria Count: ${analysis.criteriaColumns.length}`],
       [''],
       ['EXECUTIVE SUMMARY'],
@@ -198,6 +197,6 @@ export const exportTerritoryAnalysisToExcel = (exportData: TerritoryExportData):
   }
 
   // Generate filename and download
-  const filename = `territory_analysis_${format(analysis.createdAt, 'yyyy-MM-dd')}.xlsx`;
+  const filename = `territory_analysis_${format(analysis.createdAt || new Date(), 'yyyy-MM-dd')}.xlsx`;
   XLSX.writeFile(workbook, filename);
 };
