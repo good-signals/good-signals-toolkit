@@ -79,8 +79,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
   
   const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
   const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
-  const [hasInitializedForm, setHasInitializedForm] = useState(false);
-  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   const form = useForm<StandardMetricsFormData>({
     resolver: zodResolver(StandardMetricsFormSchema),
@@ -108,13 +107,10 @@ const StandardMetricsBuilderPage: React.FC = () => {
   const { loadDraft, clearDraft, hasDraft } = useStandardMetricsDraft(form, currentMetricSetId);
 
   useEffect(() => {
+    console.log('Route metric set ID changed:', routeMetricSetId);
     setCurrentMetricSetId(routeMetricSetId);
-    // Reset initialization flags when metric set ID changes
-    if (routeMetricSetId !== currentMetricSetId) {
-      setHasInitializedForm(false);
-      setIsDraftLoaded(false);
-    }
-  }, [routeMetricSetId, currentMetricSetId]);
+    setIsFormInitialized(false);
+  }, [routeMetricSetId]);
 
   const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
     queryKey: ['standardMetricSet', currentMetricSetId],
@@ -134,12 +130,37 @@ const StandardMetricsBuilderPage: React.FC = () => {
     enabled: !!currentMetricSetId,
   });
 
-  useEffect(() => {
-    // Handle existing metric set data
-    if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined && !hasInitializedForm) {
-      console.log('Loading existing data:', { existingMetricSet, existingMetrics });
+  // Create default predefined metrics
+  const createDefaultPredefinedMetrics = () => {
+    return initialPredefinedMetricsConfig.map(config => {
+      let targetValue;
+      if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
+        targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => 
+          opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand")
+        )?.value ?? 50;
+      } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
+        targetValue = 50;
+      } else {
+        targetValue = 0;
+      }
+      return {
+        metric_identifier: config.metric_identifier,
+        label: config.label,
+        category: config.category,
+        target_value: targetValue,
+        higher_is_better: config.higher_is_better,
+      };
+    });
+  };
 
-      // Initialize predefined metrics with either existing data or defaults
+  useEffect(() => {
+    if (isFormInitialized) return;
+
+    // Handle existing metric set
+    if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined) {
+      console.log('Initializing form with existing data');
+
+      // Initialize predefined metrics with existing data or defaults
       const predefinedMetricsData = initialPredefinedMetricsConfig.map(config => {
         const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier && !s.is_custom);
         let targetValue;
@@ -201,55 +222,36 @@ const StandardMetricsBuilderPage: React.FC = () => {
 
       console.log('Resetting form with existing data:', formData);
       form.reset(formData);
-      setHasInitializedForm(true);
+      setIsFormInitialized(true);
     } 
-    // Handle new metric set - check for draft first
-    else if (!currentMetricSetId && !hasInitializedForm) {
+    // Handle new metric set - always check for draft first
+    else if (!currentMetricSetId) {
+      console.log('Initializing form for new metric set');
+      
+      // Always try to load draft data first
       const draftData = loadDraft();
       
-      if (draftData && !isDraftLoaded) {
+      if (draftData) {
         console.log('Loading draft data:', draftData);
         form.reset(draftData);
-        setIsDraftLoaded(true);
-        setHasInitializedForm(true);
         sonnerToast.info("Draft loaded from previous session");
-      } else if (!isDraftLoaded) {
-        // Initialize form for new metric set with defaults
-        const defaultPredefinedMetrics = initialPredefinedMetricsConfig.map(config => {
-          let targetValue;
-          if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-            targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => 
-              opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand")
-            )?.value ?? 50;
-          } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
-            targetValue = 50;
-          } else {
-            targetValue = 0;
-          }
-          return {
-            metric_identifier: config.metric_identifier,
-            label: config.label,
-            category: config.category,
-            target_value: targetValue,
-            higher_is_better: config.higher_is_better,
-          };
-        });
-
-        const newFormData: StandardMetricsFormData = {
+      } else {
+        console.log('No draft found, initializing with defaults');
+        const defaultFormData: StandardMetricsFormData = {
           metric_set_id: undefined,
           metric_set_name: "",
           metric_set_description: "",
-          predefined_metrics: defaultPredefinedMetrics,
+          predefined_metrics: createDefaultPredefinedMetrics(),
           custom_metrics: [],
           visitor_profile_metrics: [],
         };
 
-        console.log('Initializing new form with defaults');
-        form.reset(newFormData);
-        setHasInitializedForm(true);
+        form.reset(defaultFormData);
       }
+      
+      setIsFormInitialized(true);
     }
-  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, hasInitializedForm, loadDraft, isDraftLoaded]);
+  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, loadDraft, isFormInitialized]);
 
   const mutation = useMutation({
     mutationFn: async (formData: StandardMetricsFormData) => {
@@ -276,13 +278,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
         throw new Error("Failed to get or create metric set ID.");
       }
       
-      // Include all metrics including non-editable ones for saving
-      const completeFormData = {
-        ...formData,
-        predefined_metrics: formData.predefined_metrics, // Save all predefined metrics
-      };
-
-      return saveStandardMetricSettings(operatingMetricSetId, completeFormData);
+      return saveStandardMetricSettings(operatingMetricSetId, formData);
     },
     onSuccess: (data, variables) => { 
       sonnerToast.success("Standard metric set saved successfully!");
@@ -351,8 +347,8 @@ const StandardMetricsBuilderPage: React.FC = () => {
             <p className="text-muted-foreground">
               {currentMetricSetId ? "Edit a standard target metrics template." : "Create a new standard target metrics template."}
               {!currentMetricSetId && hasDraft() && (
-                <span className="block text-sm text-blue-600 mt-1">
-                  ✓ Draft auto-saved
+                <span className="block text-sm text-green-600 mt-1 font-medium">
+                  ✓ Draft auto-saved - your changes are preserved
                 </span>
               )}
             </p>

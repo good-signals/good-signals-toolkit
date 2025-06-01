@@ -5,7 +5,6 @@ import { StandardMetricsFormData } from '@/types/standardMetrics';
 import { safeStorage } from '@/utils/safeStorage';
 
 const DRAFT_KEY = 'standard-metrics-draft';
-const AUTOSAVE_DELAY = 1000; // 1 second debounce
 
 export const useStandardMetricsDraft = (
   form: UseFormReturn<StandardMetricsFormData>,
@@ -15,29 +14,31 @@ export const useStandardMetricsDraft = (
 
   // Load draft data
   const loadDraft = useCallback((): StandardMetricsFormData | null => {
-    if (metricSetId) return null; // Don't load draft for existing metric sets
-    
-    const draftData = safeStorage.getItem(DRAFT_KEY);
-    return safeStorage.safeParse(draftData, null);
-  }, [metricSetId]);
-
-  // Save draft data (debounced)
-  const saveDraft = useCallback((data: StandardMetricsFormData) => {
-    if (metricSetId) return; // Don't save draft for existing metric sets
-    
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    if (metricSetId) {
+      console.log('Not loading draft - editing existing metric set:', metricSetId);
+      return null;
     }
     
-    timeoutRef.current = setTimeout(() => {
-      const draftData = {
-        ...data,
-        // Ensure we don't save the metric_set_id for drafts
-        metric_set_id: undefined,
-      };
-      safeStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-      console.log('Draft saved to localStorage');
-    }, AUTOSAVE_DELAY);
+    const draftData = safeStorage.getItem(DRAFT_KEY);
+    const parsed = safeStorage.safeParse(draftData, null);
+    console.log('Loading draft data:', parsed);
+    return parsed;
+  }, [metricSetId]);
+
+  // Save draft data (immediate)
+  const saveDraft = useCallback((data: StandardMetricsFormData) => {
+    if (metricSetId) {
+      console.log('Not saving draft - editing existing metric set:', metricSetId);
+      return;
+    }
+    
+    const draftData = {
+      ...data,
+      metric_set_id: undefined,
+    };
+    
+    safeStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+    console.log('Draft saved immediately:', draftData);
   }, [metricSetId]);
 
   // Clear draft data
@@ -53,18 +54,21 @@ export const useStandardMetricsDraft = (
   const hasDraft = useCallback((): boolean => {
     if (metricSetId) return false;
     const draftData = safeStorage.getItem(DRAFT_KEY);
-    return draftData !== null;
+    const exists = draftData !== null;
+    console.log('Draft exists:', exists);
+    return exists;
   }, [metricSetId]);
 
-  // Watch form changes and auto-save
+  // Watch form changes and auto-save immediately
   useEffect(() => {
-    if (metricSetId) return; // Don't auto-save for existing metric sets
+    if (metricSetId) {
+      console.log('Skipping auto-save - editing existing metric set');
+      return;
+    }
 
     const subscription = form.watch((data) => {
-      // Only save if there's meaningful content
-      if (data.metric_set_name && data.metric_set_name.trim() !== '') {
-        saveDraft(data as StandardMetricsFormData);
-      }
+      console.log('Form data changed, saving immediately:', data);
+      saveDraft(data as StandardMetricsFormData);
     });
 
     return () => {
