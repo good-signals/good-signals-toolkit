@@ -17,6 +17,14 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
     return null;
   }
 
+  // Ensure the data conforms to our expected type structure
+  if (data) {
+    return {
+      ...data,
+      user_custom_metrics_settings: data.user_custom_metrics_settings || []
+    };
+  }
+
   return data;
 };
 

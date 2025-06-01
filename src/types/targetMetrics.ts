@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const PREDEFINED_METRIC_CATEGORIES = [
@@ -47,6 +48,12 @@ export const CreateCustomMetricFormSchema = z.object({
 });
 export type CreateCustomMetricFormData = z.infer<typeof CreateCustomMetricFormSchema>;
 
+// Schema for creating target metric sets
+export const CreateTargetMetricSetSchema = z.object({
+  name: z.string().min(1, "Set name is required"),
+});
+export type CreateTargetMetricSetData = z.infer<typeof CreateTargetMetricSetSchema>;
+
 // Schema for a single custom metric setting from the database
 export const UserCustomMetricSettingSchema = z.object({
   id: z.string().uuid().optional(), // Made optional as it's DB generated
@@ -57,7 +64,7 @@ export const UserCustomMetricSettingSchema = z.object({
   category: z.string().min(1),
   label: z.string().min(1),
   target_value: z.number(),
-  measurement_type: z.enum(MEASUREMENT_TYPES).nullable(),
+  measurement_type: z.string().nullable(), // Changed from enum to string to match database
   higher_is_better: z.boolean(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
