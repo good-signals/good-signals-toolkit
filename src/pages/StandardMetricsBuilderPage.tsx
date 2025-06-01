@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Target as TargetIcon, PlusCircle, Trash2, Save, List, Info, Plus, Shield } from 'lucide-react';
@@ -180,7 +179,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
           higher_is_better: s.higher_is_better,
         }));
       
-      const formData = {
+      const formData: StandardMetricsFormData = {
         metric_set_id: existingMetricSet.id,
         metric_set_name: existingMetricSet.name,
         metric_set_description: existingMetricSet.description || "",
