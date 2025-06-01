@@ -1,11 +1,16 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 import { Button } from '@/components/ui/button'; // Import Button
-import { Zap, Target, Map } from 'lucide-react';
+import { Target, Map } from 'lucide-react';
 const LandingPage = () => {
   return <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-background to-background text-foreground">
       <header className="container mx-auto px-4 py-12 text-center">
-        <Zap size={64} className="text-primary mx-auto mb-6" />
+        <img 
+          src="/lovable-uploads/5e1ae084-72d6-4010-b4ca-a2a23c917fbb.png" 
+          alt="Good Signals mascot" 
+          className="w-16 h-16 mx-auto mb-6" 
+        />
         <h1 className="text-5xl md:text-6xl font-bold mb-6 text-primary">
           Welcome to Good Signals
         </h1>
