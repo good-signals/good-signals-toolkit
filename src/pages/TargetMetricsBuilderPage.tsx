@@ -20,6 +20,7 @@ import {
   updateTargetMetricSetName,
   getTargetMetricSetById,
 } from '@/services/targetMetricsService';
+import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import { 
   getAccountCustomMetrics,
   createAccountCustomMetric,
@@ -241,9 +242,15 @@ const TargetMetricsBuilderPage: React.FC = () => {
       }
 
       if (operatingMetricSetId) {
-        await updateTargetMetricSetName(operatingMetricSetId, user.id, formData.metric_set_name);
+        await updateTargetMetricSetName(operatingMetricSetId, formData.metric_set_name);
       } else {
-        const newSet = await createTargetMetricSet(user.id, formData.metric_set_name);
+        // Get account for user
+        const accountId = await getAccountForUser(user.id);
+        if (!accountId) {
+          throw new Error('No account found for user');
+        }
+        const account = { id: accountId };
+        const newSet = await createTargetMetricSet(formData.metric_set_name, account);
         operatingMetricSetId = newSet.id;
         setCurrentMetricSetId(newSet.id); 
         form.setValue('metric_set_id', newSet.id); 
