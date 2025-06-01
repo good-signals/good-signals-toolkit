@@ -17,11 +17,10 @@ const SiteTreasureMapPage: React.FC = () => {
   const [mapType, setMapType] = useState<'arcgis' | 'google_my_maps'>('arcgis');
   const [isGenerating, setIsGenerating] = useState(false);
   const [mapUrl, setMapUrl] = useState('');
-  const [inputs, setInputs] = useState({
-    address: '',
-    radius: 5,
-    cbsaCode: '',
-    cbsaName: '',
+  const [settings, setSettings] = useState({
+    map_type: 'arcgis' as 'arcgis' | 'google_my_maps',
+    map_url: '',
+    embed_code: '',
   });
 
   const { data: userAccounts } = useQuery({
@@ -36,8 +35,8 @@ const SiteTreasureMapPage: React.FC = () => {
     enabled: !!userAccounts?.[0]?.id,
   });
 
-  const handleInputChange = (name: string, value: string | number) => {
-    setInputs(prev => ({ ...prev, [name]: value }));
+  const handleInputChange = (field: string, value: string) => {
+    setSettings(prev => ({ ...prev, [field]: value }));
   };
 
   const handleGenerate = async () => {
@@ -53,6 +52,10 @@ const SiteTreasureMapPage: React.FC = () => {
       setIsGenerating(false);
     }
   };
+
+  useEffect(() => {
+    setSettings(prev => ({ ...prev, map_type: mapType }));
+  }, [mapType]);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -84,15 +87,12 @@ const SiteTreasureMapPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <MapInputFields
-            inputs={inputs}
-            onChange={handleInputChange}
-            onGenerate={handleGenerate}
-            isGenerating={isGenerating}
+            settings={settings}
+            onInputChange={handleInputChange}
           />
 
           <MapPreview
-            isLoading={isGenerating}
-            url={mapUrl}
+            previewUrl={mapUrl}
           />
         </div>
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,7 +17,7 @@ const AuthPage: React.FC = () => {
       if (currentUser && currentSession) {
         try {
           // Check if the user has already set target metrics
-          const hasSetMetrics = await hasUserSetAnyMetrics(currentUser.id);
+          const hasSetMetrics = await hasUserSetAnyMetrics(currentUser.id, currentUser.id);
           
           if (hasSetMetrics) {
             // User has already set metrics, redirect to toolkit hub
