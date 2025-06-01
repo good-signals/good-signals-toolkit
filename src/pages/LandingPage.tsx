@@ -2,18 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 import { Button } from '@/components/ui/button'; // Import Button
 import { Zap, Target, Map } from 'lucide-react';
-
 const LandingPage = () => {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-background to-background text-foreground">
+  return <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-background to-background text-foreground">
       <header className="container mx-auto px-4 py-12 text-center">
         <Zap size={64} className="text-primary mx-auto mb-6" />
         <h1 className="text-5xl md:text-6xl font-bold mb-6 text-primary">
           Welcome to Good Signals
         </h1>
-        <p className="text-xl md:text-2xl text-foreground/80 mb-10 max-w-3xl mx-auto">
-          Unlock hyperlocal market insights and accelerate your site selection with our powerful toolkit. Find your next high-potential location, faster.
-        </p>
+        <p className="text-xl md:text-2xl text-foreground/80 mb-10 max-w-3xl mx-auto">We make data easy to use–so you can make moves, faster and easier.</p>
         <div className="flex justify-center">
           <Button asChild size="lg" variant="default" className="text-lg px-8 py-6">
             <Link to="/auth">Sign In / Sign Up</Link>
@@ -23,9 +19,7 @@ const LandingPage = () => {
 
       <section className="py-16 bg-background/50 w-full">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-semibold text-center mb-12 text-primary">
-            Our Tools
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-semibold text-center mb-12 text-primary">Our Toolkit</h2>
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
               <Target size={48} className="text-primary mx-auto mb-4" />
@@ -55,8 +49,6 @@ const LandingPage = () => {
       <footer className="w-full py-8 text-center border-t border-border">
         <p className="text-foreground/60">&copy; {new Date().getFullYear()} Good Signals. All rights reserved.</p>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default LandingPage;
