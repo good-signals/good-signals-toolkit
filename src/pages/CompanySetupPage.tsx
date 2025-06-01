@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import CompanySetupForm from '@/components/auth/CompanySetupForm';
 import { toast } from 'sonner';
@@ -8,13 +8,18 @@ import { toast } from 'sonner';
 const CompanySetupPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, authLoading } = useAuth();
-  const [searchParams] = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
       if (user) {
-        // User is authenticated, use their ID
+        // Check if user has confirmed their email
+        if (!user.email_confirmed_at) {
+          toast.error('Please confirm your email address first.');
+          navigate('/auth');
+          return;
+        }
+        // User is authenticated and email is confirmed
         setUserId(user.id);
       } else {
         // User not authenticated, redirect to auth
