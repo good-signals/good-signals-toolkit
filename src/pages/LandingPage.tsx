@@ -2,7 +2,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 import { Button } from '@/components/ui/button'; // Import Button
-import { Target, Map } from 'lucide-react';
+import { Target, Map, Lightbulb } from 'lucide-react';
+
 const LandingPage = () => {
   return <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-background to-background text-foreground">
       <header className="container mx-auto px-4 py-12 text-center">
@@ -41,7 +42,7 @@ const LandingPage = () => {
               </p>
             </div>
             <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
-              <Zap size={48} className="text-primary mx-auto mb-4" /> {/* Placeholder icon */}
+              <Lightbulb size={48} className="text-primary mx-auto mb-4" />
               <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Site Treasure Map</h3>
               <p className="text-card-foreground/80">
                 Visualize key site data and opportunities on an interactive map.
