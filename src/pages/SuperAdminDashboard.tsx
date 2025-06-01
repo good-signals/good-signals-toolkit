@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,12 +9,12 @@ const SuperAdminDashboard: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center mb-8">
-        <Shield size={48} className="text-primary mr-4" />
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Super Admin Dashboard</h1>
-          <p className="text-muted-foreground">System administration and management tools.</p>
-        </div>
+      <div className="text-center mb-12">
+        <Shield size={48} className="text-primary mx-auto mb-4" />
+        <h1 className="text-4xl md:text-5xl font-bold mb-3 text-primary">Super Admin Dashboard</h1>
+        <p className="text-xl text-foreground/80 max-w-2xl mx-auto">
+          System administration and management tools.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
