@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Search } from 'lucide-react';
 import TerritoryHeader from './TerritoryHeader';
@@ -7,6 +8,7 @@ import TerritoryResultsSection from './TerritoryResultsSection';
 import TerritoryExecutiveSummary from './TerritoryExecutiveSummary';
 import TerritoryNotices from './TerritoryNotices';
 import { CBSAData } from '@/types/territoryTargeterTypes';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TerritoryTargeterPageContentProps {
   prompt: string;
@@ -35,13 +37,15 @@ const TerritoryTargeterPageContent: React.FC<TerritoryTargeterPageContentProps> 
   onClearAnalysis,
   hasData,
 }) => {
+  const { user } = useAuth();
+
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <TerritoryHeader />
       
       <PromptInput
-        prompt={prompt}
-        setPrompt={setPrompt}
+        value={prompt}
+        onChange={setPrompt}
         onSubmit={onSubmit}
         isLoading={isLoading}
         hasData={hasData}
@@ -49,21 +53,21 @@ const TerritoryTargeterPageContent: React.FC<TerritoryTargeterPageContentProps> 
       />
 
       <AnalysisModeSelector
-        analysisMode={analysisMode}
-        setAnalysisMode={setAnalysisMode}
+        value={analysisMode}
+        onChange={setAnalysisMode}
       />
 
-      <TerritoryNotices />
+      <TerritoryNotices user={user} cbsaDataLength={data.length} />
 
       <TerritoryResultsSection
-        data={data}
-        setData={setData}
+        cbsaData={data}
+        setCbsaData={setData}
         isLoading={isLoading}
         error={error}
         analysisMode={analysisMode}
       />
 
-      <TerritoryExecutiveSummary data={data} />
+      <TerritoryExecutiveSummary cbsaData={data} />
     </div>
   );
 };

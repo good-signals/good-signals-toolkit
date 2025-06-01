@@ -12,3 +12,9 @@ export interface CreateStandardMetricData {
   name: string;
   category: string;
 }
+
+export interface StandardTargetMetricSet {
+  id: string;
+  name: string;
+  metrics: StandardMetric[];
+}

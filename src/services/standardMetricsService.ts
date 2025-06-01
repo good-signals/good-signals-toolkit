@@ -17,3 +17,11 @@ export const updateStandardMetric = async () => {
 export const deleteStandardMetric = async () => {
   throw new Error('Standard metrics functionality has been removed');
 };
+
+export const getStandardTargetMetricSets = async () => {
+  return [];
+};
+
+export const deleteStandardTargetMetricSet = async () => {
+  throw new Error('Standard metrics functionality has been removed');
+};

@@ -1,7 +1,19 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { getAccountSignalThresholds } from './targetMetrics/accountHelpers';
+
+// Add missing type exports
+export interface ExportData {
+  name: string;
+  value: any;
+}
+
+export interface ExportOptions {
+  format: 'csv' | 'pdf';
+  includeImages?: boolean;
+}
 
 export const exportCBSADataToCSV = async (
   data: CBSAData[],
@@ -78,8 +90,8 @@ export const exportSiteAssessmentsToCSV = async (
       `"${assessment.assessment_name.replace(/"/g, '""')}"`,
       `"${assessment.address_line1?.replace(/"/g, '""') || ''}"`,
       `"${assessment.city?.replace(/"/g, '""') || ''}"`,
-      `"${assessment.state?.replace(/"/g, '""') || ''}"`,
-      `"${assessment.zip_code?.replace(/"/g, '""') || ''}"`,
+      `"${assessment.state_province?.replace(/"/g, '""') || ''}"`,
+      `"${assessment.postal_code?.replace(/"/g, '""') || ''}"`,
       `"${new Date(assessment.created_at).toLocaleDateString()}"`,
       (() => {
         if (assessment.site_signal_score === null || assessment.site_signal_score === undefined) {
@@ -110,6 +122,12 @@ export const exportSiteAssessmentsToCSV = async (
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+};
+
+export const exportAssessmentToPDF = async (assessment: SiteAssessment, options: ExportOptions = { format: 'pdf' }) => {
+  // Stub implementation for PDF export
+  console.log('Exporting assessment to PDF:', assessment.id);
+  return { success: true };
 };
 
 export const uploadCSV = async (file: File): Promise<{ data: any[]; error: Error | null }> => {
