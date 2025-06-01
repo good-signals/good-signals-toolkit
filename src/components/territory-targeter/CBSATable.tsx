@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
@@ -74,8 +73,15 @@ const CBSATable: React.FC<CBSATableProps> = ({
         ? includedScores.reduce((sum, score) => sum + score, 0) / includedScores.length
         : null;
 
+      // Ensure all required properties are present with defaults
       return {
-        ...cbsa,
+        id: cbsa.id || `cbsa-${Math.random().toString(36).substr(2, 9)}`,
+        name: cbsa.name || 'Unknown',
+        state: cbsa.state || 'Unknown',
+        region: cbsa.region || 'Unknown',
+        population: cbsa.population || 0,
+        populationGrowth: cbsa.populationGrowth || 0,
+        status: cbsa.status as CBSAStatus,
         criteriaScores,
         marketSignalScore
       };
