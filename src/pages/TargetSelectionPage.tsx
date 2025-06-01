@@ -14,30 +14,59 @@ const TargetSelectionPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // Get account ID from user metadata
+  const accountId = user?.user_metadata?.account_id || '';
+
   const { data: hasMetrics, isLoading: isLoadingHasMetrics } = useQuery({
     queryKey: ['hasUserSetAnyMetrics', user?.id],
-    queryFn: () => user ? hasUserSetAnyMetrics(user.id, user.user_metadata?.account_id || '') : false,
-    enabled: !!user,
+    queryFn: () => user ? hasUserSetAnyMetrics(user.id, accountId) : false,
+    enabled: !!user && !!accountId,
   });
   
   const mutation = useMutation({
     mutationFn: () => {
       if (!user) throw new Error("User not authenticated.");
-      return saveUserStandardMetricsPreference(user.id, user.user_metadata?.account_id || '');
+      if (!accountId) throw new Error("Account ID not found. Please contact support.");
+      return saveUserStandardMetricsPreference(user.id, accountId);
     },
-    onSuccess: () => {
-      sonnerToast.success("Standard metrics preference saved. Redirecting to Toolkit Hub...");
+    onSuccess: (result) => {
+      sonnerToast.success(`Standard metrics "${result.metricSetName}" added successfully! Redirecting to Toolkit Hub...`);
       queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] });
       navigate('/toolkit-hub');
     },
     onError: (error: Error) => {
+      console.error('Error saving standard metrics:', error);
       sonnerToast.error(`Error: ${error.message}`);
     }
   });
 
   const handleUseStandardMetrics = () => {
+    if (!accountId) {
+      sonnerToast.error('Account information not found. Please try refreshing the page or contact support.');
+      return;
+    }
     mutation.mutate();
   };
+
+  // Show loading or error state if user/account data is not ready
+  if (!user) {
+    return (
+      <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-80px)]">
+        <p>Loading user information...</p>
+      </div>
+    );
+  }
+
+  if (!accountId) {
+    return (
+      <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="text-center">
+          <p className="text-lg mb-4">Account information not found.</p>
+          <p className="text-sm text-muted-foreground">Please contact support or try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto flex flex-col items-center justify-center min-h-[calc(100vh-80px)] py-12 px-4">
@@ -70,7 +99,7 @@ const TargetSelectionPage: React.FC = () => {
               onClick={handleUseStandardMetrics}
               disabled={mutation.isPending || isLoadingHasMetrics}
             >
-              {mutation.isPending ? "Saving..." : "Use Standard Metrics"}
+              {mutation.isPending ? "Adding Standard Metrics..." : "Use Standard Metrics"}
             </Button>
           </CardFooter>
         </Card>

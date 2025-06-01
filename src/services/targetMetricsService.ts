@@ -7,6 +7,7 @@ import {
   TargetMetricsFormData
 } from '@/types/targetMetrics';
 import { getAccountForUser } from './targetMetrics/accountHelpers';
+import { copyStandardMetricSetToAccount } from './standardMetricsService';
 
 // Function to check if a user has set any target metrics
 export const hasUserSetAnyMetrics = async (userId: string, accountId: string): Promise<boolean> => {
@@ -217,9 +218,49 @@ export const saveUserCustomMetricSettings = async (userId: string, metricSetId: 
 };
 
 export const saveUserStandardMetricsPreference = async (userId: string, accountId: string) => {
-  // Implementation for saving standard metrics preference
   console.log('Saving standard metrics preference for user:', userId, 'account:', accountId);
-  return Promise.resolve();
+  
+  try {
+    // Get the most recent standard metric set (as default)
+    const { data: standardSets, error: standardSetsError } = await supabase
+      .from('standard_target_metric_sets')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (standardSetsError) {
+      console.error('Error fetching standard metric sets:', standardSetsError);
+      throw new Error('Failed to fetch standard metric sets');
+    }
+
+    if (!standardSets || standardSets.length === 0) {
+      throw new Error('No standard metric sets available. Please contact your administrator.');
+    }
+
+    const defaultStandardSet = standardSets[0];
+    console.log('Using default standard metric set:', defaultStandardSet.name);
+
+    // Check if user already has metrics
+    const hasExistingMetrics = await hasUserSetAnyMetrics(userId, accountId);
+    if (hasExistingMetrics) {
+      console.log('User already has metrics, proceeding anyway to add standard metrics');
+    }
+
+    // Copy the standard metric set to the user's account
+    const copiedSet = await copyStandardMetricSetToAccount(
+      defaultStandardSet.id,
+      accountId,
+      userId,
+      `${defaultStandardSet.name} (Standard)`
+    );
+
+    console.log('Successfully copied standard metrics to user account:', copiedSet.name);
+    return { success: true, metricSetName: copiedSet.name };
+
+  } catch (error) {
+    console.error('Error saving standard metrics preference:', error);
+    throw error;
+  }
 };
 
 export const triggerAssessmentRecalculation = async (assessmentId: string, userId?: string) => {

@@ -224,5 +224,6 @@ export const copyStandardMetricSetToAccount = async (
     }
   }
 
+  console.log(`Successfully copied ${userSettingsToInsert.length} metrics from standard set "${standardSet.name}" to user account`);
   return newTargetSet;
 };
