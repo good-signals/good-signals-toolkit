@@ -1,71 +1,39 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-interface MapPreviewProps {
-  isLoading: boolean;
-  url?: string;
-  embedCode?: string;
+export interface MapPreviewProps {
+  previewUrl: string;
 }
 
-const MapPreview: React.FC<MapPreviewProps> = ({
-  isLoading,
-  url,
-  embedCode,
-}) => {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Map Preview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
-            <p className="text-muted-foreground">Loading map...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!url && !embedCode) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Map Preview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <p>Configure and generate a map to see preview</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
+const MapPreview: React.FC<MapPreviewProps> = ({ previewUrl }) => {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Map Preview</CardTitle>
+        <CardDescription>
+          Preview your uploaded map before saving.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-64 border rounded-md overflow-hidden">
-          {embedCode ? (
-            <div dangerouslySetInnerHTML={{ __html: embedCode }} />
-          ) : url ? (
-            <iframe 
-              src={url} 
-              className="w-full h-full border-0"
-              title="Map Preview"
+        {previewUrl ? (
+          <div className="aspect-video">
+            <iframe
+              src={previewUrl}
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              style={{ border: 0 }}
+              allowFullScreen
+              aria-hidden="false"
+              tabIndex={0}
             />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <p>No map data available</p>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="aspect-video bg-muted flex items-center justify-center">
+            <p className="text-muted-foreground">No preview available</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

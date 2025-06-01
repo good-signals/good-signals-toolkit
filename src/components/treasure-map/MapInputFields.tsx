@@ -1,88 +1,46 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
-interface MapInputFieldsProps {
-  inputs: {
-    address: string;
-    radius: number;
-    cbsaCode: string;
-    cbsaName: string;
+export interface MapInputFieldsProps {
+  settings: {
+    map_type: 'arcgis' | 'google_my_maps';
+    map_url?: string;
+    embed_code?: string;
   };
-  onChange: (name: string, value: string | number) => void;
-  onGenerate: () => Promise<void>;
-  isGenerating: boolean;
+  onInputChange: (field: string, value: string) => void;
 }
 
-const MapInputFields: React.FC<MapInputFieldsProps> = ({
-  inputs,
-  onChange,
-  onGenerate,
-  isGenerating,
-}) => {
+const MapInputFields: React.FC<MapInputFieldsProps> = ({ settings, onInputChange }) => {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Map Configuration</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+      {settings.map_type === 'arcgis' && (
         <div>
-          <Label htmlFor="address">Address</Label>
+          <Label htmlFor="map_url">ArcGIS Map URL</Label>
           <Input
-            id="address"
-            value={inputs.address}
-            onChange={(e) => onChange('address', e.target.value)}
-            placeholder="Enter address"
+            id="map_url"
+            value={settings.map_url || ''}
+            onChange={(e) => onInputChange('map_url', e.target.value)}
+            placeholder="https://your-arcgis-map-url"
           />
         </div>
-        
+      )}
+      
+      {settings.map_type === 'google_my_maps' && (
         <div>
-          <Label htmlFor="radius">Radius (miles)</Label>
-          <Input
-            id="radius"
-            type="number"
-            value={inputs.radius}
-            onChange={(e) => onChange('radius', parseInt(e.target.value) || 0)}
-            placeholder="Enter radius"
+          <Label htmlFor="embed_code">Google My Maps Embed Code</Label>
+          <Textarea
+            id="embed_code"
+            value={settings.embed_code || ''}
+            onChange={(e) => onInputChange('embed_code', e.target.value)}
+            placeholder="Paste your Google My Maps embed code here"
+            rows={4}
           />
         </div>
-        
-        <div>
-          <Label htmlFor="cbsaCode">CBSA Code</Label>
-          <Input
-            id="cbsaCode"
-            value={inputs.cbsaCode}
-            onChange={(e) => onChange('cbsaCode', e.target.value)}
-            placeholder="Enter CBSA code"
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="cbsaName">CBSA Name</Label>
-          <Input
-            id="cbsaName"
-            value={inputs.cbsaName}
-            onChange={(e) => onChange('cbsaName', e.target.value)}
-            placeholder="Enter CBSA name"
-          />
-        </div>
-        
-        <Button 
-          onClick={onGenerate} 
-          disabled={isGenerating}
-          className="w-full"
-        >
-          {isGenerating ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : null}
-          Generate Map
-        </Button>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 

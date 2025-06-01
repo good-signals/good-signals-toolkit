@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
@@ -9,46 +8,20 @@ import {
 import { getAccountForUser } from './targetMetrics/accountHelpers';
 
 // Function to check if a user has set any target metrics
-export const hasUserSetAnyMetrics = async (userId: string): Promise<boolean> => {
-  try {
-    // Fetch user metric settings for the user
-    const { data: userMetricSettings, error: userMetricSettingsError } = await supabase
-      .from('user_custom_metrics_settings')
-      .select('*')
-      .eq('user_id', userId);
+export const hasUserSetAnyMetrics = async (userId: string, accountId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('user_custom_metrics_settings')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('account_id', accountId)
+    .limit(1);
 
-    if (userMetricSettingsError) {
-      console.error("Error fetching user metric settings:", userMetricSettingsError);
-      return false;
-    }
-
-    // If user has any metric settings, return true
-    if (userMetricSettings && userMetricSettings.length > 0) {
-      return true;
-    }
-
-    // If no user metric settings, check for target metric sets
-    const { data: targetMetricSets, error: targetMetricSetsError } = await supabase
-      .from('target_metric_sets')
-      .select('*')
-      .eq('account_id', userId); // Note: this might need to be adjusted based on your data model
-
-    if (targetMetricSetsError) {
-      console.error("Error fetching target metric sets:", targetMetricSetsError);
-      return false;
-    }
-
-    // If user has any target metric sets, return true
-    if (targetMetricSets && targetMetricSets.length > 0) {
-      return true;
-    }
-
-    return false;
-
-  } catch (error) {
-    console.error("Error checking user metrics:", error);
+  if (error) {
+    console.error('Error checking user metrics:', error);
     return false;
   }
+
+  return data && data.length > 0;
 };
 
 export const getTargetMetricSets = async (accountId: string) => {
@@ -131,21 +104,29 @@ export const createTargetMetricSet = async (data: CreateTargetMetricSetData) => 
   return result;
 };
 
-export const updateTargetMetricSetName = async (id: string, name: string) => {
-  const { error } = await supabase
+export const updateTargetMetricSet = async (setId: string, data: { name: string }, userId: string, accountId: string) => {
+  const { data: result, error } = await supabase
     .from('target_metric_sets')
-    .update({ name })
-    .eq('id', id);
-  
+    .update({
+      name: data.name,
+      account_id: accountId,
+    })
+    .eq('id', setId)
+    .select()
+    .single();
+
   if (error) {
-    console.error('Error updating target metric set name:', error);
+    console.error('Error updating target metric set:', error);
     throw error;
   }
+
+  return result;
 };
 
-export const saveUserStandardMetricsPreference = async (userId: string, preferences: any) => {
-  console.log('Saving user standard metrics preference:', userId, preferences);
-  return { success: true };
+export const saveUserStandardMetricsPreference = async (userId: string, accountId: string) => {
+  // Implementation for saving standard metrics preference
+  console.log('Saving standard metrics preference for user:', userId, 'account:', accountId);
+  return Promise.resolve();
 };
 
 export const triggerAssessmentRecalculation = async (assessmentId: string, userId?: string) => {

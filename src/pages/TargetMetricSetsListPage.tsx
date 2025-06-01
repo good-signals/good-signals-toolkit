@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetricsService';
-import { TargetMetricSet } from '@/types/targetMetrics'; // Corrected import
+import { TargetMetricSet } from '@/types/targetMetrics';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { PlusCircle, Edit3, Trash2, ListChecks } from 'lucide-react';
@@ -43,7 +44,7 @@ const TargetMetricSetsListPage: React.FC = () => {
     onSuccess: () => {
       sonnerToast.success("Metric set deleted successfully.");
       queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] }); // If this key is used
+      queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] });
     },
     onError: (err: Error) => {
       sonnerToast.error(`Failed to delete metric set: ${err.message}`);

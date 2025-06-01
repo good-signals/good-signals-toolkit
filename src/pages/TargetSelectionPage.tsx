@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckSquare, Edit3, ListChecks, PlusCircle } from 'lucide-react'; // Added PlusCircle
+import { CheckSquare, Edit3, ListChecks, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveUserStandardMetricsPreference, hasUserSetAnyMetrics } from '@/services/targetMetricsService';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,14 +16,14 @@ const TargetSelectionPage: React.FC = () => {
 
   const { data: hasMetrics, isLoading: isLoadingHasMetrics } = useQuery({
     queryKey: ['hasUserSetAnyMetrics', user?.id],
-    queryFn: () => user ? hasUserSetAnyMetrics(user.id) : false,
+    queryFn: () => user ? hasUserSetAnyMetrics(user.id, user.user_metadata?.account_id || '') : false,
     enabled: !!user,
   });
   
   const mutation = useMutation({
     mutationFn: () => {
       if (!user) throw new Error("User not authenticated.");
-      return saveUserStandardMetricsPreference(user.id);
+      return saveUserStandardMetricsPreference(user.id, user.user_metadata?.account_id || '');
     },
     onSuccess: () => {
       sonnerToast.success("Standard metrics preference saved. Redirecting to Toolkit Hub...");

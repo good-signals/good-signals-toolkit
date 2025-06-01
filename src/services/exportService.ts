@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -6,18 +5,19 @@ import { getAccountSignalThresholds } from './targetMetrics/accountHelpers';
 
 // Fix ExportData interface to match component usage
 export interface ExportData {
-  assessment: SiteAssessment;
-  targetMetricSet?: {
-    id: string;
-    name: string;
-    account_id: string;
-    created_at: string;
-    updated_at: string;
-  };
-  accountSettings?: any;
-  detailedMetricScores?: Map<string, number>;
-  overallSiteSignalScore?: number;
-  completionPercentage?: number;
+  assessment: any; // SiteAssessment type
+  targetMetricSet: {
+    id?: string;
+    account_id?: string;
+    name?: string;
+    created_at?: string;
+    updated_at?: string;
+    user_custom_metrics_settings?: any[];
+  } | null;
+  accountSettings: any; // Account type
+  detailedMetricScores: Map<string, any>;
+  overallSiteSignalScore: number | null;
+  completionPercentage: number | null;
 }
 
 export interface ExportOptions {
