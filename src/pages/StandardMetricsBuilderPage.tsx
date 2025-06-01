@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { StandardMetricsFormData } from '@/types/standardMetrics';
 
 const StandardMetricsFormSchema = z.object({
   metric_set_id: z.string().optional(),
@@ -63,8 +64,6 @@ const StandardMetricsFormSchema = z.object({
     higher_is_better: z.boolean(),
   })),
 });
-
-type StandardMetricsFormData = z.infer<typeof StandardMetricsFormSchema>;
 
 const NON_EDITABLE_PREDEFINED_METRICS = [
   'market_saturation_trade_area_overlap',
@@ -191,7 +190,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
       console.log('Resetting form with data:', formData);
       form.reset(formData);
     } else if (!currentMetricSetId) {
-      // Initialize form for new metric set
+      // Initialize form for new metric set with proper required fields
       const defaultPredefinedMetrics = initialPredefinedMetricsConfig.map(config => {
         let targetValue;
         if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
@@ -212,14 +211,16 @@ const StandardMetricsBuilderPage: React.FC = () => {
         };
       });
 
-      form.reset({
+      const newFormData: StandardMetricsFormData = {
         metric_set_id: undefined,
         metric_set_name: "",
         metric_set_description: "",
         predefined_metrics: defaultPredefinedMetrics,
         custom_metrics: [],
         visitor_profile_metrics: [],
-      });
+      };
+
+      form.reset(newFormData);
     }
   }, [currentMetricSetId, existingMetricSet, existingMetrics, form]);
 
