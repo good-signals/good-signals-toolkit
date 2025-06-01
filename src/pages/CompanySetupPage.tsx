@@ -17,18 +17,12 @@ const CompanySetupPage: React.FC = () => {
         // User is authenticated, use their ID
         setUserId(user.id);
       } else {
-        // User not authenticated, check if we have a userId from signup
-        const userIdFromParams = searchParams.get('userId');
-        if (userIdFromParams) {
-          setUserId(userIdFromParams);
-        } else {
-          // No user and no userId parameter, redirect to auth
-          toast.error('Invalid access. Please sign up first.');
-          navigate('/auth');
-        }
+        // User not authenticated, redirect to auth
+        toast.error('Please sign up or sign in first.');
+        navigate('/auth');
       }
     }
-  }, [user, authLoading, searchParams, navigate]);
+  }, [user, authLoading, navigate]);
 
   if (authLoading) {
     return (

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { signUpWithEmailService } from '@/services/authService';
+import { supabase } from '@/integrations/supabase/client';
 import { companyCategoriesData } from '@/data/companyCategories';
 
 interface CompanySetupFormProps {
@@ -17,10 +18,6 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyCategory, setCompanyCategory] = useState('');
@@ -29,39 +26,33 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !firstName || !lastName || !companyName) {
-      toast.error("Please fill in all required fields.");
+    if (!companyName) {
+      toast.error("Please enter a company name.");
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      const { user, session, error } = await signUpWithEmailService(
-        email,
-        password,
-        firstName,
-        lastName,
-        companyName,
-        companyAddress || null,
-        companyCategory || null,
-        companySubcategory || null
-      );
+      // Call Edge Function to create account and membership
+      const { error: functionError } = await supabase.functions.invoke('create-account-and-admin', {
+        body: { 
+          userId,
+          companyName,
+          companyAddress: companyAddress || null,
+          companyCategory: companyCategory || null,
+          companySubcategory: companySubcategory || null
+        },
+      });
 
-      if (error) {
-        console.error('Company setup error:', error.message);
+      if (functionError) {
+        console.error('Error creating company account/admin role:', functionError);
+        toast.error(`Failed to set up company: ${functionError.message}. Please contact support.`);
         return;
       }
-
-      if (session) {
-        // User is confirmed and signed in, redirect to target selection
-        toast.success('Company setup completed! Let\'s set up your target metrics...');
-        navigate('/target-selection');
-      } else {
-        // User needs email confirmation, still redirect to target selection
-        toast.success('Company setup completed! Please check your email to confirm your account, then set up your target metrics.');
-        navigate('/target-selection');
-      }
+      
+      toast.success('Company setup completed! Let\'s set up your target metrics...');
+      navigate('/target-selection');
     } catch (error: any) {
       console.error('Error during company setup:', error);
       toast.error('An unexpected error occurred. Please try again.');
@@ -78,64 +69,11 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
         <CardHeader>
           <CardTitle>Complete Your Company Setup</CardTitle>
           <CardDescription>
-            Please provide your personal and company information to complete your account setup.
+            Please provide your company information to complete your account setup.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  autoComplete="given-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  placeholder="Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  autoComplete="family-name"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="john@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Choose a secure password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="companyName">Company Name <span className="text-destructive">*</span></Label>
               <Input

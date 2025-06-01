@@ -57,15 +57,9 @@ const SignUpForm: React.FC = () => {
         return;
       }
 
-      if (signUpData.session) {
-        // User is confirmed and signed in, redirect to company setup
-        toast.success('Account created successfully! Please set up your company.');
-        navigate('/company-setup');
-      } else {
-        // User needs email confirmation, redirect to company setup with userId
-        toast.success('Account created successfully! Please set up your company information and check your email to confirm your account.');
-        navigate(`/company-setup?userId=${signUpData.user.id}`);
-      }
+      // User account created successfully, redirect to company setup
+      toast.success('Account created successfully! Now let\'s set up your company.');
+      navigate('/company-setup');
     } catch (error: any) {
       console.error('Error during sign up:', error);
       toast.error('An unexpected error occurred. Please try again.');
