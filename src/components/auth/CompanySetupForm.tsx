@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { signUpWithEmailService } from '@/services/authService';
-import { COMPANY_CATEGORIES } from '@/data/companyCategories';
+import { companyCategoriesData } from '@/data/companyCategories';
 
 interface CompanySetupFormProps {
   userId: string;
@@ -71,7 +70,7 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
     }
   };
 
-  const selectedCategory = COMPANY_CATEGORIES.find(cat => cat.name === companyCategory);
+  const selectedCategory = companyCategoriesData.find(cat => cat.name === companyCategory);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
@@ -170,7 +169,7 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COMPANY_CATEGORIES.map((category) => (
+                    {companyCategoriesData.map((category) => (
                       <SelectItem key={category.name} value={category.name}>
                         {category.name}
                       </SelectItem>
@@ -191,8 +190,8 @@ const CompanySetupForm: React.FC<CompanySetupFormProps> = ({ userId }) => {
                   </SelectTrigger>
                   <SelectContent>
                     {selectedCategory?.subcategories.map((subcategory) => (
-                      <SelectItem key={subcategory} value={subcategory}>
-                        {subcategory}
+                      <SelectItem key={subcategory.name} value={subcategory.name}>
+                        {subcategory.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
