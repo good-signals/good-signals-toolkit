@@ -1,74 +1,54 @@
+
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/components/ui/use-toast';
+import { Loader2, Settings, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import MapTypeSelector from '@/components/treasure-map/MapTypeSelector';
+import { fetchUserAccountsWithAdminRole } from '@/services/accountService';
+import { getTreasureMapSettings, saveTreasureMapSettings } from '@/services/treasureMapService';
 import MapInputFields from '@/components/treasure-map/MapInputFields';
 import MapPreview from '@/components/treasure-map/MapPreview';
-import { getAccountSignalThresholds } from '@/services/targetMetrics/accountHelpers';
 
 const SiteTreasureMapPage: React.FC = () => {
   const { user } = useAuth();
-  const [mapType, setMapType] = useState<'site' | 'territory'>('site');
-  const [mapInputs, setMapInputs] = useState({
+  const [mapType, setMapType] = useState<'arcgis' | 'google_my_maps'>('arcgis');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mapUrl, setMapUrl] = useState('');
+  const [inputs, setInputs] = useState({
     address: '',
     radius: 5,
     cbsaCode: '',
     cbsaName: '',
   });
-  const [mapUrl, setMapUrl] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Get account signal thresholds
-  const { goodThreshold, badThreshold } = getAccountSignalThresholds(null);
+  const { data: userAccounts } = useQuery({
+    queryKey: ['userAccounts', user?.id],
+    queryFn: () => user ? fetchUserAccountsWithAdminRole(user.id) : Promise.resolve([]),
+    enabled: !!user,
+  });
 
-  const handleMapTypeChange = (type: 'site' | 'territory') => {
-    setMapType(type);
-    setMapUrl(null);
-    setError(null);
-  };
+  const { data: treasureMapSettings } = useQuery({
+    queryKey: ['treasureMapSettings', userAccounts?.[0]?.id],
+    queryFn: () => userAccounts?.[0]?.id ? getTreasureMapSettings(userAccounts[0].id) : Promise.resolve(null),
+    enabled: !!userAccounts?.[0]?.id,
+  });
 
   const handleInputChange = (name: string, value: string | number) => {
-    setMapInputs(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    setMapUrl(null);
-    setError(null);
+    setInputs(prev => ({ ...prev, [name]: value }));
   };
 
-  const generateMap = async () => {
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    setError(null);
-
     try {
-      // Validate inputs
-      if (mapType === 'site' && !mapInputs.address) {
-        throw new Error('Please enter a valid address');
-      }
-      if (mapType === 'territory' && !mapInputs.cbsaCode) {
-        throw new Error('Please select a valid CBSA');
-      }
-
-      // This would normally call an API to generate the map
-      // For now, we'll simulate a delay and return a placeholder URL
+      // Simulate map generation
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const baseUrl = 'https://maps.googleapis.com/maps/api/staticmap';
-      const apiKey = 'YOUR_API_KEY'; // This would be replaced with an environment variable
-      
-      let mapUrlValue = '';
-      if (mapType === 'site') {
-        // Generate a site-specific map URL
-        mapUrlValue = `${baseUrl}?center=${encodeURIComponent(mapInputs.address)}&zoom=14&size=600x400&key=${apiKey}`;
-      } else {
-        // Generate a territory map URL (this is a placeholder)
-        mapUrlValue = `${baseUrl}?center=${encodeURIComponent(mapInputs.cbsaName)}&zoom=10&size=600x400&key=${apiKey}`;
-      }
-      
-      setMapUrl(mapUrlValue);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setMapUrl('https://example.com/generated-map');
+      toast({ title: 'Success', description: 'Map generated successfully!' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to generate map', variant: 'destructive' });
     } finally {
       setIsGenerating(false);
     }
@@ -76,64 +56,56 @@ const SiteTreasureMapPage: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-4">Site Treasure Map</h1>
-        <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
-          Generate detailed maps for site analysis and territory visualization.
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-primary mb-2">Site Treasure Map</h1>
+        <p className="text-muted-foreground">
+          Generate interactive maps to visualize site opportunities and market data.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Map Configuration</CardTitle>
-              <CardDescription>
-                Select map type and enter location details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <MapTypeSelector 
-                mapType={mapType} 
-                onChange={handleMapTypeChange} 
-              />
-              
-              <MapInputFields 
-                mapType={mapType}
-                inputs={mapInputs}
-                onChange={handleInputChange}
-                onGenerate={generateMap}
-                isGenerating={isGenerating}
-              />
-              
-              {error && (
-                <div className="text-sm text-destructive mt-2">
-                  {error}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="space-y-6">
+        {/* Map Type Selector */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Map Type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={mapType} onValueChange={(value: 'arcgis' | 'google_my_maps') => setMapType(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select map type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="arcgis">ArcGIS</SelectItem>
+                <SelectItem value="google_my_maps">Google My Maps</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <MapInputFields
+            inputs={inputs}
+            onChange={handleInputChange}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+          />
+
+          <MapPreview
+            isLoading={isGenerating}
+            url={mapUrl}
+          />
         </div>
 
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Map Preview</CardTitle>
-              <CardDescription>
-                {mapUrl 
-                  ? `${mapType === 'site' ? 'Site' : 'Territory'} map for ${mapType === 'site' ? mapInputs.address : mapInputs.cbsaName}`
-                  : 'Configure your map settings and generate a preview'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MapPreview 
-                mapUrl={mapUrl} 
-                isLoading={isGenerating}
-                mapType={mapType}
-              />
-            </CardContent>
-          </Card>
+        {/* Action Buttons */}
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => window.location.href = '/treasure-map-settings'}>
+            <Settings className="mr-2 h-4 w-4" />
+            Map Settings
+          </Button>
+          <Button variant="outline" onClick={() => window.location.href = '/treasure-map-upload'}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Data
+          </Button>
         </div>
       </div>
     </div>

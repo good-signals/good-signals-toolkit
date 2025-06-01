@@ -1,51 +1,71 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ExternalLink } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 interface MapPreviewProps {
-  previewUrl: string;
+  isLoading: boolean;
+  url?: string;
+  embedCode?: string;
 }
 
-const MapPreview: React.FC<MapPreviewProps> = ({ previewUrl }) => {
+const MapPreview: React.FC<MapPreviewProps> = ({
+  isLoading,
+  url,
+  embedCode,
+}) => {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Map Preview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+            <p className="text-muted-foreground">Loading map...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!url && !embedCode) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Map Preview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            <p>Configure and generate a map to see preview</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Map Preview</CardTitle>
-        <CardDescription>
-          Preview how your map will appear on the Site Treasure Map page.
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        {previewUrl ? (
-          <div className="space-y-3">
-            <iframe
-              src={previewUrl}
-              width="100%"
-              height="400"
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              className="rounded-lg"
+        <div className="h-64 border rounded-md overflow-hidden">
+          {embedCode ? (
+            <div dangerouslySetInnerHTML={{ __html: embedCode }} />
+          ) : url ? (
+            <iframe 
+              src={url} 
+              className="w-full h-full border-0"
+              title="Map Preview"
             />
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ExternalLink className="h-4 w-4" />
-              <a 
-                href={previewUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hover:underline"
-              >
-                Open in new tab
-              </a>
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>No map data available</p>
             </div>
-          </div>
-        ) : (
-          <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
-            <p className="text-muted-foreground">No map configured yet</p>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );

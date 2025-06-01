@@ -2,8 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
-  UserMetricSettings, 
-  CreateUserMetricSettingsData,
+  UserCustomMetricSetting, 
   TargetMetricSet,
   CreateTargetMetricSetData 
 } from '@/types/targetMetrics';
@@ -66,10 +65,13 @@ export const getTargetMetricSets = async (accountId: string) => {
   return data || [];
 };
 
-export const getTargetMetricSetById = async (id: string) => {
+export const getTargetMetricSetById = async (id: string, userId?: string) => {
   const { data, error } = await supabase
     .from('target_metric_sets')
-    .select('*')
+    .select(`
+      *,
+      user_custom_metrics_settings (*)
+    `)
     .eq('id', id)
     .single();
   
@@ -131,6 +133,7 @@ export const createTargetMetricSet = async (data: CreateTargetMetricSetData) => 
 
 export const updateTargetMetricSetName = async (id: string, name: string) => {
   const { error } = await supabase
+    .from('target_metric_sets')
     .update({ name })
     .eq('id', id);
   

@@ -100,3 +100,47 @@ export const generateExecutiveSummary = async (
     return { success: false, error: 'Failed to generate executive summary.' };
   }
 };
+
+// Add the missing exports that components are trying to import
+export const generateExecutiveSummaryForAssessment = async (
+  assessment: SiteAssessment,
+  detailedMetricScores: Map<string, { score: number | null; enteredValue: any; targetValue: any; higherIsBetter: boolean; notes: string | null; imageUrl: string | null }>,
+  siteVisitRatingsWithLabels: any[],
+  accountSettings: any,
+  targetMetricSet: any,
+  metricCategories: string[]
+): Promise<string> => {
+  // Generate a basic executive summary
+  let summary = `Executive Summary for ${assessment.assessment_name}:\n\n`;
+  
+  if (assessment.site_signal_score !== null) {
+    summary += `Overall Site Signal Score: ${assessment.site_signal_score.toFixed(2)}\n\n`;
+  }
+  
+  summary += "Assessment completed with the following data:\n";
+  summary += `- ${detailedMetricScores.size} metrics evaluated\n`;
+  summary += `- ${siteVisitRatingsWithLabels.length} site visit ratings\n`;
+  summary += `- Completion: ${assessment.completion_percentage || 0}%\n`;
+  
+  return summary;
+};
+
+export const updateSiteAssessmentSummary = async (
+  assessmentId: string,
+  summary: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('site_assessments')
+    .update({
+      executive_summary: summary,
+      last_summary_generated_at: new Date().toISOString()
+    })
+    .eq('id', assessmentId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error updating assessment summary:', error);
+    throw error;
+  }
+};

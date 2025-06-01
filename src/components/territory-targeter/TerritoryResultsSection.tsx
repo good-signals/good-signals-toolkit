@@ -1,65 +1,74 @@
 
 import React from 'react';
-import ExecutiveSummary from './ExecutiveSummary';
-import TerritoryExecutiveSummary from './TerritoryExecutiveSummary';
-import ColumnManagement from './ColumnManagement';
-import ExportControls from './ExportControls';
-import { TerritoryAnalysis, CBSAData } from '@/types/territoryTargeterTypes';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CBSAData } from '@/types/territoryTargeterTypes';
+import { Loader2 } from 'lucide-react';
 
 interface TerritoryResultsSectionProps {
-  currentAnalysis: TerritoryAnalysis;
   cbsaData: CBSAData[];
-  executiveSummary: string;
-  isGeneratingSummary: boolean;
-  onGenerateSummary: () => Promise<void>;
-  onUpdateSummary: (newSummary: string) => void;
-  onToggleColumn: (columnId: string, included: boolean) => void;
-  onDeleteColumn: (columnId: string) => void;
-  onClearAnalysis: () => void;
-  onExportCSV: () => void;
-  onExportExcel: () => void;
+  isLoading: boolean;
+  error: string | null;
+  analysisMode: 'manual' | 'ai';
 }
 
 const TerritoryResultsSection: React.FC<TerritoryResultsSectionProps> = ({
-  currentAnalysis,
   cbsaData,
-  executiveSummary,
-  isGeneratingSummary,
-  onGenerateSummary,
-  onUpdateSummary,
-  onToggleColumn,
-  onDeleteColumn,
-  onClearAnalysis,
-  onExportCSV,
-  onExportExcel
+  isLoading,
+  error,
+  analysisMode,
 }) => {
+  if (isLoading) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+            <p className="text-muted-foreground">Analyzing territories...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-destructive">{error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (cbsaData.length === 0) {
+    return null;
+  }
+
   return (
-    <>
-      <ExecutiveSummary 
-        criteriaColumns={currentAnalysis.criteriaColumns}
-      />
-
-      <TerritoryExecutiveSummary
-        analysis={currentAnalysis}
-        cbsaData={cbsaData}
-        onGenerateSummary={onGenerateSummary}
-        isGenerating={isGeneratingSummary}
-        executiveSummary={executiveSummary}
-        onUpdateSummary={onUpdateSummary}
-      />
-
-      <ColumnManagement
-        criteriaColumns={currentAnalysis.criteriaColumns}
-        onToggleColumn={onToggleColumn}
-        onDeleteColumn={onDeleteColumn}
-      />
-
-      <ExportControls
-        onClearAnalysis={onClearAnalysis}
-        onExportCSV={onExportCSV}
-        onExportExcel={onExportExcel}
-      />
-    </>
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Territory Analysis Results</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Found {cbsaData.length} territories matching your criteria
+          </p>
+          <div className="grid gap-2">
+            {cbsaData.slice(0, 5).map((territory, index) => (
+              <div key={index} className="p-3 border rounded-md">
+                <h4 className="font-medium">{territory.name || `Territory ${index + 1}`}</h4>
+                <p className="text-sm text-muted-foreground">
+                  Score: {territory.site_signal_score || 'N/A'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

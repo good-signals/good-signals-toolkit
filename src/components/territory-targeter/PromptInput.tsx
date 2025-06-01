@@ -1,202 +1,61 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Plus, ChevronDown, ChevronUp, X, AlertCircle } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import ProgressCounter from './ProgressCounter';
-import AnalysisModeSelector from './AnalysisModeSelector';
+import { Button } from '@/components/ui/button';
+import { Search, Loader2, Trash2 } from 'lucide-react';
 
 interface PromptInputProps {
-  onSubmit: (prompt: string, mode: 'fast' | 'detailed') => void;
-  onCancel?: () => void;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
   isLoading: boolean;
-  analysisStartTime?: number | null;
-  analysisMode?: 'fast' | 'detailed';
-  estimatedDuration?: number;
-  disabled?: boolean;
-  onModeChange?: (mode: 'fast' | 'detailed') => void;
-  hasExistingAnalysis?: boolean;
+  hasData: boolean;
+  onClearAnalysis: () => void;
 }
 
-const PromptInput: React.FC<PromptInputProps> = ({ 
+const PromptInput: React.FC<PromptInputProps> = ({
+  value,
+  onChange,
   onSubmit,
-  onCancel,
-  isLoading, 
-  analysisStartTime,
-  analysisMode = 'detailed',
-  estimatedDuration = 75,
-  disabled = false,
-  onModeChange,
-  hasExistingAnalysis = false
+  isLoading,
+  hasData,
+  onClearAnalysis,
 }) => {
-  const [prompt, setPrompt] = useState('');
-  const [selectedMode, setSelectedMode] = useState<'fast' | 'detailed'>(analysisMode);
-  const [isOpen, setIsOpen] = useState(!hasExistingAnalysis); // Open by default if no existing analysis
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!prompt.trim()) {
-      console.log('Empty prompt submitted');
-      return;
-    }
-    
-    if (isLoading || isSubmitting) {
-      console.log('Submission blocked - already processing');
-      return;
-    }
-
-    console.log('PromptInput: Submitting prompt:', prompt.substring(0, 100) + '...');
-    console.log('PromptInput: Selected mode:', selectedMode);
-    
-    try {
-      setIsSubmitting(true);
-      await onSubmit(prompt.trim(), selectedMode);
-      setPrompt(''); // Clear prompt after successful submission
-    } catch (error) {
-      console.error('PromptInput: Submit error:', error);
-      // Error handling is done in the parent component
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCancel = () => {
-    console.log('PromptInput: Cancel requested');
-    if (onCancel) {
-      onCancel();
-    }
-  };
-
-  const handleModeChange = (mode: 'fast' | 'detailed') => {
-    console.log('PromptInput: Mode changed to:', mode);
-    setSelectedMode(mode);
-    if (onModeChange) {
-      onModeChange(mode);
-    }
-  };
-
-  const isProcessing = isLoading || isSubmitting;
-  const canSubmit = prompt.trim() && !isProcessing && !disabled;
-
-  const examplePrompts = [
-    "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand",
-    "Identify markets with strong healthcare infrastructure and aging populations for senior living facilities",
-    "Find markets with tech talent concentration and startup ecosystems for a software company",
-    "Assess markets for family dining restaurants based on household income and family density"
-  ];
-
   return (
-    <Card className="mb-6">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader>
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between cursor-pointer">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                {hasExistingAnalysis ? 'Add New Scoring Criteria' : 'Territory Scoring Criteria'}
-              </CardTitle>
-              {isOpen ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </CollapsibleTrigger>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="space-y-4">
-            {/* Analysis Mode Selector */}
-            {!isProcessing && (
-              <AnalysisModeSelector
-                selectedMode={selectedMode}
-                onModeChange={handleModeChange}
-                disabled={disabled}
-              />
+    <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+      <div className="space-y-4">
+        <Textarea
+          placeholder="Describe the type of location or market you want to analyze..."
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-h-[100px] resize-none"
+        />
+        <div className="flex gap-3">
+          <Button 
+            onClick={onSubmit} 
+            disabled={isLoading || !value.trim()}
+            className="flex-1"
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" />
             )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="scoring-prompt" className="block text-sm font-medium mb-2">
-                  {hasExistingAnalysis 
-                    ? 'Add another way to score each market:' 
-                    : 'How should AI score each market?'
-                  }
-                </label>
-                <Textarea
-                  id="scoring-prompt"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={hasExistingAnalysis 
-                    ? "Enter additional scoring criteria... (e.g., 'Rate markets for digital marketing reach and social media engagement')"
-                    : "Enter your scoring criteria here... (e.g., 'Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand')"
-                  }
-                  className="min-h-[100px]"
-                  disabled={disabled || isProcessing}
-                />
-                {isProcessing && (
-                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Analysis in progress - please wait for completion before adding new criteria</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4 items-start">
-                {!isProcessing ? (
-                  <Button 
-                    type="submit" 
-                    disabled={!canSubmit}
-                    className="whitespace-nowrap"
-                  >
-                    {hasExistingAnalysis && <Plus className="mr-2 h-4 w-4" />}
-                    {hasExistingAnalysis
-                      ? `Add Criteria (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
-                      : `Score Markets (${selectedMode === 'fast' ? 'Fast' : 'Detailed'})`
-                    }
-                  </Button>
-                ) : (
-                  <Button 
-                    type="button"
-                    variant="destructive"
-                    onClick={handleCancel}
-                    className="whitespace-nowrap"
-                    disabled={isSubmitting}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel Analysis
-                  </Button>
-                )}
-                
-                {!hasExistingAnalysis && !isProcessing && (
-                  <div className="text-sm text-muted-foreground">
-                    <p className="mb-2">Example prompts:</p>
-                    <ul className="space-y-1">
-                      {examplePrompts.map((example, index) => (
-                        <li key={index} className="text-xs">
-                          • {example}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </form>
-
-            {/* Progress Counter */}
-            <ProgressCounter 
-              isActive={isProcessing} 
-              duration={estimatedDuration}
-              startTime={analysisStartTime}
-              analysisMode={selectedMode}
-            />
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+            {isLoading ? 'Analyzing...' : 'Analyze Territory'}
+          </Button>
+          {hasData && (
+            <Button 
+              onClick={onClearAnalysis}
+              variant="outline"
+              disabled={isLoading}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Analysis
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 
