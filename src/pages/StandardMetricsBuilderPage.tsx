@@ -87,23 +87,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
       metric_set_id: routeMetricSetId, 
       metric_set_name: "", 
       metric_set_description: "",
-      predefined_metrics: initialPredefinedMetricsConfig.map(config => {
-        let targetValue;
-        if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 50;
-        } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
-          targetValue = 50;
-        } else {
-          targetValue = 0;
-        }
-        return {
-          metric_identifier: config.metric_identifier,
-          label: config.label,
-          category: config.category,
-          target_value: targetValue,
-          higher_is_better: config.higher_is_better,
-        };
-      }),
+      predefined_metrics: [],
       custom_metrics: [],
       visitor_profile_metrics: [],
     },
@@ -142,22 +126,26 @@ const StandardMetricsBuilderPage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (currentMetricSetId && existingMetricSet && existingMetrics) {
+    if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined) {
+      console.log('Loading existing data:', { existingMetricSet, existingMetrics });
+
+      // Initialize predefined metrics with either existing data or defaults
       const predefinedMetricsData = initialPredefinedMetricsConfig.map(config => {
-        const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier);
+        const existing = existingMetrics.find(s => s.metric_identifier === config.metric_identifier && !s.is_custom);
         let targetValue;
 
-        if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-           targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 
-                         existing?.target_value ?? 
-                         50;
-        } else if (existing) {
+        if (existing) {
           targetValue = existing.target_value;
+        } else if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
+          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => 
+            opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand")
+          )?.value ?? 50;
         } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
           targetValue = 50;
         } else {
           targetValue = 0;
         }
+
         return {
           metric_identifier: config.metric_identifier,
           label: config.label,
@@ -167,7 +155,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
         };
       });
 
-      // Handle custom metrics
+      // Handle custom metrics (non-visitor profile)
       const customMetricsData = existingMetrics
         .filter(metric => metric.is_custom && metric.category !== VISITOR_PROFILE_CATEGORY)
         .map(metric => ({
@@ -180,6 +168,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
           is_custom: true as const,
         }));
 
+      // Handle visitor profile metrics
       const visitorProfileMetricsData = existingMetrics
         .filter(s => s.category === VISITOR_PROFILE_CATEGORY)
         .map(s => ({
@@ -191,13 +180,46 @@ const StandardMetricsBuilderPage: React.FC = () => {
           higher_is_better: s.higher_is_better,
         }));
       
-      form.reset({
+      const formData = {
         metric_set_id: existingMetricSet.id,
         metric_set_name: existingMetricSet.name,
         metric_set_description: existingMetricSet.description || "",
         predefined_metrics: predefinedMetricsData,
         custom_metrics: customMetricsData,
         visitor_profile_metrics: visitorProfileMetricsData,
+      };
+
+      console.log('Resetting form with data:', formData);
+      form.reset(formData);
+    } else if (!currentMetricSetId) {
+      // Initialize form for new metric set
+      const defaultPredefinedMetrics = initialPredefinedMetricsConfig.map(config => {
+        let targetValue;
+        if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
+          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => 
+            opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand")
+          )?.value ?? 50;
+        } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
+          targetValue = 50;
+        } else {
+          targetValue = 0;
+        }
+        return {
+          metric_identifier: config.metric_identifier,
+          label: config.label,
+          category: config.category,
+          target_value: targetValue,
+          higher_is_better: config.higher_is_better,
+        };
+      });
+
+      form.reset({
+        metric_set_id: undefined,
+        metric_set_name: "",
+        metric_set_description: "",
+        predefined_metrics: defaultPredefinedMetrics,
+        custom_metrics: [],
+        visitor_profile_metrics: [],
       });
     }
   }, [currentMetricSetId, existingMetricSet, existingMetrics, form]);
@@ -227,14 +249,13 @@ const StandardMetricsBuilderPage: React.FC = () => {
         throw new Error("Failed to get or create metric set ID.");
       }
       
-      const mutableFormData = {
+      // Include all metrics including non-editable ones for saving
+      const completeFormData = {
         ...formData,
-        predefined_metrics: formData.predefined_metrics.filter(
-          metric => !NON_EDITABLE_PREDEFINED_METRICS.includes(metric.metric_identifier)
-        ),
+        predefined_metrics: formData.predefined_metrics, // Save all predefined metrics
       };
 
-      return saveStandardMetricSettings(operatingMetricSetId, mutableFormData);
+      return saveStandardMetricSettings(operatingMetricSetId, completeFormData);
     },
     onSuccess: (data, variables) => { 
       sonnerToast.success("Standard metric set saved successfully!");
@@ -434,7 +455,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
                     );
                   })}
 
-                  {/* Custom Metrics - Note: In a real implementation, super admin might define custom metric templates */}
+                  {/* Custom Metrics */}
                   {customMetricsInCategory.map((customMetric) => (
                     <FormField
                       key={`${customMetric.metric_identifier}-${customMetric.index}-custom`}
