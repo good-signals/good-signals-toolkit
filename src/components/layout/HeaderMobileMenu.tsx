@@ -3,10 +3,10 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 
 interface HeaderMobileMenuProps {
   user: any;
-  isSuperAdmin: boolean;
   isMobileMenuOpen: boolean;
   toggleMobileMenu: () => void;
   setIsMobileMenuOpen: (open: boolean) => void;
@@ -14,11 +14,12 @@ interface HeaderMobileMenuProps {
 
 const HeaderMobileMenu: React.FC<HeaderMobileMenuProps> = ({
   user,
-  isSuperAdmin,
   isMobileMenuOpen,
   toggleMobileMenu,
   setIsMobileMenuOpen,
 }) => {
+  const { isSuperAdmin } = useSuperAdmin();
+
   return (
     <>
       {/* Mobile menu button */}
