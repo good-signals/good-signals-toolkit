@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Loader2, Settings, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserAccountsWithAdminRole } from '@/services/accountService';
-import { getTreasureMapSettings, saveTreasureMapSettings } from '@/services/treasureMapService';
+import { getTreasureMapSettings } from '@/services/treasureMapService';
 import MapInputFields from '@/components/treasure-map/MapInputFields';
 import MapPreview from '@/components/treasure-map/MapPreview';
 
