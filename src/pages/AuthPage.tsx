@@ -1,16 +1,18 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
+import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm';
 import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser, session: currentSession } = useAuth();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
@@ -40,6 +42,16 @@ const AuthPage: React.FC = () => {
     checkUserAndRedirect();
   }, [currentUser, currentSession, navigate]);
 
+  if (showForgotPassword) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="w-[400px] md:w-[550px]">
+          <ForgotPasswordForm onBackToSignIn={() => setShowForgotPassword(false)} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <Tabs defaultValue="signup" className="w-[400px] md:w-[550px]">
@@ -48,7 +60,7 @@ const AuthPage: React.FC = () => {
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
         </TabsList>
         <TabsContent value="signin">
-          <SignInForm />
+          <SignInForm onForgotPassword={() => setShowForgotPassword(true)} />
         </TabsContent>
         <TabsContent value="signup">
           <SignUpForm />

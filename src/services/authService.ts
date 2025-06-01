@@ -83,6 +83,38 @@ export const signUpWithEmailService = async (
   }
 };
 
+export const resetPasswordService = async (email: string) => {
+  const redirectUrl = `${window.location.origin}/auth/update-password`;
+  
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectUrl,
+  });
+  
+  if (error) {
+    console.error('Error sending reset password email:', error.message);
+    toast.error(error.message || 'Failed to send reset password email.');
+  } else {
+    toast.success('Password reset email sent! Please check your inbox.');
+  }
+  
+  return { error };
+};
+
+export const updatePasswordService = async (newPassword: string) => {
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+  
+  if (error) {
+    console.error('Error updating password:', error.message);
+    toast.error(error.message || 'Failed to update password.');
+  } else {
+    toast.success('Password updated successfully!');
+  }
+  
+  return { error };
+};
+
 export const signOutService = async () => {
   const { error } = await supabase.auth.signOut();
   if (error) {

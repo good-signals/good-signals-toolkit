@@ -7,12 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 
-const SignInForm: React.FC = () => {
-  const { signInWithEmail, authLoading } = useAuth(); // Updated: authLoading
+interface SignInFormProps {
+  onForgotPassword?: () => void;
+}
+
+const SignInForm: React.FC<SignInFormProps> = ({ onForgotPassword }) => {
+  const { signInWithEmail, authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +59,15 @@ const SignInForm: React.FC = () => {
               required
               autoComplete="current-password"
             />
+          </div>
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot your password?
+            </button>
           </div>
         </CardContent>
         <CardFooter>

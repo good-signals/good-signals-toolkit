@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from "sonner";
-import { signInWithEmailService, signUpWithEmailService, signOutService } from '@/services/authService';
+import { signInWithEmailService, signUpWithEmailService, signOutService, resetPasswordService, updatePasswordService } from '@/services/authService';
 import { fetchProfileById, updateProfileService } from '@/services/profileService';
 
 // Define the shape of the profile data
@@ -31,6 +31,8 @@ interface AuthContextType {
     companyCategory: string | null,
     companySubcategory: string | null
   ) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateContextUserProfile: (updates: { full_name?: string; avatar_url?: string }) => Promise<boolean>;
   uploadAvatarAndUpdateProfile: (file: File) => Promise<boolean>;
@@ -115,6 +117,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
   };
 
+  const resetPassword = async (email: string) => {
+    await resetPasswordService(email);
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    await updatePasswordService(newPassword);
+  };
+
   const signOut = async () => {
     setAuthLoading(true);
     await signOutService();
@@ -179,6 +189,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authLoading,
     signInWithEmail,
     signUpWithEmail,
+    resetPassword,
+    updatePassword,
     signOut,
     updateContextUserProfile,
     uploadAvatarAndUpdateProfile,

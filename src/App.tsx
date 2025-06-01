@@ -25,6 +25,7 @@ import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import StandardMetricsListPage from "./pages/StandardMetricsListPage";
 import StandardMetricsBuilderPage from "./pages/StandardMetricsBuilderPage";
+import UpdatePasswordForm from "./components/auth/UpdatePasswordForm";
 import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const AppContent = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/auth/update-password" element={<UpdatePasswordForm />} />
         <Route path="/" element={<MainLayout />}>
           <Route index element={<LandingPage />} />
           <Route 
