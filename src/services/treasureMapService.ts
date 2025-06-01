@@ -23,7 +23,15 @@ export const getTreasureMapSettings = async (accountId: string): Promise<Treasur
     throw error;
   }
 
-  return data;
+  if (!data) {
+    return null;
+  }
+
+  // Type cast the map_type to ensure it matches our expected union type
+  return {
+    ...data,
+    map_type: data.map_type as 'arcgis' | 'google_my_maps'
+  };
 };
 
 export const saveTreasureMapSettings = async (settings: Omit<TreasureMapSettings, 'id' | 'created_at' | 'updated_at'>): Promise<TreasureMapSettings> => {
@@ -38,5 +46,8 @@ export const saveTreasureMapSettings = async (settings: Omit<TreasureMapSettings
     throw error;
   }
 
-  return data;
+  return {
+    ...data,
+    map_type: data.map_type as 'arcgis' | 'google_my_maps'
+  };
 };

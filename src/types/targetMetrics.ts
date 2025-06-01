@@ -71,13 +71,13 @@ export const UserCustomMetricSettingSchema = z.object({
 });
 export type UserCustomMetricSetting = z.infer<typeof UserCustomMetricSettingSchema>;
 
-// Schema for a target metric set from the database
+// Schema for a target metric set from the database - ensuring required fields are non-optional
 export const TargetMetricSetSchema = z.object({
   id: z.string().uuid(),
-  account_id: z.string().uuid(), // Changed from user_id to account_id
+  account_id: z.string().uuid(), 
   name: z.string().min(1, "Set name is required."),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
   user_custom_metrics_settings: z.array(UserCustomMetricSettingSchema).optional(),
 });
 export type TargetMetricSet = z.infer<typeof TargetMetricSetSchema>;

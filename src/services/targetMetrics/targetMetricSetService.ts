@@ -20,12 +20,16 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
   // Ensure the data conforms to our expected type structure
   if (data) {
     return {
-      ...data,
+      id: data.id,
+      account_id: data.account_id,
+      name: data.name,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
       user_custom_metrics_settings: data.user_custom_metrics_settings || []
     };
   }
 
-  return data;
+  return null;
 };
 
 export const deleteTargetMetricSet = async (id: string, userId: string) => {

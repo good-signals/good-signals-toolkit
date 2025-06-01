@@ -35,10 +35,10 @@ const TerritoryExecutiveSummary: React.FC<TerritoryExecutiveSummaryProps> = ({
               <h4 className="font-medium mb-2">Key Insights:</h4>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                 <li>Total territories analyzed: {cbsaData.length}</li>
-                <li>Territories with data: {cbsaData.filter(t => t.site_signal_score).length}</li>
+                <li>Territories with data: {cbsaData.filter(t => t.score).length}</li>
                 <li>Average signal score: {
                   cbsaData.length > 0 
-                    ? (cbsaData.reduce((sum, t) => sum + (t.site_signal_score || 0), 0) / cbsaData.length).toFixed(2)
+                    ? (cbsaData.reduce((sum, t) => sum + (t.score || 0), 0) / cbsaData.length).toFixed(2)
                     : 'N/A'
                 }</li>
               </ul>

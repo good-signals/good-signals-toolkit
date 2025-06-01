@@ -61,7 +61,6 @@ const TerritoryTargeterPageContent: React.FC<TerritoryTargeterPageContentProps> 
 
       <TerritoryResultsSection
         cbsaData={data}
-        setCbsaData={setData}
         isLoading={isLoading}
         error={error}
         analysisMode={analysisMode}

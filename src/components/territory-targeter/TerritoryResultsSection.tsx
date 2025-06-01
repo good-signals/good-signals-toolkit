@@ -61,7 +61,7 @@ const TerritoryResultsSection: React.FC<TerritoryResultsSectionProps> = ({
               <div key={index} className="p-3 border rounded-md">
                 <h4 className="font-medium">{territory.name || `Territory ${index + 1}`}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Score: {territory.site_signal_score || 'N/A'}
+                  Score: {territory.score || 'N/A'}
                 </p>
               </div>
             ))}
