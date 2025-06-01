@@ -79,7 +79,6 @@ const StandardMetricsBuilderPage: React.FC = () => {
   
   const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
   const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
-  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   const form = useForm<StandardMetricsFormData>({
     resolver: zodResolver(StandardMetricsFormSchema),
@@ -109,7 +108,6 @@ const StandardMetricsBuilderPage: React.FC = () => {
   useEffect(() => {
     console.log('Route metric set ID changed:', routeMetricSetId);
     setCurrentMetricSetId(routeMetricSetId);
-    setIsFormInitialized(false);
   }, [routeMetricSetId]);
 
   const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
@@ -153,8 +151,11 @@ const StandardMetricsBuilderPage: React.FC = () => {
     });
   };
 
+  // Initialize form data
   useEffect(() => {
-    if (isFormInitialized) return;
+    console.log('Form initialization effect - currentMetricSetId:', currentMetricSetId);
+    console.log('existingMetricSet:', existingMetricSet);
+    console.log('existingMetrics loaded:', !!existingMetrics);
 
     // Handle existing metric set
     if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined) {
@@ -222,7 +223,6 @@ const StandardMetricsBuilderPage: React.FC = () => {
 
       console.log('Resetting form with existing data:', formData);
       form.reset(formData);
-      setIsFormInitialized(true);
     } 
     // Handle new metric set - always check for draft first
     else if (!currentMetricSetId) {
@@ -234,7 +234,6 @@ const StandardMetricsBuilderPage: React.FC = () => {
       if (draftData) {
         console.log('Loading draft data:', draftData);
         form.reset(draftData);
-        sonnerToast.info("Draft loaded from previous session");
       } else {
         console.log('No draft found, initializing with defaults');
         const defaultFormData: StandardMetricsFormData = {
@@ -248,10 +247,8 @@ const StandardMetricsBuilderPage: React.FC = () => {
 
         form.reset(defaultFormData);
       }
-      
-      setIsFormInitialized(true);
     }
-  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, loadDraft, isFormInitialized]);
+  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, loadDraft]);
 
   const mutation = useMutation({
     mutationFn: async (formData: StandardMetricsFormData) => {
