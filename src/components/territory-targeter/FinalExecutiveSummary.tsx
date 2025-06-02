@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -49,7 +48,7 @@ const FinalExecutiveSummary: React.FC<FinalExecutiveSummaryProps> = ({
   };
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 mt-6">
       <Accordion type="single" collapsible defaultValue="executive-summary">
         <AccordionItem value="executive-summary" className="border-none">
           <CardHeader className="pb-2">
