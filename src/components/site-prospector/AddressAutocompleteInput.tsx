@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useMemo } from 'react';
 import { Input } from '@/components/ui/input';
@@ -173,8 +172,7 @@ const useGooglePlacesAutocomplete = () => {
       const request: google.maps.places.AutocompletionRequest = {
         input: input.trim(),
         componentRestrictions: { country: ['us', 'ca'] },
-        types: ['address', 'establishment'],
-        fields: ['place_id', 'description', 'structured_formatting']
+        types: ['address', 'establishment']
       };
 
       console.log('[AddressAutocompleteInput] Requesting predictions for:', input);
