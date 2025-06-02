@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
@@ -9,8 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
 import TerritoryHeader from '@/components/territory-targeter/TerritoryHeader';
 import PromptInput from '@/components/territory-targeter/PromptInput';
-import AnalysisModeSelector from '@/components/territory-targeter/AnalysisModeSelector';
-import AnalysisDepthSelector from '@/components/territory-targeter/AnalysisDepthSelector';
 import TerritoryNotices from '@/components/territory-targeter/TerritoryNotices';
 import ProgressCounter from '@/components/territory-targeter/ProgressCounter';
 import FinalExecutiveSummary from '@/components/territory-targeter/FinalExecutiveSummary';
@@ -174,16 +170,10 @@ const TerritoryTargeterPage: React.FC = () => {
         isLoading={isLoading}
         hasData={hasAnalysisData}
         onClearAnalysis={handleClearAnalysis}
-      />
-
-      <AnalysisModeSelector
-        value={analysisMode}
-        onChange={setAnalysisMode}
-      />
-
-      <AnalysisDepthSelector
+        analysisMode={analysisMode}
+        onAnalysisModeChange={setAnalysisMode}
         scoringMode={scoringMode}
-        setScoringMode={setScoringMode}
+        onScoringModeChange={setScoringMode}
       />
 
       <TerritoryNotices user={user} cbsaDataLength={cbsaData.length} />
@@ -246,4 +236,3 @@ const TerritoryTargeterPage: React.FC = () => {
 };
 
 export default TerritoryTargeterPage;
-
