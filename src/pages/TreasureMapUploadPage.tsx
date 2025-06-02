@@ -45,19 +45,36 @@ const TreasureMapUploadPage = () => {
   };
 
   const handlePreview = () => {
+    console.log('Preview button clicked with settings:', settings);
+    
     const url = extractPreviewUrl(settings.map_type, settings.map_url, settings.embed_code);
+    console.log('Extracted preview URL:', url);
+    
     if (url) {
       setPreviewUrl(url);
-    } else if (settings.map_type === 'google_my_maps') {
       toast({
-        title: "Invalid Embed Code",
-        description: "Could not extract URL from embed code. Please check the format.",
-        variant: "destructive",
+        title: "Preview Generated",
+        description: "Map preview has been generated successfully.",
       });
+    } else {
+      if (settings.map_type === 'google_my_maps') {
+        toast({
+          title: "Invalid Embed Code",
+          description: "Could not extract URL from embed code. Please check the format and ensure it's a valid Google My Maps embed code.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Invalid Map URL",
+          description: "Please provide a valid map URL.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
   const handleInputChange = (field: keyof typeof settings, value: string) => {
+    console.log('Input changed:', field, value?.substring(0, 50));
     setSettings(prev => ({
       ...prev,
       [field]: value
