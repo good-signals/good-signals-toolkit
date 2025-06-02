@@ -3,6 +3,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { AuthContextType } from '@/types/auth';
 import { useAuthState } from '@/hooks/useAuthState';
 import { useAuthOperations } from '@/hooks/useAuthOperations';
+import AuthErrorBoundary from '@/components/auth/AuthErrorBoundary';
 
 // Create the context with a default undefined value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -12,7 +13,7 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+const AuthProviderContent: React.FC<AuthProviderProps> = ({ children }) => {
   const {
     session,
     user,
@@ -47,6 +48,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  return (
+    <AuthErrorBoundary>
+      <AuthProviderContent>{children}</AuthProviderContent>
+    </AuthErrorBoundary>
+  );
 };
 
 // Custom hook to use the AuthContext

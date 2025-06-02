@@ -1,18 +1,66 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useReducer } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from "sonner";
 import { fetchProfileById } from '@/services/profileService';
 import { UserProfile } from '@/types/auth';
 
+// Define auth state and actions for reducer
+interface AuthState {
+  session: Session | null;
+  user: User | null;
+  profile: UserProfile | null;
+  authLoading: boolean;
+  authInitialized: boolean;
+}
+
+type AuthAction = 
+  | { type: 'SET_SESSION'; session: Session | null; user: User | null }
+  | { type: 'SET_PROFILE'; profile: UserProfile | null }
+  | { type: 'SET_LOADING'; loading: boolean }
+  | { type: 'SET_INITIALIZED'; initialized: boolean };
+
+const authReducer = (state: AuthState, action: AuthAction): AuthState => {
+  switch (action.type) {
+    case 'SET_SESSION':
+      return {
+        ...state,
+        session: action.session,
+        user: action.user,
+      };
+    case 'SET_PROFILE':
+      return {
+        ...state,
+        profile: action.profile,
+      };
+    case 'SET_LOADING':
+      return {
+        ...state,
+        authLoading: action.loading,
+      };
+    case 'SET_INITIALIZED':
+      return {
+        ...state,
+        authInitialized: action.initialized,
+        authLoading: action.initialized ? false : state.authLoading,
+      };
+    default:
+      return state;
+  }
+};
+
+const initialAuthState: AuthState = {
+  session: null,
+  user: null,
+  profile: null,
+  authLoading: true,
+  authInitialized: false,
+};
+
 export const useAuthState = () => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authState, dispatch] = useReducer(authReducer, initialAuthState);
   const [activeOperations, setActiveOperations] = useState<Set<string>>(new Set());
-  const [authInitialized, setAuthInitialized] = useState(false);
 
   const addActiveOperation = (operationId: string) => {
     console.log('[AuthContext] Adding active operation:', operationId);
@@ -33,16 +81,15 @@ export const useAuthState = () => {
       const { data: profileData, error: profileError } = await fetchProfileById(userId);
       if (profileError && !profileData) {
         console.warn('[AuthContext] Error fetching profile details:', profileError);
-        toast.error('Error fetching profile details.');
-        setProfile(null);
+        dispatch({ type: 'SET_PROFILE', profile: null });
       } else if (profileData) {
-        setProfile(profileData);
+        dispatch({ type: 'SET_PROFILE', profile: profileData });
       } else {
-        setProfile(null);
+        dispatch({ type: 'SET_PROFILE', profile: null });
       }
     } catch (error) {
       console.error('[AuthContext] Exception fetching profile:', error);
-      setProfile(null);
+      dispatch({ type: 'SET_PROFILE', profile: null });
     }
   };
 
@@ -50,95 +97,77 @@ export const useAuthState = () => {
   useEffect(() => {
     console.log('[AuthContext] Initializing auth state');
     
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('[AuthContext] Auth state changed:', { 
         event, 
         hasSession: !!newSession, 
         hasUser: !!newSession?.user,
         userId: newSession?.user?.id,
-        accessToken: newSession?.access_token ? 'present' : 'missing',
-        activeOperationsCount: activeOperations.size
+        accessToken: newSession?.access_token ? 'present' : 'missing'
       });
       
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
+      dispatch({ 
+        type: 'SET_SESSION', 
+        session: newSession, 
+        user: newSession?.user ?? null 
+      });
       
-      if (!authInitialized) {
+      if (!authState.authInitialized) {
         console.log('[AuthContext] Auth initialized');
-        setAuthInitialized(true);
+        dispatch({ type: 'SET_INITIALIZED', initialized: true });
       }
       
       if (newSession?.user) {
-        // Ensure the session is properly set in Supabase client
-        try {
-          await supabase.auth.setSession({
-            access_token: newSession.access_token,
-            refresh_token: newSession.refresh_token,
-          });
-        } catch (error) {
-          console.warn('[AuthContext] Error setting session:', error);
-        }
-        
-        // Fetch profile in background - don't block auth resolution
+        // Fetch profile in background
         fetchProfileAndUpdateContext(newSession.user.id);
       } else {
-        setProfile(null);
+        dispatch({ type: 'SET_PROFILE', profile: null });
       }
     });
 
-    // THEN check for existing session
+    // Check for existing session
     const initializeAuth = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         console.log('[AuthContext] Initial session check:', { 
           hasSession: !!currentSession, 
           hasUser: !!currentSession?.user,
-          error: error?.message,
-          accessToken: currentSession?.access_token ? 'present' : 'missing'
+          error: error?.message
         });
         
         if (error) {
           console.error('[AuthContext] Error getting initial session:', error);
-          setAuthInitialized(true);
+          dispatch({ type: 'SET_INITIALIZED', initialized: true });
           return;
         }
         
-        // If we have a session and no auth state change event fired yet
-        if (currentSession && !session) {
-          // Ensure the session is properly set in Supabase client
-          try {
-            await supabase.auth.setSession({
-              access_token: currentSession.access_token,
-              refresh_token: currentSession.refresh_token,
-            });
-          } catch (error) {
-            console.warn('[AuthContext] Error setting initial session:', error);
-          }
-          
-          setSession(currentSession);
-          setUser(currentSession.user);
+        if (currentSession && !authState.session) {
+          dispatch({ 
+            type: 'SET_SESSION', 
+            session: currentSession, 
+            user: currentSession.user 
+          });
           
           if (currentSession.user) {
             fetchProfileAndUpdateContext(currentSession.user.id);
           }
         }
         
-        // Mark auth as initialized if not already
-        if (!authInitialized) {
-          setAuthInitialized(true);
+        if (!authState.authInitialized) {
+          dispatch({ type: 'SET_INITIALIZED', initialized: true });
         }
       } catch (error) {
         console.error('[AuthContext] Exception during auth initialization:', error);
-        setAuthInitialized(true);
+        dispatch({ type: 'SET_INITIALIZED', initialized: true });
       }
     };
 
-    // Add timeout protection - force resolve loading after 5 seconds
+    // Timeout protection
     const timeoutId = setTimeout(() => {
-      if (!authInitialized) {
-        console.warn('[AuthContext] Auth loading timeout - forcing initial resolution');
-        setAuthInitialized(true);
+      if (!authState.authInitialized) {
+        console.warn('[AuthContext] Auth loading timeout - forcing resolution');
+        dispatch({ type: 'SET_INITIALIZED', initialized: true });
       }
     }, 5000);
 
@@ -149,39 +178,41 @@ export const useAuthState = () => {
       clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, []); // No dependencies to avoid race conditions
+  }, []);
 
-  // Effect to handle loading state based on auth initialization and active operations
+  // Handle loading state based on operations
   useEffect(() => {
     const hasActiveOps = activeOperations.size > 0;
     
     console.log('[AuthContext] Loading state check:', { 
       hasActiveOps, 
-      authInitialized,
-      currentAuthLoading: authLoading,
-      activeOperationsCount: activeOperations.size,
-      operations: Array.from(activeOperations)
+      authInitialized: authState.authInitialized,
+      currentAuthLoading: authState.authLoading,
+      activeOperationsCount: activeOperations.size
     });
     
-    // Resolve loading if auth is initialized AND no active operations
-    if (authInitialized && !hasActiveOps) {
-      if (authLoading) {
-        console.log('[AuthContext] Resolving auth loading - auth initialized and no active operations');
-        setAuthLoading(false);
-      }
-    } else if (hasActiveOps) {
-      if (!authLoading) {
-        console.log('[AuthContext] Setting auth loading - active operations detected');
-        setAuthLoading(true);
-      }
+    if (authState.authInitialized && hasActiveOps && !authState.authLoading) {
+      console.log('[AuthContext] Setting loading - operations detected');
+      dispatch({ type: 'SET_LOADING', loading: true });
+    } else if (authState.authInitialized && !hasActiveOps && authState.authLoading) {
+      console.log('[AuthContext] Clearing loading - no operations');
+      dispatch({ type: 'SET_LOADING', loading: false });
     }
-  }, [activeOperations.size, authInitialized, authLoading]);
+  }, [activeOperations.size, authState.authInitialized, authState.authLoading]);
+
+  const setProfile = (profile: UserProfile | null) => {
+    dispatch({ type: 'SET_PROFILE', profile });
+  };
+
+  const setAuthLoading = (loading: boolean) => {
+    dispatch({ type: 'SET_LOADING', loading });
+  };
 
   return {
-    session,
-    user,
-    profile,
-    authLoading,
+    session: authState.session,
+    user: authState.user,
+    profile: authState.profile,
+    authLoading: authState.authLoading,
     setProfile,
     setAuthLoading,
     addActiveOperation,

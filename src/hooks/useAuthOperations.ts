@@ -1,5 +1,4 @@
 
-import { useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from "sonner";
@@ -32,21 +31,7 @@ export const useAuthOperations = (
       }
       
       if (freshSession) {
-        console.log('[AuthOperations] Fresh session obtained after sign in');
-        // Ensure the session is properly set in Supabase client
-        await supabase.auth.setSession({
-          access_token: freshSession.access_token,
-          refresh_token: freshSession.refresh_token,
-        });
-        
-        // Force a session refresh to ensure tokens are valid
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.warn('[AuthOperations] Session refresh failed after sign in:', refreshError);
-        } else if (refreshedSession) {
-          console.log('[AuthOperations] Session refreshed successfully after sign in');
-        }
-        
+        console.log('[AuthOperations] Sign in successful');
         toast.success('Signed in successfully!');
       }
     } catch (error) {
