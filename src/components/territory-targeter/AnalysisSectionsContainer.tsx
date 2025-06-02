@@ -1,31 +1,30 @@
 
 import React from 'react';
-import { CBSAData, TerritoryAnalysis, ManualScoreOverride } from '@/types/territoryTargeterTypes';
-import { CBSAStatus } from './table/CBSAStatusSelector';
-import ExecutiveSummary from './ExecutiveSummary';
-import FinalExecutiveSummary from './FinalExecutiveSummary';
+import { TerritoryAnalysis, CBSAData } from '@/types/territoryTargeterTypes';
+import CBSATable from './CBSATable';
 import ColumnManagement from './ColumnManagement';
 import ExportControls from './ExportControls';
-import CBSATable from './CBSATable';
+import FinalExecutiveSummary from './FinalExecutiveSummary';
+import ClearAnalysisDialog from './ClearAnalysisDialog';
 
 interface AnalysisSectionsContainerProps {
   hasAnalysisData: boolean;
-  currentAnalysis: TerritoryAnalysis;
+  currentAnalysis: TerritoryAnalysis | null;
   cbsaData: CBSAData[];
   accountGoodThreshold?: number | null;
   accountBadThreshold?: number | null;
   refreshingColumnId?: string | null;
-  executiveSummary: string | null;
+  executiveSummary?: string | null;
   isGeneratingSummary: boolean;
-  onStatusChange: (cbsaId: string, status: CBSAStatus) => void;
-  onManualScoreOverride: (override: ManualScoreOverride) => void;
+  onStatusChange: (cbsaId: string, status: any) => void;
+  onManualScoreOverride: (override: any) => void;
   onRefreshColumn: (columnId: string, type: 'all' | 'na-only') => void;
   onToggleColumn: (columnId: string, included: boolean) => void;
   onDeleteColumn: (columnId: string) => void;
   onClearAnalysis: () => void;
   onExportCSV: () => void;
   onExportExcel: () => void;
-  onGenerateExecutiveSummary: (cbsaData: CBSAData[]) => void;
+  onGenerateExecutiveSummary: () => void;
   onUpdateExecutiveSummary: (summary: string) => void;
 }
 
@@ -49,56 +48,50 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
   onGenerateExecutiveSummary,
   onUpdateExecutiveSummary
 }) => {
-  if (!hasAnalysisData) return null;
+  // Always show the CBSA table with basic data
+  const criteriaColumns = currentAnalysis?.criteriaColumns || [];
+  const marketSignalScore = currentAnalysis?.marketSignalScore || 0;
 
   return (
-    <>
-      {/* AI Logic Summary */}
-      <ExecutiveSummary
-        criteriaColumns={currentAnalysis.criteriaColumns}
-      />
-
-      {/* Final Executive Summary - moved here */}
-      <FinalExecutiveSummary
-        executiveSummary={executiveSummary}
-        isGeneratingSummary={isGeneratingSummary}
-        hasAnalysisData={hasAnalysisData}
-        onGenerateExecutiveSummary={onGenerateExecutiveSummary}
-        onUpdateExecutiveSummary={onUpdateExecutiveSummary}
+    <div className="space-y-8">
+      {/* Always show the CBSA Table */}
+      <CBSATable
         cbsaData={cbsaData}
+        criteriaColumns={criteriaColumns}
+        marketSignalScore={marketSignalScore}
+        accountGoodThreshold={accountGoodThreshold}
+        accountBadThreshold={accountBadThreshold}
+        onStatusChange={onStatusChange}
+        onManualScoreOverride={onManualScoreOverride}
+        onRefreshColumn={onRefreshColumn}
+        refreshingColumnId={refreshingColumnId}
       />
 
-      {/* Column Management */}
-      <div className="mt-6">
-        <ColumnManagement
-          criteriaColumns={currentAnalysis.criteriaColumns}
-          onToggleColumn={onToggleColumn}
-          onDeleteColumn={onDeleteColumn}
-        />
-      </div>
+      {/* Show management and export controls only when we have analysis data */}
+      {hasAnalysisData && (
+        <>
+          <ColumnManagement
+            currentAnalysis={currentAnalysis}
+            onToggleColumn={onToggleColumn}
+            onDeleteColumn={onDeleteColumn}
+          />
 
-      {/* Export Controls */}
-      <ExportControls
-        onClearAnalysis={onClearAnalysis}
-        onExportCSV={onExportCSV}
-        onExportExcel={onExportExcel}
-      />
+          <ExportControls
+            onExportCSV={onExportCSV}
+            onExportExcel={onExportExcel}
+          />
 
-      {/* Results Table */}
-      <div className="mt-6">
-        <CBSATable
-          cbsaData={cbsaData}
-          criteriaColumns={currentAnalysis.criteriaColumns}
-          marketSignalScore={currentAnalysis.marketSignalScore || 0}
-          accountGoodThreshold={accountGoodThreshold}
-          accountBadThreshold={accountBadThreshold}
-          onStatusChange={onStatusChange}
-          onManualScoreOverride={onManualScoreOverride}
-          onRefreshColumn={onRefreshColumn}
-          refreshingColumnId={refreshingColumnId}
-        />
-      </div>
-    </>
+          <FinalExecutiveSummary
+            executiveSummary={executiveSummary}
+            isGeneratingSummary={isGeneratingSummary}
+            onGenerateExecutiveSummary={onGenerateExecutiveSummary}
+            onUpdateExecutiveSummary={onUpdateExecutiveSummary}
+          />
+
+          <ClearAnalysisDialog onClearAnalysis={onClearAnalysis} />
+        </>
+      )}
+    </div>
   );
 };
 

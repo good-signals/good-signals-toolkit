@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
@@ -51,27 +52,33 @@ const CBSATable: React.FC<CBSATableProps> = ({
     return cbsaData.map(cbsa => {
       const criteriaScores: { [columnId: string]: { score: number | null; reasoning: string | null; sources?: string[] } } = {};
       
-      criteriaColumns.forEach(column => {
-        const scoreData = column.scores.find(s => s.market === cbsa.name);
-        criteriaScores[column.id] = {
-          score: scoreData?.score || null,
-          reasoning: scoreData?.reasoning || null,
-          sources: scoreData?.sources
-        };
-      });
+      // Only process criteria columns if they exist
+      if (hasScores) {
+        criteriaColumns.forEach(column => {
+          const scoreData = column.scores.find(s => s.market === cbsa.name);
+          criteriaScores[column.id] = {
+            score: scoreData?.score || null,
+            reasoning: scoreData?.reasoning || null,
+            sources: scoreData?.sources
+          };
+        });
+      }
 
-      // Calculate market signal score (average of included criteria scores only)
-      const includedScores = Object.entries(criteriaScores)
-        .filter(([columnId]) => {
-          const column = criteriaColumns.find(c => c.id === columnId);
-          return column && column.isIncludedInSignalScore !== false;
-        })
-        .map(([_, scoreData]) => scoreData.score)
-        .filter(score => score !== null) as number[];
-      
-      const marketSignalScore = includedScores.length > 0 
-        ? includedScores.reduce((sum, score) => sum + score, 0) / includedScores.length
-        : null;
+      // Calculate market signal score only if we have criteria columns
+      let marketSignalScore = null;
+      if (hasScores) {
+        const includedScores = Object.entries(criteriaScores)
+          .filter(([columnId]) => {
+            const column = criteriaColumns.find(c => c.id === columnId);
+            return column && column.isIncludedInSignalScore !== false;
+          })
+          .map(([_, scoreData]) => scoreData.score)
+          .filter(score => score !== null) as number[];
+        
+        marketSignalScore = includedScores.length > 0 
+          ? includedScores.reduce((sum, score) => sum + score, 0) / includedScores.length
+          : null;
+      }
 
       // Ensure all required properties are present with defaults
       return {
@@ -86,7 +93,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
         marketSignalScore
       };
     });
-  }, [cbsaData, criteriaColumns]);
+  }, [cbsaData, criteriaColumns, hasScores]);
 
   // Sort data based on current sort config
   const sortedData = useMemo(() => {
@@ -181,7 +188,10 @@ const CBSATable: React.FC<CBSATableProps> = ({
       <div className="border-b pb-4">
         <h2 className="text-2xl font-bold text-foreground">Territory Analysis</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Core-Based Statistical Areas ranked by population and custom criteria scoring
+          {hasScores 
+            ? "Core-Based Statistical Areas ranked by population and custom criteria scoring"
+            : "Core-Based Statistical Areas ranked by population - run an analysis to add custom scoring"
+          }
         </p>
       </div>
 
@@ -214,17 +224,19 @@ const CBSATable: React.FC<CBSATableProps> = ({
         </Table>
       </div>
 
-      {/* Manual Score Override Dialog */}
-      <ManualScoreOverrideDialog
-        isOpen={overrideDialog.isOpen}
-        onClose={() => setOverrideDialog(prev => ({ ...prev, isOpen: false }))}
-        onSave={handleOverrideSave}
-        marketName={overrideDialog.marketName}
-        columnId={overrideDialog.columnId}
-        columnTitle={overrideDialog.columnTitle}
-        currentScore={overrideDialog.currentScore}
-        currentReasoning={overrideDialog.currentReasoning}
-      />
+      {/* Manual Score Override Dialog - only show if we have criteria columns */}
+      {hasScores && (
+        <ManualScoreOverrideDialog
+          isOpen={overrideDialog.isOpen}
+          onClose={() => setOverrideDialog(prev => ({ ...prev, isOpen: false }))}
+          onSave={handleOverrideSave}
+          marketName={overrideDialog.marketName}
+          columnId={overrideDialog.columnId}
+          columnTitle={overrideDialog.columnTitle}
+          currentScore={overrideDialog.currentScore}
+          currentReasoning={overrideDialog.currentReasoning}
+        />
+      )}
     </div>
   );
 };

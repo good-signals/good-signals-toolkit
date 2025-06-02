@@ -47,8 +47,8 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
 }) => {
   const signalStatus = getSignalStatus(row.marketSignalScore, accountGoodThreshold, accountBadThreshold);
   
-  // Combine all reasoning into one text
-  const combinedReasoning = criteriaColumns
+  // Combine all reasoning into one text (only if we have criteria columns)
+  const combinedReasoning = criteriaColumns.length > 0 ? criteriaColumns
     .map((column, index) => {
       const scoreData = row.criteriaScores[column.id];
       if (!scoreData?.reasoning) return null;
@@ -63,9 +63,10 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
       return reasoning;
     })
     .filter(Boolean)
-    .join(' | ');
+    .join(' | ') : '';
 
   const showMarketSignalScore = criteriaColumns.length > 1;
+  const hasScores = criteriaColumns.length > 0;
 
   return (
     <TableRow key={row.id} className={isEvenRow ? 'bg-muted/30' : ''}>
@@ -127,7 +128,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
           )}
         </TableCell>
       )}
-      {criteriaColumns.length > 0 && (
+      {hasScores && (
         <TableCell className="text-sm">
           {combinedReasoning || 'No reasoning available'}
         </TableCell>
