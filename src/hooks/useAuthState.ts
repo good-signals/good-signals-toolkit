@@ -50,16 +50,21 @@ export const useAuthState = () => {
       
       // Authentication state is now determined - resolve loading immediately
       if (!authResolved) {
+        console.log('[AuthContext] Resolving auth loading state');
         setAuthLoading(false);
         authResolved = true;
       }
       
       if (newSession?.user) {
         // Ensure the session is properly set in Supabase client
-        await supabase.auth.setSession({
-          access_token: newSession.access_token,
-          refresh_token: newSession.refresh_token,
-        });
+        try {
+          await supabase.auth.setSession({
+            access_token: newSession.access_token,
+            refresh_token: newSession.refresh_token,
+          });
+        } catch (error) {
+          console.warn('[AuthContext] Error setting session:', error);
+        }
         
         // Fetch profile in background - don't block auth resolution
         fetchProfileAndUpdateContext(newSession.user.id);
@@ -82,6 +87,7 @@ export const useAuthState = () => {
         if (error) {
           console.error('[AuthContext] Error getting initial session:', error);
           if (!authResolved) {
+            console.log('[AuthContext] Resolving auth loading after error');
             setAuthLoading(false);
             authResolved = true;
           }
@@ -91,10 +97,14 @@ export const useAuthState = () => {
         // If we have a session and no auth state change event fired yet
         if (currentSession && !session) {
           // Ensure the session is properly set in Supabase client
-          await supabase.auth.setSession({
-            access_token: currentSession.access_token,
-            refresh_token: currentSession.refresh_token,
-          });
+          try {
+            await supabase.auth.setSession({
+              access_token: currentSession.access_token,
+              refresh_token: currentSession.refresh_token,
+            });
+          } catch (error) {
+            console.warn('[AuthContext] Error setting initial session:', error);
+          }
           
           setSession(currentSession);
           setUser(currentSession.user);
@@ -106,26 +116,28 @@ export const useAuthState = () => {
         
         // Always resolve auth loading after initial check
         if (!authResolved) {
+          console.log('[AuthContext] Resolving auth loading after initial check');
           setAuthLoading(false);
           authResolved = true;
         }
       } catch (error) {
         console.error('[AuthContext] Exception during auth initialization:', error);
         if (!authResolved) {
+          console.log('[AuthContext] Resolving auth loading after exception');
           setAuthLoading(false);
           authResolved = true;
         }
       }
     };
 
-    // Add timeout protection - force resolve loading after 5 seconds
+    // Add timeout protection - force resolve loading after 3 seconds
     const timeoutId = setTimeout(() => {
       if (!authResolved) {
         console.warn('[AuthContext] Auth loading timeout - forcing resolution');
         setAuthLoading(false);
         authResolved = true;
       }
-    }, 5000);
+    }, 3000);
 
     initializeAuth();
 
