@@ -15,6 +15,8 @@ interface TerritoryTargeterPageContentProps {
   setPrompt: (value: string) => void;
   analysisMode: 'manual' | 'ai';
   setAnalysisMode: (mode: 'manual' | 'ai') => void;
+  scoringMode: 'fast' | 'detailed';
+  setScoringMode: (mode: 'fast' | 'detailed') => void;
   data: CBSAData[];
   setData: (data: CBSAData[]) => void;
   isLoading: boolean;
@@ -29,6 +31,8 @@ const TerritoryTargeterPageContent: React.FC<TerritoryTargeterPageContentProps> 
   setPrompt,
   analysisMode,
   setAnalysisMode,
+  scoringMode,
+  setScoringMode,
   data,
   setData,
   isLoading,
@@ -50,6 +54,10 @@ const TerritoryTargeterPageContent: React.FC<TerritoryTargeterPageContentProps> 
         isLoading={isLoading}
         hasData={hasData}
         onClearAnalysis={onClearAnalysis}
+        analysisMode={analysisMode}
+        onAnalysisModeChange={setAnalysisMode}
+        scoringMode={scoringMode}
+        onScoringModeChange={setScoringMode}
       />
 
       <AnalysisModeSelector
