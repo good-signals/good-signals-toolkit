@@ -15,25 +15,24 @@ export const useAuthOperations = (
 ) => {
   const signInWithEmail = async (email: string, password: string) => {
     const operationId = 'signin-' + Date.now();
-    console.log('[AuthContext] Sign in attempt for email:', email, 'operationId:', operationId);
+    console.log('[AuthOperations] Sign in attempt for email:', email, 'operationId:', operationId);
     
     addActiveOperation(operationId);
     
     try {
-      // Get fresh session after sign in
       const { data: { session: freshSession }, error } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
       });
       
       if (error) {
-        console.error('[AuthContext] Sign in error:', error);
+        console.error('[AuthOperations] Sign in error:', error);
         toast.error(error.message || 'Sign in failed. Please check your credentials.');
         return;
       }
       
       if (freshSession) {
-        console.log('[AuthContext] Fresh session obtained after sign in');
+        console.log('[AuthOperations] Fresh session obtained after sign in');
         // Ensure the session is properly set in Supabase client
         await supabase.auth.setSession({
           access_token: freshSession.access_token,
@@ -43,18 +42,18 @@ export const useAuthOperations = (
         // Force a session refresh to ensure tokens are valid
         const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError) {
-          console.warn('[AuthContext] Session refresh failed after sign in:', refreshError);
+          console.warn('[AuthOperations] Session refresh failed after sign in:', refreshError);
         } else if (refreshedSession) {
-          console.log('[AuthContext] Session refreshed successfully after sign in');
+          console.log('[AuthOperations] Session refreshed successfully after sign in');
         }
         
         toast.success('Signed in successfully!');
       }
     } catch (error) {
-      console.error('[AuthContext] Sign in exception:', error);
+      console.error('[AuthOperations] Sign in exception:', error);
       toast.error('Sign in failed. Please try again.');
     } finally {
-      console.log('[AuthContext] Removing sign in operation:', operationId);
+      console.log('[AuthOperations] Removing sign in operation:', operationId);
       removeActiveOperation(operationId);
     }
   };
@@ -83,14 +82,14 @@ export const useAuthOperations = (
 
   const signOut = async () => {
     const operationId = 'signout-' + Date.now();
-    console.log('[AuthContext] Sign out attempt, operationId:', operationId);
+    console.log('[AuthOperations] Sign out attempt, operationId:', operationId);
     
     addActiveOperation(operationId);
     
     try {
       await signOutService();
     } finally {
-      console.log('[AuthContext] Removing sign out operation:', operationId);
+      console.log('[AuthOperations] Removing sign out operation:', operationId);
       removeActiveOperation(operationId);
     }
   };
