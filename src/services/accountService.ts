@@ -90,7 +90,7 @@ export const updateAccountDetailsService = async (
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', accountId)
       .select()
-      .maybeSingle();
+      .single();
 
     if (error) {
       console.error('Error updating account details in service:', error);
@@ -100,11 +100,12 @@ export const updateAccountDetailsService = async (
     
     if (data) {
         toast.success('Account details updated successfully!');
-    } else if (!error) {
-        console.warn('Account update was attempted, but no data returned. Account ID:', accountId);
-        toast.info('Account details updated, but confirmation failed. Please refresh.');
+        return data;
+    } else {
+        console.error('Account update returned no data. Account ID:', accountId);
+        toast.error('Failed to update account details. Please try again.');
+        return null;
     }
-    return data;
   } catch (error: any) {
     console.error('Catch error updating account details in service:', error);
     toast.error('An unexpected error occurred while updating account details.');
