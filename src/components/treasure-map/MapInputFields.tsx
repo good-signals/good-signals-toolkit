@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { sanitizeMapEmbedCode, validateMapEmbedCode } from '@/utils/inputValidation';
+import { extractPreviewUrl } from '@/utils/mapUrlExtractor';
 
 export interface MapInputFieldsProps {
   settings: {
@@ -13,10 +14,21 @@ export interface MapInputFieldsProps {
     embed_code?: string;
   };
   onInputChange: (field: string, value: string) => void;
+  onAutoPreview?: (previewUrl: string) => void;
 }
 
-const MapInputFields: React.FC<MapInputFieldsProps> = ({ settings, onInputChange }) => {
+const MapInputFields: React.FC<MapInputFieldsProps> = ({ settings, onInputChange, onAutoPreview }) => {
   const [pasteIndicator, setPasteIndicator] = useState<string>('');
+
+  // Auto-preview when embed code or URL changes
+  useEffect(() => {
+    if (onAutoPreview) {
+      const url = extractPreviewUrl(settings.map_type, settings.map_url, settings.embed_code);
+      if (url) {
+        onAutoPreview(url);
+      }
+    }
+  }, [settings.map_url, settings.embed_code, settings.map_type, onAutoPreview]);
 
   const handleEmbedCodePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();

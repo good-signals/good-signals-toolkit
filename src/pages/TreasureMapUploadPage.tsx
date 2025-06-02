@@ -9,7 +9,7 @@ import MapTypeSelector from '@/components/treasure-map/MapTypeSelector';
 import MapInputFields from '@/components/treasure-map/MapInputFields';
 import MapPreview from '@/components/treasure-map/MapPreview';
 import { useTreasureMapSettings } from '@/hooks/useTreasureMapSettings';
-import { extractPreviewUrl, validateMapSettings } from '@/utils/mapUrlExtractor';
+import { validateMapSettings } from '@/utils/mapUrlExtractor';
 
 const TreasureMapUploadPage = () => {
   const navigate = useNavigate();
@@ -44,33 +44,9 @@ const TreasureMapUploadPage = () => {
     setPreviewUrl('');
   };
 
-  const handlePreview = () => {
-    console.log('Preview button clicked with settings:', settings);
-    
-    const url = extractPreviewUrl(settings.map_type, settings.map_url, settings.embed_code);
-    console.log('Extracted preview URL:', url);
-    
-    if (url) {
-      setPreviewUrl(url);
-      toast({
-        title: "Preview Generated",
-        description: "Map preview has been generated successfully.",
-      });
-    } else {
-      if (settings.map_type === 'google_my_maps') {
-        toast({
-          title: "Invalid Embed Code",
-          description: "Could not extract URL from embed code. Please check the format and ensure it's a valid Google My Maps embed code.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Invalid Map URL",
-          description: "Please provide a valid map URL.",
-          variant: "destructive",
-        });
-      }
-    }
+  const handleAutoPreview = (url: string) => {
+    console.log('Auto-preview triggered with URL:', url);
+    setPreviewUrl(url);
   };
 
   const handleInputChange = (field: keyof typeof settings, value: string) => {
@@ -94,7 +70,7 @@ const TreasureMapUploadPage = () => {
       <div className="flex items-center gap-3 mb-6">
         <Upload className="h-8 w-8 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">Upload Treasure Map</h1>
+          <h1 className="text-3xl font-bold">Configure Treasure Map</h1>
           <p className="text-muted-foreground">Upload and configure your organization's treasure map</p>
         </div>
       </div>
@@ -102,7 +78,7 @@ const TreasureMapUploadPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Map Upload</CardTitle>
+            <CardTitle>Map Configuration</CardTitle>
             <CardDescription>
               Choose between ArcGIS maps or Google My Maps and provide the necessary information.
             </CardDescription>
@@ -116,14 +92,12 @@ const TreasureMapUploadPage = () => {
             <MapInputFields
               settings={settings}
               onInputChange={handleInputChange}
+              onAutoPreview={handleAutoPreview}
             />
 
             <div className="flex gap-3">
-              <Button onClick={handlePreview} variant="outline">
-                Preview
-              </Button>
               <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Uploading...' : 'Upload Map'}
+                {isSaving ? 'Saving...' : 'Save Configuration'}
               </Button>
             </div>
           </CardContent>
