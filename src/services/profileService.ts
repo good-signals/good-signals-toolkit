@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { UserProfile } from '@/contexts/AuthContext'; // We'll refine this dependency later if needed or define UserProfile here
+import { UserProfile } from '@/types/auth';
 
 export const fetchProfileById = async (userId: string): Promise<{ data: UserProfile | null; error: Error | null }> => {
   try {
