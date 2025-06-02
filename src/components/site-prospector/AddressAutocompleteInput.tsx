@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useMemo } from 'react';
 import { Input } from '@/components/ui/input';
@@ -365,7 +366,6 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
     } catch (error) {
       console.error('[AddressAutocompleteInput] Error selecting address:', error);
       // Show user-friendly error but don't break the flow
-      setApiError('Failed to load address details. Please try selecting a different address.');
     }
   };
 
