@@ -172,29 +172,46 @@ const useGooglePlacesAutocomplete = () => {
       const request: google.maps.places.AutocompletionRequest = {
         input: input.trim(),
         componentRestrictions: { country: ['us', 'ca'] },
-        types: ['address', 'establishment']
+        types: ['geocode'] // Fixed: Use 'geocode' for addresses instead of conflicting types
       };
 
-      console.log('[AddressAutocompleteInput] Requesting predictions for:', input);
+      console.log('[AddressAutocompleteInput] Requesting predictions for:', input, 'with request:', request);
 
       autocompleteService.getPlacePredictions(
         request,
         (results, status) => {
           setLoading(false);
-          console.log('[AddressAutocompleteInput] Prediction response:', { status, resultsCount: results?.length || 0 });
+          console.log('[AddressAutocompleteInput] Prediction response:', { 
+            status, 
+            statusName: google.maps.places.PlacesServiceStatus[status],
+            resultsCount: results?.length || 0,
+            results: results?.slice(0, 3) // Log first 3 results for debugging
+          });
           
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
             setPredictions(results);
             setApiError(null);
+            console.log('[AddressAutocompleteInput] Successfully loaded', results.length, 'predictions');
           } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
             setPredictions([]);
+            console.log('[AddressAutocompleteInput] No results found for:', input);
           } else {
-            console.warn('[AddressAutocompleteInput] Places API error:', status);
+            console.error('[AddressAutocompleteInput] Places API error:', {
+              status,
+              statusName: google.maps.places.PlacesServiceStatus[status],
+              input
+            });
             setPredictions([]);
+            
+            // Provide more specific error messages
             if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
-              setApiError('Google Places API access denied. Please check your API key.');
+              setApiError('Google Places API access denied. Please check your API key and ensure Places API is enabled.');
             } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
-              setApiError('Google Places API quota exceeded.');
+              setApiError('Google Places API quota exceeded. Please try again later.');
+            } else if (status === google.maps.places.PlacesServiceStatus.INVALID_REQUEST) {
+              setApiError('Invalid request to Google Places API. Please try a different search term.');
+            } else {
+              setApiError(`Google Places API error: ${google.maps.places.PlacesServiceStatus[status] || status}`);
             }
           }
         }
@@ -203,7 +220,7 @@ const useGooglePlacesAutocomplete = () => {
       console.error('[AddressAutocompleteInput] Error fetching predictions:', error);
       setLoading(false);
       setPredictions([]);
-      setApiError('Failed to fetch address suggestions');
+      setApiError('Failed to fetch address suggestions. Please check your internet connection.');
     }
   };
 
@@ -221,6 +238,17 @@ const useGooglePlacesAutocomplete = () => {
           fields: ['address_components', 'geometry', 'formatted_address', 'name', 'types'] 
         },
         (result, status) => {
+          console.log(`[AddressAutocompleteInput] Place details response:`, {
+            status,
+            statusName: google.maps.places.PlacesServiceStatus[status],
+            result: result ? {
+              placeId: result.place_id,
+              formattedAddress: result.formatted_address,
+              hasGeometry: !!result.geometry,
+              componentCount: result.address_components?.length || 0
+            } : null
+          });
+
           if (status === google.maps.places.PlacesServiceStatus.OK && result) {
             const components: AddressComponents = {
               addressLine1: '',
@@ -257,8 +285,9 @@ const useGooglePlacesAutocomplete = () => {
             console.log('[AddressAutocompleteInput] Parsed address components:', components);
             resolve(components);
           } else {
-            console.error(`[AddressAutocompleteInput] Error fetching place details: ${status}`);
-            reject(new Error(`Error fetching place details: ${status}`));
+            const errorMsg = `Error fetching place details: ${google.maps.places.PlacesServiceStatus[status] || status}`;
+            console.error(`[AddressAutocompleteInput] ${errorMsg}`);
+            reject(new Error(errorMsg));
           }
         }
       );
@@ -315,8 +344,11 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       setShowSuggestions(true);
       // Debounce the API call
       debounceTimeoutRef.current = setTimeout(() => {
+        console.log('[AddressAutocompleteInput] Triggering debounced search for:', value);
         getPlacePredictions(value);
       }, 300);
+    } else {
+      console.warn('[AddressAutocompleteInput] Cannot search - Google not loaded or API error:', { isGoogleLoaded, apiError });
     }
   };
 
@@ -332,6 +364,8 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       onAddressSelect(addressDetails);
     } catch (error) {
       console.error('[AddressAutocompleteInput] Error selecting address:', error);
+      // Show user-friendly error but don't break the flow
+      setApiError('Failed to load address details. Please try selecting a different address.');
     }
   };
 
@@ -370,13 +404,22 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         onChange={handleInputChange}
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
-        placeholder="Start typing an address or place name..."
+        placeholder={apiError ? "Address search unavailable" : "Start typing an address..."}
         className={`${error ? 'border-destructive' : ''}`}
         autoComplete="off"
         disabled={!!apiError}
       />
       {error && <p className="text-sm text-destructive mt-1">{error}</p>}
-      {apiError && <p className="text-sm text-destructive mt-1">{apiError}</p>}
+      {apiError && (
+        <p className="text-sm text-destructive mt-1">
+          {apiError}
+          {apiError.includes('API key') && (
+            <span className="block text-xs mt-1">
+              Check that your Google Maps API key is valid and has Places API enabled.
+            </span>
+          )}
+        </p>
+      )}
       
       {showSuggestions && isGoogleLoaded && !apiError && (predictions.length > 0 || loading) && (
         <div 
@@ -385,7 +428,7 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         >
           {loading && (
             <div className="p-3 text-sm text-muted-foreground">
-              Loading suggestions...
+              Searching for addresses...
             </div>
           )}
           {predictions.map((prediction) => (
@@ -405,7 +448,7 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
           ))}
           {!loading && predictions.length === 0 && address.trim() !== "" && (
             <div className="p-3 text-sm text-muted-foreground">
-              No suggestions found.
+              No addresses found. Try a different search term.
             </div>
           )}
         </div>
