@@ -8,6 +8,7 @@ import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
 import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm';
 import { hasUserSetAnyMetrics } from '@/services/targetMetricsService';
+import { getUserAccount } from '@/services/userAccountService';
 import { supabase } from '@/integrations/supabase/client';
 
 const AuthPage: React.FC = () => {
@@ -54,27 +55,41 @@ const AuthPage: React.FC = () => {
     const checkUserAndRedirect = async () => {
       if (currentUser && currentSession && !authLoading && !isHandlingConfirmation) {
         try {
-          // Check if user has set up their company by checking if they have metrics
-          const hasSetMetrics = await hasUserSetAnyMetrics(currentUser.id, currentUser.id);
+          // First, get the user's account information
+          const userAccount = await getUserAccount(currentUser.id);
           
-          if (hasSetMetrics) {
-            // User has already completed setup, redirect to toolkit hub
-            toast.success("Welcome back! Redirecting to Toolkit Hub...");
-            navigate('/toolkit-hub');
-          } else {
-            // Check if user has confirmed their email and needs company setup
+          if (!userAccount) {
+            // User doesn't have an account, needs company setup
             if (currentUser.email_confirmed_at) {
               toast.success("Email confirmed! Let's set up your company...");
               navigate('/company-setup');
             } else {
-              // User needs to confirm email first
               toast.info("Please check your email to confirm your account.");
             }
+            return;
+          }
+
+          // User has an account, check if they have metrics set up
+          const hasSetMetrics = await hasUserSetAnyMetrics(currentUser.id, userAccount.id);
+          
+          if (hasSetMetrics) {
+            // User has completed setup, redirect to toolkit hub
+            toast.success("Welcome back! Redirecting to Toolkit Hub...");
+            navigate('/toolkit-hub');
+          } else {
+            // User has account but no metrics, redirect to target selection
+            toast.success("Welcome back! Let's set up your target metrics...");
+            navigate('/target-selection');
           }
         } catch (error) {
           console.error("Error checking user setup status:", error);
-          // On error, try company setup - the page will handle redirects appropriately
-          navigate('/company-setup');
+          // On error, check if user has confirmed email
+          if (currentUser.email_confirmed_at) {
+            // If email is confirmed but we can't determine setup status, try company setup
+            navigate('/company-setup');
+          } else {
+            toast.info("Please check your email to confirm your account.");
+          }
         }
       }
     };
