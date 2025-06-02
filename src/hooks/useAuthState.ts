@@ -13,14 +13,20 @@ export const useAuthState = () => {
   const [authLoading, setAuthLoading] = useState(true);
 
   const fetchProfileAndUpdateContext = async (userId: string) => {
-    const { data: profileData, error: profileError } = await fetchProfileById(userId);
-    if (profileError && !profileData) {
+    try {
+      const { data: profileData, error: profileError } = await fetchProfileById(userId);
+      if (profileError && !profileData) {
+        console.warn('[AuthContext] Error fetching profile details:', profileError);
         toast.error('Error fetching profile details.');
         setProfile(null);
-    } else if (profileData) {
+      } else if (profileData) {
         setProfile(profileData);
-    } else {
+      } else {
         setProfile(null);
+      }
+    } catch (error) {
+      console.error('[AuthContext] Exception fetching profile:', error);
+      setProfile(null);
     }
   };
 
@@ -38,7 +44,6 @@ export const useAuthState = () => {
         accessToken: newSession?.access_token ? 'present' : 'missing'
       });
       
-      setAuthLoading(true);
       setSession(newSession);
       setUser(newSession?.user ?? null);
       
@@ -49,60 +54,73 @@ export const useAuthState = () => {
           refresh_token: newSession.refresh_token,
         });
         
-        // Use setTimeout to defer profile fetching and avoid blocking auth state updates
-        setTimeout(async () => {
-          try {
-            await fetchProfileAndUpdateContext(newSession.user.id);
-          } catch (error) {
-            console.error('[AuthContext] Error fetching profile during auth state change:', error);
-          } finally {
-            setAuthLoading(false);
-          }
-        }, 0);
+        // Fetch profile in background but don't block auth loading resolution
+        fetchProfileAndUpdateContext(newSession.user.id).finally(() => {
+          setAuthLoading(false);
+        });
       } else {
         setProfile(null);
         setAuthLoading(false);
       }
     });
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: currentSession }, error }) => {
-      console.log('[AuthContext] Initial session check:', { 
-        hasSession: !!currentSession, 
-        hasUser: !!currentSession?.user,
-        error: error?.message,
-        accessToken: currentSession?.access_token ? 'present' : 'missing'
-      });
-      
-      if (error) {
-        console.error('[AuthContext] Error getting initial session:', error);
-      }
-      
-      // Only set state if we don't already have a session (to avoid duplicate state updates)
-      if (!session && currentSession) {
-        // Ensure the session is properly set in Supabase client
-        await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token,
+    // THEN check for existing session with timeout protection
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        console.log('[AuthContext] Initial session check:', { 
+          hasSession: !!currentSession, 
+          hasUser: !!currentSession?.user,
+          error: error?.message,
+          accessToken: currentSession?.access_token ? 'present' : 'missing'
         });
         
-        setSession(currentSession);
-        setUser(currentSession.user);
-        if (currentSession.user) {
-          await fetchProfileAndUpdateContext(currentSession.user.id);
+        if (error) {
+          console.error('[AuthContext] Error getting initial session:', error);
+          setAuthLoading(false);
+          return;
         }
-      }
-      
-      if (!currentSession) {
+        
+        // If we have a session but no auth state change event fired yet
+        if (currentSession && !session) {
+          // Ensure the session is properly set in Supabase client
+          await supabase.auth.setSession({
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token,
+          });
+          
+          setSession(currentSession);
+          setUser(currentSession.user);
+          
+          if (currentSession.user) {
+            await fetchProfileAndUpdateContext(currentSession.user.id);
+          }
+        }
+        
+        // Always resolve loading state after initial check
+        setAuthLoading(false);
+      } catch (error) {
+        console.error('[AuthContext] Exception during auth initialization:', error);
         setAuthLoading(false);
       }
+    };
+
+    // Add timeout protection - force resolve loading after 10 seconds
+    const timeoutId = setTimeout(() => {
+      console.warn('[AuthContext] Auth loading timeout - forcing resolution');
+      setAuthLoading(false);
+    }, 10000);
+
+    initializeAuth().finally(() => {
+      clearTimeout(timeoutId);
     });
 
     return () => {
       console.log('[AuthContext] Cleaning up auth subscription');
+      clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, []);
+  }, []); // Remove session dependency to avoid race conditions
 
   return {
     session,
