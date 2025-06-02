@@ -39,6 +39,7 @@ const TargetSelectionPage: React.FC = () => {
     onSuccess: (result) => {
       sonnerToast.success(`Standard metrics "${result.metricSetName}" added successfully! Redirecting to Toolkit Hub...`);
       queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', accountId] });
       navigate('/toolkit-hub');
     },
     onError: (error: Error) => {

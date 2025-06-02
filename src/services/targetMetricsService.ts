@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
@@ -27,16 +28,20 @@ export const hasUserSetAnyMetrics = async (userId: string, accountId: string): P
 };
 
 export const getTargetMetricSets = async (accountId: string) => {
+  console.log('Fetching target metric sets for account:', accountId);
+  
   const { data, error } = await supabase
     .from('target_metric_sets')
     .select('*')
-    .eq('account_id', accountId);
+    .eq('account_id', accountId)
+    .order('created_at', { ascending: false });
   
   if (error) {
     console.error('Error fetching target metric sets:', error);
     return [];
   }
   
+  console.log('Found target metric sets:', data?.length || 0);
   return data || [];
 };
 
@@ -112,17 +117,32 @@ export const updateTargetMetricSetName = async (setId: string, newName: string) 
 };
 
 export const deleteTargetMetricSet = async (setId: string, accountId: string) => {
+  console.log('Deleting target metric set:', setId, 'for account:', accountId);
+  
+  // First delete related user_custom_metrics_settings
+  const { error: settingsError } = await supabase
+    .from('user_custom_metrics_settings')
+    .delete()
+    .eq('metric_set_id', setId);
+
+  if (settingsError) {
+    console.error('Error deleting user custom metric settings:', settingsError);
+    throw settingsError;
+  }
+
+  // Then delete the target metric set
   const { error } = await supabase
     .from('target_metric_sets')
     .delete()
     .eq('id', setId)
-    .eq('account_id', accountId); // Use accountId string instead of account object
+    .eq('account_id', accountId);
 
   if (error) {
     console.error('Error deleting target metric set:', error);
     throw error;
   }
 
+  console.log('Successfully deleted target metric set');
   return true;
 };
 

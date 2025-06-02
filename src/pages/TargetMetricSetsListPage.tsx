@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetricsService';
+import { getUserAccount } from '@/services/userAccountService';
 import { TargetMetricSet } from '@/types/targetMetrics';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
@@ -27,23 +28,32 @@ const TargetMetricSetsListPage: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Fetch user's account information
+  const { data: userAccount, isLoading: isLoadingAccount, error: accountError } = useQuery({
+    queryKey: ['userAccount', user?.id],
+    queryFn: () => user ? getUserAccount(user.id) : null,
+    enabled: !!user,
+  });
+
+  const accountId = userAccount?.id || '';
+
   const { data: metricSets, isLoading, error } = useQuery<TargetMetricSet[], Error>({
-    queryKey: ['targetMetricSets', user?.id],
+    queryKey: ['targetMetricSets', accountId],
     queryFn: () => {
-      if (!user?.id) return Promise.resolve([]);
-      return getTargetMetricSets(user.id);
+      if (!accountId) return Promise.resolve([]);
+      return getTargetMetricSets(accountId);
     },
-    enabled: !!user && !authLoading,
+    enabled: !!accountId,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (metricSetId: string) => {
-      if (!user?.id) throw new Error("User not authenticated.");
-      return deleteTargetMetricSet(metricSetId, user.id);
+      if (!accountId) throw new Error("Account not found.");
+      return deleteTargetMetricSet(metricSetId, accountId);
     },
     onSuccess: () => {
       sonnerToast.success("Metric set deleted successfully.");
-      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['targetMetricSets', accountId] });
       queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] });
     },
     onError: (err: Error) => {
@@ -55,8 +65,24 @@ const TargetMetricSetsListPage: React.FC = () => {
     deleteMutation.mutate(metricSetId);
   };
 
-  if (isLoading || authLoading) {
+  if (isLoading || authLoading || isLoadingAccount) {
     return <div className="container mx-auto p-4 text-center">Loading metric sets...</div>;
+  }
+
+  if (accountError || !userAccount) {
+    return (
+      <div className="container mx-auto p-4 text-center">
+        <div className="text-destructive">
+          <p className="text-lg mb-4">Account information not found.</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Please ensure your company setup is complete.
+          </p>
+          <Button onClick={() => navigate('/company-setup')}>
+            Complete Company Setup
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -70,7 +96,7 @@ const TargetMetricSetsListPage: React.FC = () => {
           <ListChecks size={48} className="text-primary mr-4" />
           <div>
             <h1 className="text-3xl font-bold text-primary">Your Target Metric Sets</h1>
-            <p className="text-muted-foreground">Manage your custom sets of target metrics.</p>
+            <p className="text-muted-foreground">Manage your custom sets of target metrics for {userAccount.name}.</p>
           </div>
         </div>
         <Button asChild>
