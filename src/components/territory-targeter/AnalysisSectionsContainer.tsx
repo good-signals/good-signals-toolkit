@@ -3,6 +3,7 @@ import React from 'react';
 import { CBSAData, TerritoryAnalysis, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { CBSAStatus } from './table/CBSAStatusSelector';
 import ExecutiveSummary from './ExecutiveSummary';
+import FinalExecutiveSummary from './FinalExecutiveSummary';
 import ColumnManagement from './ColumnManagement';
 import ExportControls from './ExportControls';
 import CBSATable from './CBSATable';
@@ -14,6 +15,8 @@ interface AnalysisSectionsContainerProps {
   accountGoodThreshold?: number | null;
   accountBadThreshold?: number | null;
   refreshingColumnId?: string | null;
+  executiveSummary: string | null;
+  isGeneratingSummary: boolean;
   onStatusChange: (cbsaId: string, status: CBSAStatus) => void;
   onManualScoreOverride: (override: ManualScoreOverride) => void;
   onRefreshColumn: (columnId: string, type: 'all' | 'na-only') => void;
@@ -22,6 +25,8 @@ interface AnalysisSectionsContainerProps {
   onClearAnalysis: () => void;
   onExportCSV: () => void;
   onExportExcel: () => void;
+  onGenerateExecutiveSummary: (cbsaData: CBSAData[]) => void;
+  onUpdateExecutiveSummary: (summary: string) => void;
 }
 
 const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
@@ -31,6 +36,8 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
   accountGoodThreshold,
   accountBadThreshold,
   refreshingColumnId,
+  executiveSummary,
+  isGeneratingSummary,
   onStatusChange,
   onManualScoreOverride,
   onRefreshColumn,
@@ -38,7 +45,9 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
   onDeleteColumn,
   onClearAnalysis,
   onExportCSV,
-  onExportExcel
+  onExportExcel,
+  onGenerateExecutiveSummary,
+  onUpdateExecutiveSummary
 }) => {
   if (!hasAnalysisData) return null;
 
@@ -47,6 +56,16 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
       {/* AI Logic Summary */}
       <ExecutiveSummary
         criteriaColumns={currentAnalysis.criteriaColumns}
+      />
+
+      {/* Final Executive Summary - moved here */}
+      <FinalExecutiveSummary
+        executiveSummary={executiveSummary}
+        isGeneratingSummary={isGeneratingSummary}
+        hasAnalysisData={hasAnalysisData}
+        onGenerateExecutiveSummary={onGenerateExecutiveSummary}
+        onUpdateExecutiveSummary={onUpdateExecutiveSummary}
+        cbsaData={cbsaData}
       />
 
       {/* Column Management */}

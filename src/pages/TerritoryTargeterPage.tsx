@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
@@ -199,6 +198,8 @@ const TerritoryTargeterPage: React.FC = () => {
         accountGoodThreshold={accountGoodThreshold}
         accountBadThreshold={accountBadThreshold}
         refreshingColumnId={refreshingColumnId}
+        executiveSummary={executiveSummary}
+        isGeneratingSummary={isGeneratingSummary}
         onStatusChange={handleStatusChange}
         onManualScoreOverride={applyManualOverride}
         onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
@@ -207,15 +208,8 @@ const TerritoryTargeterPage: React.FC = () => {
         onClearAnalysis={handleClearAnalysis}
         onExportCSV={handleExportCSV}
         onExportExcel={handleExportExcel}
-      />
-
-      <FinalExecutiveSummary
-        executiveSummary={executiveSummary}
-        isGeneratingSummary={isGeneratingSummary}
-        hasAnalysisData={hasAnalysisData}
         onGenerateExecutiveSummary={handleGenerateExecutiveSummary}
         onUpdateExecutiveSummary={handleUpdateExecutiveSummary}
-        cbsaData={cbsaData}
       />
     </div>
   );
