@@ -32,7 +32,8 @@ export const useAuthState = () => {
 
   useEffect(() => {
     console.log('[AuthContext] Initializing auth state');
-    setAuthLoading(true);
+    
+    let authResolved = false;
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -47,6 +48,12 @@ export const useAuthState = () => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       
+      // Authentication state is now determined - resolve loading immediately
+      if (!authResolved) {
+        setAuthLoading(false);
+        authResolved = true;
+      }
+      
       if (newSession?.user) {
         // Ensure the session is properly set in Supabase client
         await supabase.auth.setSession({
@@ -54,13 +61,10 @@ export const useAuthState = () => {
           refresh_token: newSession.refresh_token,
         });
         
-        // Fetch profile in background but don't block auth loading resolution
-        fetchProfileAndUpdateContext(newSession.user.id).finally(() => {
-          setAuthLoading(false);
-        });
+        // Fetch profile in background - don't block auth resolution
+        fetchProfileAndUpdateContext(newSession.user.id);
       } else {
         setProfile(null);
-        setAuthLoading(false);
       }
     });
 
@@ -77,11 +81,14 @@ export const useAuthState = () => {
         
         if (error) {
           console.error('[AuthContext] Error getting initial session:', error);
-          setAuthLoading(false);
+          if (!authResolved) {
+            setAuthLoading(false);
+            authResolved = true;
+          }
           return;
         }
         
-        // If we have a session but no auth state change event fired yet
+        // If we have a session and no auth state change event fired yet
         if (currentSession && !session) {
           // Ensure the session is properly set in Supabase client
           await supabase.auth.setSession({
@@ -93,34 +100,41 @@ export const useAuthState = () => {
           setUser(currentSession.user);
           
           if (currentSession.user) {
-            await fetchProfileAndUpdateContext(currentSession.user.id);
+            fetchProfileAndUpdateContext(currentSession.user.id);
           }
         }
         
-        // Always resolve loading state after initial check
-        setAuthLoading(false);
+        // Always resolve auth loading after initial check
+        if (!authResolved) {
+          setAuthLoading(false);
+          authResolved = true;
+        }
       } catch (error) {
         console.error('[AuthContext] Exception during auth initialization:', error);
-        setAuthLoading(false);
+        if (!authResolved) {
+          setAuthLoading(false);
+          authResolved = true;
+        }
       }
     };
 
-    // Add timeout protection - force resolve loading after 10 seconds
+    // Add timeout protection - force resolve loading after 5 seconds
     const timeoutId = setTimeout(() => {
-      console.warn('[AuthContext] Auth loading timeout - forcing resolution');
-      setAuthLoading(false);
-    }, 10000);
+      if (!authResolved) {
+        console.warn('[AuthContext] Auth loading timeout - forcing resolution');
+        setAuthLoading(false);
+        authResolved = true;
+      }
+    }, 5000);
 
-    initializeAuth().finally(() => {
-      clearTimeout(timeoutId);
-    });
+    initializeAuth();
 
     return () => {
       console.log('[AuthContext] Cleaning up auth subscription');
       clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, []); // Remove session dependency to avoid race conditions
+  }, []); // No dependencies to avoid race conditions
 
   return {
     session,
