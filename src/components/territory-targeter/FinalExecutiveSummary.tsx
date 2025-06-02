@@ -28,7 +28,7 @@ const FinalExecutiveSummary: React.FC<FinalExecutiveSummaryProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Executive Summary
+          Generative Executive Summary
         </CardTitle>
       </CardHeader>
       <CardContent>

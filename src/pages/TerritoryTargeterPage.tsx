@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
@@ -11,8 +12,10 @@ import AnalysisModeSelector from '@/components/territory-targeter/AnalysisModeSe
 import AnalysisDepthSelector from '@/components/territory-targeter/AnalysisDepthSelector';
 import TerritoryNotices from '@/components/territory-targeter/TerritoryNotices';
 import ProgressCounter from '@/components/territory-targeter/ProgressCounter';
-import AnalysisSectionsContainer from '@/components/territory-targeter/AnalysisSectionsContainer';
 import FinalExecutiveSummary from '@/components/territory-targeter/FinalExecutiveSummary';
+import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
+import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
+import CBSATable from '@/components/territory-targeter/CBSATable';
 import ErrorDisplay from '@/components/territory-targeter/ErrorDisplay';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { toast } from '@/hooks/use-toast';
@@ -162,6 +165,7 @@ const TerritoryTargeterPage: React.FC = () => {
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <TerritoryHeader />
       
+      {/* 1. Prompt */}
       <PromptInput
         value={prompt}
         onChange={setPrompt}
@@ -196,26 +200,48 @@ const TerritoryTargeterPage: React.FC = () => {
 
       <ErrorDisplay error={error} />
 
-      <AnalysisSectionsContainer
-        hasAnalysisData={hasAnalysisData}
-        currentAnalysis={currentAnalysis}
-        cbsaData={cbsaData}
-        accountGoodThreshold={accountGoodThreshold}
-        accountBadThreshold={accountBadThreshold}
-        refreshingColumnId={refreshingColumnId}
+      {/* 2. Generative Executive Summary */}
+      <FinalExecutiveSummary
         executiveSummary={executiveSummary}
         isGeneratingSummary={isGeneratingSummary}
-        onStatusChange={handleStatusChange}
-        onManualScoreOverride={applyManualOverride}
-        onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
-        onToggleColumn={toggleColumnInSignalScore}
-        onDeleteColumn={deleteColumn}
-        onClearAnalysis={handleClearAnalysis}
-        onExportCSV={handleExportCSV}
-        onExportExcel={handleExportExcel}
+        hasAnalysisData={hasAnalysisData}
         onGenerateExecutiveSummary={handleGenerateExecutiveSummaryWrapper}
         onUpdateExecutiveSummary={handleUpdateExecutiveSummary}
+        cbsaData={cbsaData}
       />
+
+      {/* 3. AI Logic */}
+      {hasAnalysisData && (
+        <ExecutiveSummary
+          criteriaColumns={currentAnalysis.criteriaColumns}
+        />
+      )}
+
+      {/* 4. Column Management */}
+      {hasAnalysisData && (
+        <ColumnManagement
+          criteriaColumns={currentAnalysis.criteriaColumns}
+          onToggleColumn={toggleColumnInSignalScore}
+          onDeleteColumn={deleteColumn}
+        />
+      )}
+
+      {/* 5. Territory Analysis */}
+      {hasAnalysisData && (
+        <CBSATable
+          cbsaData={cbsaData}
+          currentAnalysis={currentAnalysis}
+          accountGoodThreshold={accountGoodThreshold}
+          accountBadThreshold={accountBadThreshold}
+          refreshingColumnId={refreshingColumnId}
+          onStatusChange={handleStatusChange}
+          onManualScoreOverride={applyManualOverride}
+          onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
+          onClearAnalysis={handleClearAnalysis}
+          onExportCSV={handleExportCSV}
+          onExportExcel={handleExportExcel}
+        />
+      )}
     </div>
   );
 };
