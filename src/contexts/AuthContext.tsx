@@ -55,24 +55,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    console.log('[AuthContext] Initializing auth state');
     setAuthLoading(true);
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.user) {
-        await fetchProfileAndUpdateContext(currentSession.user.id);
-      }
-      setAuthLoading(false);
-    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log('[AuthContext] Auth state changed:', { 
+        event, 
+        hasSession: !!newSession, 
+        hasUser: !!newSession?.user,
+        userId: newSession?.user?.id 
+      });
+      
       setAuthLoading(true);
       setSession(newSession);
       setUser(newSession?.user ?? null);
+      
       if (newSession?.user) {
+        // Use setTimeout to defer profile fetching and avoid blocking auth state updates
         setTimeout(async () => {
+          try {
             await fetchProfileAndUpdateContext(newSession.user.id);
+          } catch (error) {
+            console.error('[AuthContext] Error fetching profile during auth state change:', error);
+          } finally {
             setAuthLoading(false);
+          }
         }, 0);
       } else {
         setProfile(null);
@@ -80,14 +88,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     });
 
+    // THEN check for existing session
+    supabase.auth.getSession().then(async ({ data: { session: currentSession }, error }) => {
+      console.log('[AuthContext] Initial session check:', { 
+        hasSession: !!currentSession, 
+        hasUser: !!currentSession?.user,
+        error: error?.message 
+      });
+      
+      if (error) {
+        console.error('[AuthContext] Error getting initial session:', error);
+      }
+      
+      // Only set state if we don't already have a session (to avoid duplicate state updates)
+      if (!session && currentSession) {
+        setSession(currentSession);
+        setUser(currentSession.user);
+        if (currentSession.user) {
+          await fetchProfileAndUpdateContext(currentSession.user.id);
+        }
+      }
+      
+      if (!currentSession) {
+        setAuthLoading(false);
+      }
+    });
+
     return () => {
+      console.log('[AuthContext] Cleaning up auth subscription');
       subscription?.unsubscribe();
     };
   }, []);
 
   const signInWithEmail = async (email: string, password: string) => {
+    console.log('[AuthContext] Sign in attempt for email:', email);
     setAuthLoading(true);
-    await signInWithEmailService(email, password);
+    try {
+      await signInWithEmailService(email, password);
+    } finally {
+      // Don't set authLoading to false here - let the auth state change handler do it
+    }
   };
 
   const resetPassword = async (email: string) => {
@@ -99,8 +139,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOut = async () => {
+    console.log('[AuthContext] Sign out attempt');
     setAuthLoading(true);
-    await signOutService();
+    try {
+      await signOutService();
+    } finally {
+      // Don't set authLoading to false here - let the auth state change handler do it
+    }
   };
   
   const updateContextUserProfile = async (updates: { full_name?: string; avatar_url?: string }) => {

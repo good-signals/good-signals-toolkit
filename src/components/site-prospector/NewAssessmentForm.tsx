@@ -46,7 +46,7 @@ interface NewAssessmentFormProps {
 }
 
 const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreated, onCancel }) => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coordinates, setCoordinates] = useState<{ lat?: number; lng?: number }>({});
@@ -78,11 +78,15 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   };
 
   const onSubmit: SubmitHandler<AddressFormData> = async (data) => {
-    console.log('[NewAssessmentForm] Form submission started:', { data, user: user?.id });
+    console.log('[NewAssessmentForm] Form submission started:', { data, user: user?.id, hasSession: !!session });
     
-    if (!user) {
-      console.error('User not authenticated');
-      toast({ title: "Error", description: "You must be logged in to create an assessment.", variant: "destructive" });
+    if (!user || !session) {
+      console.error('[NewAssessmentForm] User not authenticated or session missing', { user: !!user, session: !!session });
+      toast({ 
+        title: "Authentication Error", 
+        description: "You must be logged in to create an assessment. Please try logging out and back in.", 
+        variant: "destructive" 
+      });
       return;
     }
     
@@ -99,7 +103,8 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
         site_status: data.site_status,
         latitude: coordinates.lat, 
         longitude: coordinates.lng,
-        userId: user.id
+        userId: user.id,
+        sessionId: session.access_token ? 'has_token' : 'no_token'
       });
 
       const assessmentPayload: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'> = {
@@ -129,11 +134,21 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
     } catch (error) {
       console.error("[NewAssessmentForm] Failed to create assessment:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      toast({ 
-        title: "Error", 
-        description: `Failed to create assessment: ${errorMessage}`, 
-        variant: "destructive" 
-      });
+      
+      // Provide more specific guidance for authentication errors
+      if (errorMessage.includes('Authentication error') || errorMessage.includes('row-level security')) {
+        toast({ 
+          title: "Authentication Error", 
+          description: "Unable to save assessment. Please try logging out and back in, then try again.", 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Error", 
+          description: `Failed to create assessment: ${errorMessage}`, 
+          variant: "destructive" 
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -143,6 +158,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   const formData = watch();
   console.log('[NewAssessmentForm] Current form data:', formData);
   console.log('[NewAssessmentForm] Form errors:', errors);
+  console.log('[NewAssessmentForm] Auth state:', { user: !!user, session: !!session });
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
