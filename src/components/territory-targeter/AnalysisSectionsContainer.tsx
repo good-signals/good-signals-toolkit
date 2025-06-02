@@ -71,12 +71,13 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
       {hasAnalysisData && (
         <>
           <ColumnManagement
-            currentAnalysis={currentAnalysis}
+            criteriaColumns={criteriaColumns}
             onToggleColumn={onToggleColumn}
             onDeleteColumn={onDeleteColumn}
           />
 
           <ExportControls
+            onClearAnalysis={onClearAnalysis}
             onExportCSV={onExportCSV}
             onExportExcel={onExportExcel}
           />
@@ -84,11 +85,11 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
           <FinalExecutiveSummary
             executiveSummary={executiveSummary}
             isGeneratingSummary={isGeneratingSummary}
+            hasAnalysisData={hasAnalysisData}
             onGenerateExecutiveSummary={onGenerateExecutiveSummary}
             onUpdateExecutiveSummary={onUpdateExecutiveSummary}
+            cbsaData={cbsaData}
           />
-
-          <ClearAnalysisDialog onClearAnalysis={onClearAnalysis} />
         </>
       )}
     </div>

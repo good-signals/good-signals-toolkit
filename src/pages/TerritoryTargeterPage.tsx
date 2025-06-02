@@ -146,6 +146,11 @@ const TerritoryTargeterPage: React.FC = () => {
     }
   };
 
+  // Create a wrapper function that matches the expected signature
+  const handleGenerateExecutiveSummaryWrapper = () => {
+    handleGenerateExecutiveSummary(cbsaData);
+  };
+
   // Don't render until CBSA data is initialized
   if (!isInitialized) {
     return <div className="container mx-auto py-8 px-4 text-center">Loading...</div>;
@@ -208,7 +213,7 @@ const TerritoryTargeterPage: React.FC = () => {
         onClearAnalysis={handleClearAnalysis}
         onExportCSV={handleExportCSV}
         onExportExcel={handleExportExcel}
-        onGenerateExecutiveSummary={handleGenerateExecutiveSummary}
+        onGenerateExecutiveSummary={handleGenerateExecutiveSummaryWrapper}
         onUpdateExecutiveSummary={handleUpdateExecutiveSummary}
       />
     </div>
