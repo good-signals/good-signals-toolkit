@@ -14,9 +14,9 @@ export const saveAssessmentMetricValues = async (
     metricValuesCount: metricValues.length
   });
 
-  // Check authentication before proceeding
+  // Force session refresh and verify authentication
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  console.log('[saveAssessmentMetricValues] Session check:', { 
+  console.log('[saveAssessmentMetricValues] Initial session check:', { 
     hasSession: !!session, 
     hasUser: !!session?.user,
     userId: session?.user?.id,
@@ -27,6 +27,43 @@ export const saveAssessmentMetricValues = async (
     console.error('[saveAssessmentMetricValues] No authenticated user found');
     throw new Error('You must be logged in to save assessment data');
   }
+
+  // Refresh the session to ensure we have valid tokens
+  try {
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+    console.log('[saveAssessmentMetricValues] Session refresh result:', {
+      refreshSuccess: !!refreshedSession,
+      refreshError: refreshError?.message
+    });
+    
+    if (refreshError) {
+      console.warn('[saveAssessmentMetricValues] Session refresh failed, proceeding with existing session');
+    }
+  } catch (refreshErr) {
+    console.warn('[saveAssessmentMetricValues] Session refresh exception:', refreshErr);
+  }
+
+  // Verify user owns the assessment before attempting to save metric values
+  console.log('[saveAssessmentMetricValues] Verifying assessment ownership for user:', session.user.id);
+  const { data: assessment, error: assessmentError } = await supabase
+    .from('site_assessments')
+    .select('id, user_id')
+    .eq('id', assessmentId)
+    .eq('user_id', session.user.id)
+    .single();
+
+  if (assessmentError || !assessment) {
+    console.error('[saveAssessmentMetricValues] Assessment verification failed:', {
+      error: assessmentError,
+      hasAssessment: !!assessment
+    });
+    throw new Error('Assessment not found or access denied');
+  }
+
+  console.log('[saveAssessmentMetricValues] Assessment ownership verified:', {
+    assessmentId: assessment.id,
+    userId: assessment.user_id
+  });
 
   const valuesToSave = metricValues.map(mv => ({
     ...mv,
@@ -40,6 +77,7 @@ export const saveAssessmentMetricValues = async (
     sampleValue: valuesToSave[0]
   });
 
+  // Use explicit session for the database operation
   const { data, error } = await supabase
     .from('assessment_metric_values')
     .upsert(valuesToSave, { onConflict: 'assessment_id, metric_identifier' })

@@ -89,6 +89,17 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       });
       return;
     }
+
+    // Additional session validation
+    if (!session.access_token) {
+      console.error('[NewAssessmentForm] Session missing access token');
+      toast({ 
+        title: "Session Error", 
+        description: "Your session is invalid. Please try logging out and back in.", 
+        variant: "destructive" 
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -104,7 +115,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
         latitude: coordinates.lat, 
         longitude: coordinates.lng,
         userId: user.id,
-        sessionId: session.access_token ? 'has_token' : 'no_token'
+        hasAccessToken: !!session.access_token
       });
 
       const assessmentPayload: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'> = {
@@ -136,7 +147,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       
       // Provide more specific guidance for authentication errors
-      if (errorMessage.includes('Authentication error') || errorMessage.includes('row-level security')) {
+      if (errorMessage.includes('Authentication error') || errorMessage.includes('row-level security') || errorMessage.includes('session')) {
         toast({ 
           title: "Authentication Error", 
           description: "Unable to save assessment. Please try logging out and back in, then try again.", 

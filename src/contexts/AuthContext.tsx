@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,7 +63,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         event, 
         hasSession: !!newSession, 
         hasUser: !!newSession?.user,
-        userId: newSession?.user?.id 
+        userId: newSession?.user?.id,
+        accessToken: newSession?.access_token ? 'present' : 'missing'
       });
       
       setAuthLoading(true);
@@ -72,6 +72,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(newSession?.user ?? null);
       
       if (newSession?.user) {
+        // Ensure the session is properly set in Supabase client
+        await supabase.auth.setSession({
+          access_token: newSession.access_token,
+          refresh_token: newSession.refresh_token,
+        });
+        
         // Use setTimeout to defer profile fetching and avoid blocking auth state updates
         setTimeout(async () => {
           try {
@@ -93,7 +99,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('[AuthContext] Initial session check:', { 
         hasSession: !!currentSession, 
         hasUser: !!currentSession?.user,
-        error: error?.message 
+        error: error?.message,
+        accessToken: currentSession?.access_token ? 'present' : 'missing'
       });
       
       if (error) {
@@ -102,6 +109,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Only set state if we don't already have a session (to avoid duplicate state updates)
       if (!session && currentSession) {
+        // Ensure the session is properly set in Supabase client
+        await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token,
+        });
+        
         setSession(currentSession);
         setUser(currentSession.user);
         if (currentSession.user) {
@@ -124,7 +137,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('[AuthContext] Sign in attempt for email:', email);
     setAuthLoading(true);
     try {
-      await signInWithEmailService(email, password);
+      const { data, error } = await signInWithEmailService(email, password);
+      if (data?.session) {
+        // Ensure the session is properly set in Supabase client
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        console.log('[AuthContext] Session set successfully after sign in');
+      }
+      if (error) throw error;
     } finally {
       // Don't set authLoading to false here - let the auth state change handler do it
     }
