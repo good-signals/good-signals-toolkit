@@ -9,12 +9,12 @@ import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSetting
 import TerritoryHeader from '@/components/territory-targeter/TerritoryHeader';
 import PromptInput from '@/components/territory-targeter/PromptInput';
 import AnalysisModeSelector from '@/components/territory-targeter/AnalysisModeSelector';
+import AnalysisDepthSelector from '@/components/territory-targeter/AnalysisDepthSelector';
 import TerritoryNotices from '@/components/territory-targeter/TerritoryNotices';
-import CBSATable from '@/components/territory-targeter/CBSATable';
-import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
-import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
-import ExportControls from '@/components/territory-targeter/ExportControls';
 import ProgressCounter from '@/components/territory-targeter/ProgressCounter';
+import AnalysisSectionsContainer from '@/components/territory-targeter/AnalysisSectionsContainer';
+import FinalExecutiveSummary from '@/components/territory-targeter/FinalExecutiveSummary';
+import ErrorDisplay from '@/components/territory-targeter/ErrorDisplay';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { toast } from '@/hooks/use-toast';
 
@@ -172,40 +172,10 @@ const TerritoryTargeterPage: React.FC = () => {
         onChange={setAnalysisMode}
       />
 
-      {/* Analysis Mode Selection */}
-      <div className="mt-6 bg-card border border-border rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Analysis Depth</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setScoringMode('fast')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                scoringMode === 'fast'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              Fast Analysis
-            </button>
-            <button
-              onClick={() => setScoringMode('detailed')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                scoringMode === 'detailed'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              Detailed Analysis
-            </button>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {scoringMode === 'fast' 
-            ? 'Fast analysis provides quick results with basic scoring (~2-3 minutes)'
-            : 'Detailed analysis provides comprehensive scoring with deeper insights (~5-8 minutes)'
-          }
-        </p>
-      </div>
+      <AnalysisDepthSelector
+        scoringMode={scoringMode}
+        setScoringMode={setScoringMode}
+      />
 
       <TerritoryNotices user={user} cbsaDataLength={cbsaData.length} />
 
@@ -220,95 +190,33 @@ const TerritoryTargeterPage: React.FC = () => {
         />
       )}
 
-      {/* AI Logic Summary */}
-      {hasAnalysisData && (
-        <ExecutiveSummary
-          criteriaColumns={currentAnalysis.criteriaColumns}
-        />
-      )}
+      <ErrorDisplay error={error} />
 
-      {/* Column Management */}
-      {hasAnalysisData && (
-        <ColumnManagement
-          criteriaColumns={currentAnalysis.criteriaColumns}
-          onToggleColumn={toggleColumnInSignalScore}
-          onDeleteColumn={deleteColumn}
-        />
-      )}
+      <AnalysisSectionsContainer
+        hasAnalysisData={hasAnalysisData}
+        currentAnalysis={currentAnalysis}
+        cbsaData={cbsaData}
+        accountGoodThreshold={accountGoodThreshold}
+        accountBadThreshold={accountBadThreshold}
+        refreshingColumnId={refreshingColumnId}
+        onStatusChange={handleStatusChange}
+        onManualScoreOverride={applyManualOverride}
+        onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
+        onToggleColumn={toggleColumnInSignalScore}
+        onDeleteColumn={deleteColumn}
+        onClearAnalysis={handleClearAnalysis}
+        onExportCSV={handleExportCSV}
+        onExportExcel={handleExportExcel}
+      />
 
-      {/* Export Controls */}
-      {hasAnalysisData && (
-        <ExportControls
-          onClearAnalysis={handleClearAnalysis}
-          onExportCSV={handleExportCSV}
-          onExportExcel={handleExportExcel}
-        />
-      )}
-
-      {/* Error Display */}
-      {error && (
-        <div className="mt-6 p-4 border border-destructive/50 bg-destructive/10 text-destructive rounded-lg">
-          <h4 className="font-medium mb-2">Analysis Error</h4>
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Results Table */}
-      {hasAnalysisData && (
-        <div className="mt-6">
-          <CBSATable
-            cbsaData={cbsaData}
-            criteriaColumns={currentAnalysis.criteriaColumns}
-            marketSignalScore={currentAnalysis.marketSignalScore || 0}
-            accountGoodThreshold={accountGoodThreshold}
-            accountBadThreshold={accountBadThreshold}
-            onStatusChange={handleStatusChange}
-            onManualScoreOverride={applyManualOverride}
-            onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
-            refreshingColumnId={refreshingColumnId}
-          />
-        </div>
-      )}
-
-      {/* Executive Summary */}
-      {hasAnalysisData && (
-        <div className="mt-6">
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Executive Summary</h3>
-              {!executiveSummary && (
-                <button
-                  onClick={() => handleGenerateExecutiveSummary(cbsaData)}
-                  disabled={isGeneratingSummary}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {isGeneratingSummary ? 'Generating...' : 'Generate AI Summary'}
-                </button>
-              )}
-            </div>
-            
-            {executiveSummary ? (
-              <div className="prose max-w-none">
-                <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                  {executiveSummary}
-                </div>
-                <div className="mt-4 pt-4 border-t">
-                  <button
-                    onClick={() => handleUpdateExecutiveSummary('')}
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Clear and regenerate
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Generate an AI-powered executive summary of your territory analysis results.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      <FinalExecutiveSummary
+        executiveSummary={executiveSummary}
+        isGeneratingSummary={isGeneratingSummary}
+        hasAnalysisData={hasAnalysisData}
+        onGenerateExecutiveSummary={handleGenerateExecutiveSummary}
+        onUpdateExecutiveSummary={handleUpdateExecutiveSummary}
+        cbsaData={cbsaData}
+      />
     </div>
   );
 };
