@@ -36,43 +36,105 @@ const useGooglePlacesAutocomplete = () => {
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [loading, setLoading] = useState(false);
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Check if Google Maps is already loaded
   useEffect(() => {
-    if (window.google && window.google.maps && window.google.maps.places) {
-      console.log('[AddressAutocompleteInput] Google Maps already loaded');
-      setIsGoogleLoaded(true);
+    let isMounted = true;
+    let checkInterval: NodeJS.Timeout;
+
+    const checkGoogleMapsLoaded = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        console.log('[AddressAutocompleteInput] Google Maps already loaded');
+        if (isMounted) {
+          setIsGoogleLoaded(true);
+          setApiError(null);
+        }
+        return true;
+      }
+      return false;
+    };
+
+    // First check if it's already loaded
+    if (checkGoogleMapsLoaded()) {
       return;
     }
 
     // Create global callback function
     window.initGooglePlaces = () => {
-      console.log('[AddressAutocompleteInput] Google Maps API loaded successfully');
-      setIsGoogleLoaded(true);
+      console.log('[AddressAutocompleteInput] Google Maps API loaded via callback');
+      if (isMounted && checkGoogleMapsLoaded()) {
+        setIsGoogleLoaded(true);
+        setApiError(null);
+      }
     };
 
     // Check if script already exists
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]') as HTMLScriptElement;
     if (existingScript) {
       console.log('[AddressAutocompleteInput] Google Maps script already exists, waiting for load...');
+      
+      // If script exists but Google isn't loaded yet, wait for it
+      checkInterval = setInterval(() => {
+        if (checkGoogleMapsLoaded() && isMounted) {
+          clearInterval(checkInterval);
+        }
+      }, 200);
+
+      // Cleanup after timeout
+      setTimeout(() => {
+        if (checkInterval) clearInterval(checkInterval);
+        if (!window.google || !window.google.maps) {
+          console.error('[AddressAutocompleteInput] Google Maps failed to load within timeout');
+          if (isMounted) {
+            setApiError('Google Maps API failed to load');
+          }
+        }
+      }, 15000);
       return;
     }
 
-    // Load Google Maps script
+    // Load script if it doesn't exist
+    console.log('[AddressAutocompleteInput] Loading Google Maps script...');
     const script = document.createElement('script');
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCYg8pkH1rO2z8p6YtsocdhG0s-FKInCnU';
+    
+    if (!apiKey || apiKey === 'your-api-key-here') {
+      console.error('[AddressAutocompleteInput] Invalid or missing Google Maps API key');
+      if (isMounted) {
+        setApiError('Google Maps API key not configured');
+      }
+      return;
+    }
+
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGooglePlaces`;
     script.async = true;
     script.defer = true;
     
     script.onerror = (error) => {
-      console.error('[AddressAutocompleteInput] Failed to load Google Maps API:', error);
+      console.error('[AddressAutocompleteInput] Failed to load Google Maps API script:', error);
+      if (isMounted) {
+        setApiError('Failed to load Google Maps API');
+      }
     };
     
     document.head.appendChild(script);
 
+    // Set timeout for loading
+    setTimeout(() => {
+      if (!window.google || !window.google.maps) {
+        console.error('[AddressAutocompleteInput] Google Maps loading timeout');
+        if (isMounted) {
+          setApiError('Google Maps API loading timeout');
+        }
+      }
+    }, 15000);
+
     return () => {
-      // Cleanup
+      isMounted = false;
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
       if (window.initGooglePlaces) {
         delete window.initGooglePlaces;
       }
@@ -80,17 +142,17 @@ const useGooglePlacesAutocomplete = () => {
   }, []);
 
   const autocompleteService = useMemo(() => {
-    if (isGoogleLoaded && window.google && window.google.maps && window.google.maps.places) {
+    if (isGoogleLoaded && window.google?.maps?.places?.AutocompleteService) {
       console.log('[AddressAutocompleteInput] AutocompleteService initialized');
-      return new google.maps.places.AutocompleteService();
+      return new window.google.maps.places.AutocompleteService();
     }
     return null;
   }, [isGoogleLoaded]);
 
   const placesService = useMemo(() => {
-    if (isGoogleLoaded && window.google && window.google.maps && window.google.maps.places) {
+    if (isGoogleLoaded && window.google?.maps?.places?.PlacesService) {
       console.log('[AddressAutocompleteInput] PlacesService initialized');
-      return new google.maps.places.PlacesService(document.createElement('div'));
+      return new window.google.maps.places.PlacesService(document.createElement('div'));
     }
     return null;
   }, [isGoogleLoaded]);
@@ -101,25 +163,40 @@ const useGooglePlacesAutocomplete = () => {
       return;
     }
 
+    if (apiError) {
+      console.warn('[AddressAutocompleteInput] Skipping prediction request due to API error:', apiError);
+      return;
+    }
+
     setLoading(true);
     try {
       const request: google.maps.places.AutocompletionRequest = {
-        input,
+        input: input.trim(),
         componentRestrictions: { country: ['us', 'ca'] },
-        types: ['address', 'establishment']
+        types: ['address', 'establishment'],
+        fields: ['place_id', 'description', 'structured_formatting']
       };
+
+      console.log('[AddressAutocompleteInput] Requesting predictions for:', input);
 
       autocompleteService.getPlacePredictions(
         request,
         (results, status) => {
           setLoading(false);
+          console.log('[AddressAutocompleteInput] Prediction response:', { status, resultsCount: results?.length || 0 });
+          
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-            console.log('[AddressAutocompleteInput] Predictions received:', results.length);
             setPredictions(results);
-          } else {
+            setApiError(null);
+          } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
             setPredictions([]);
-            if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-              console.warn('[AddressAutocompleteInput] Places API error:', status);
+          } else {
+            console.warn('[AddressAutocompleteInput] Places API error:', status);
+            setPredictions([]);
+            if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
+              setApiError('Google Places API access denied. Please check your API key.');
+            } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
+              setApiError('Google Places API quota exceeded.');
             }
           }
         }
@@ -128,6 +205,7 @@ const useGooglePlacesAutocomplete = () => {
       console.error('[AddressAutocompleteInput] Error fetching predictions:', error);
       setLoading(false);
       setPredictions([]);
+      setApiError('Failed to fetch address suggestions');
     }
   };
 
@@ -195,7 +273,8 @@ const useGooglePlacesAutocomplete = () => {
     getPlacePredictions, 
     getPlaceDetails, 
     setPredictions,
-    isGoogleLoaded 
+    isGoogleLoaded,
+    apiError
   };
 };
 
@@ -210,6 +289,7 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
   
   const { 
     predictions, 
@@ -217,29 +297,40 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
     getPlacePredictions, 
     getPlaceDetails, 
     setPredictions,
-    isGoogleLoaded 
+    isGoogleLoaded,
+    apiError
   } = useGooglePlacesAutocomplete();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setAddress(value);
     
+    // Clear previous timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
     if (value.trim() === "") {
       setShowSuggestions(false);
       setPredictions([]);
-    } else if (isGoogleLoaded) {
+    } else if (isGoogleLoaded && !apiError) {
       setShowSuggestions(true);
-      getPlacePredictions(value);
+      // Debounce the API call
+      debounceTimeoutRef.current = setTimeout(() => {
+        getPlacePredictions(value);
+      }, 300);
     }
   };
 
   const handleSelectSuggestion = async (placeId: string, description: string) => {
+    console.log('[AddressAutocompleteInput] Selecting suggestion:', { placeId, description });
     setAddress(description);
     setShowSuggestions(false);
     setPredictions([]);
     
     try {
       const addressDetails = await getPlaceDetails(placeId);
+      console.log('[AddressAutocompleteInput] Address details retrieved:', addressDetails);
       onAddressSelect(addressDetails);
     } catch (error) {
       console.error('[AddressAutocompleteInput] Error selecting address:', error);
@@ -247,9 +338,9 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
   };
 
   const handleInputFocus = () => {
-    if (address && predictions.length > 0) {
+    if (address && predictions.length > 0 && !apiError) {
       setShowSuggestions(true);
-    } else if (address && isGoogleLoaded) {
+    } else if (address && isGoogleLoaded && !apiError) {
       getPlacePredictions(address);
       setShowSuggestions(true);
     }
@@ -261,6 +352,15 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       setTimeout(() => setShowSuggestions(false), 200);
     }
   };
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="relative">
@@ -275,10 +375,12 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         placeholder="Start typing an address or place name..."
         className={`${error ? 'border-destructive' : ''}`}
         autoComplete="off"
+        disabled={!!apiError}
       />
       {error && <p className="text-sm text-destructive mt-1">{error}</p>}
+      {apiError && <p className="text-sm text-destructive mt-1">{apiError}</p>}
       
-      {showSuggestions && isGoogleLoaded && (predictions.length > 0 || loading) && (
+      {showSuggestions && isGoogleLoaded && !apiError && (predictions.length > 0 || loading) && (
         <div 
           ref={dropdownRef}
           className="absolute z-50 w-full border bg-card shadow-lg rounded-md mt-1 max-h-60 overflow-y-auto"
@@ -311,7 +413,7 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         </div>
       )}
       
-      {!isGoogleLoaded && address && (
+      {!isGoogleLoaded && !apiError && address && (
         <div className="absolute z-50 w-full border bg-card shadow-lg rounded-md mt-1 p-3 text-sm text-muted-foreground">
           Loading Google Places...
         </div>
