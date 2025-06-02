@@ -169,21 +169,35 @@ export const saveStandardMetricSettings = async (metricSetId: string, formData: 
   return { success: true };
 };
 
-// Function to copy a standard metric set to an account's target metric sets
+// Enhanced function to copy a standard metric set to an account's target metric sets
 export const copyStandardMetricSetToAccount = async (
   standardSetId: string, 
   accountId: string, 
   userId: string,
   newName?: string
 ) => {
+  console.log('[copyStandardMetricSetToAccount] Starting copy process:', {
+    standardSetId,
+    accountId,
+    userId,
+    newName
+  });
+
   // Get the standard metric set
   const standardSet = await getStandardMetricSetById(standardSetId);
   if (!standardSet) {
     throw new Error('Standard metric set not found');
   }
 
+  console.log('[copyStandardMetricSetToAccount] Found standard set:', standardSet.name);
+
   // Get the standard metric settings
   const standardSettings = await getStandardMetricSettings(standardSetId);
+  console.log('[copyStandardMetricSetToAccount] Found standard settings:', standardSettings.length);
+
+  if (standardSettings.length === 0) {
+    throw new Error('No standard metric settings found for this set');
+  }
 
   // Create a new target metric set for the account
   const { data: newTargetSet, error: createError } = await supabase
@@ -200,6 +214,8 @@ export const copyStandardMetricSetToAccount = async (
     throw createError;
   }
 
+  console.log('[copyStandardMetricSetToAccount] Created new target set:', newTargetSet.id);
+
   // Copy the settings to user_custom_metrics_settings
   const userSettingsToInsert = standardSettings.map(setting => ({
     user_id: userId,
@@ -213,6 +229,8 @@ export const copyStandardMetricSetToAccount = async (
     measurement_type: setting.measurement_type,
   }));
 
+  console.log('[copyStandardMetricSetToAccount] Inserting user settings:', userSettingsToInsert.length);
+
   if (userSettingsToInsert.length > 0) {
     const { error: insertError } = await supabase
       .from('user_custom_metrics_settings')
@@ -220,10 +238,33 @@ export const copyStandardMetricSetToAccount = async (
 
     if (insertError) {
       console.error('Error copying standard settings to user settings:', insertError);
+      // If user settings insert fails, clean up the target set
+      await supabase
+        .from('target_metric_sets')
+        .delete()
+        .eq('id', newTargetSet.id);
       throw insertError;
     }
   }
 
-  console.log(`Successfully copied ${userSettingsToInsert.length} metrics from standard set "${standardSet.name}" to user account`);
-  return newTargetSet;
+  console.log(`[copyStandardMetricSetToAccount] Successfully copied ${userSettingsToInsert.length} metrics from standard set "${standardSet.name}" to user account`);
+  
+  // Return the new target set with the settings for verification
+  const { data: finalTargetSet, error: fetchError } = await supabase
+    .from('target_metric_sets')
+    .select(`
+      *,
+      user_custom_metrics_settings (*)
+    `)
+    .eq('id', newTargetSet.id)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching final target set with settings:', fetchError);
+    return newTargetSet; // Return the basic set if we can't fetch with settings
+  }
+
+  console.log('[copyStandardMetricSetToAccount] Final verification - settings count:', finalTargetSet.user_custom_metrics_settings?.length || 0);
+  
+  return finalTargetSet;
 };

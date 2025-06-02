@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
 import { AssessmentStep } from './useSiteProspectorSession';
+import { repairTargetMetricSet, checkIfMetricSetNeedsRepair } from '@/services/targetMetrics/metricSetRepairService';
+import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 
 interface StepHandlersProps {
   setCurrentStep: (step: AssessmentStep) => void;
@@ -58,8 +60,47 @@ export const useSiteProspectorStepHandlers = ({
     }
   };
 
-  const handleMetricSetSelected = (assessmentId: string, metricSetId: string) => {
-    console.log('Metric set selected:', { assessmentId, metricSetId });
+  const handleMetricSetSelected = async (assessmentId: string, metricSetId: string) => {
+    console.log('[useSiteProspectorStepHandlers] Metric set selected:', { assessmentId, metricSetId });
+    
+    // Check if the metric set needs repair before proceeding
+    if (user?.id) {
+      try {
+        const needsRepair = await checkIfMetricSetNeedsRepair(metricSetId, user.id);
+        console.log('[useSiteProspectorStepHandlers] Metric set needs repair:', needsRepair);
+        
+        if (needsRepair) {
+          console.log('[useSiteProspectorStepHandlers] Attempting to repair metric set');
+          toast({
+            title: "Repairing Metric Set",
+            description: "This metric set needs to be repaired. Importing standard metrics...",
+          });
+          
+          const accountId = await getAccountForUser(user.id);
+          if (accountId) {
+            await repairTargetMetricSet(metricSetId, user.id, accountId);
+            
+            // Invalidate queries to refresh the data
+            queryClient.invalidateQueries({ queryKey: ['targetMetricSet', metricSetId] });
+            queryClient.invalidateQueries({ queryKey: ['targetMetricSetForDetailsView', metricSetId] });
+            
+            toast({
+              title: "Metric Set Repaired",
+              description: "Successfully imported standard metrics. You can now proceed with the assessment.",
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[useSiteProspectorStepHandlers] Error during metric set repair:', error);
+        toast({
+          title: "Repair Failed",
+          description: "Could not repair the metric set. You may need to select a different metric set or contact your administrator.",
+          variant: "destructive"
+        });
+        // Don't block the flow, let them proceed anyway
+      }
+    }
+    
     setActiveAssessmentId(assessmentId); 
     setSelectedMetricSetId(metricSetId);
     setCurrentStep('inputMetrics');
@@ -101,8 +142,9 @@ export const useSiteProspectorStepHandlers = ({
     setCurrentStep('selectMetrics');
   };
   
-  const handleViewAssessment = (assessment: SiteAssessment) => {
-    console.log('Viewing assessment:', assessment.id);
+  const handleViewAssessment = async (assessment: SiteAssessment) => {
+    console.log('[useSiteProspectorStepHandlers] Viewing assessment:', assessment.id);
+    
     if (!assessment.target_metric_set_id) {
       toast({
         title: "Cannot View Details",
@@ -111,15 +153,94 @@ export const useSiteProspectorStepHandlers = ({
       });
       return;
     }
+
+    // Check if the metric set needs repair before viewing
+    if (user?.id) {
+      try {
+        const needsRepair = await checkIfMetricSetNeedsRepair(assessment.target_metric_set_id, user.id);
+        console.log('[useSiteProspectorStepHandlers] Assessment metric set needs repair:', needsRepair);
+        
+        if (needsRepair) {
+          console.log('[useSiteProspectorStepHandlers] Attempting to repair metric set before viewing');
+          toast({
+            title: "Repairing Assessment Data",
+            description: "This assessment's metric set needs repair. Importing standard metrics...",
+          });
+          
+          const accountId = await getAccountForUser(user.id);
+          if (accountId) {
+            await repairTargetMetricSet(assessment.target_metric_set_id, user.id, accountId);
+            
+            // Invalidate queries to refresh the data
+            queryClient.invalidateQueries({ queryKey: ['targetMetricSet', assessment.target_metric_set_id] });
+            queryClient.invalidateQueries({ queryKey: ['targetMetricSetForDetailsView', assessment.target_metric_set_id] });
+            
+            toast({
+              title: "Assessment Data Repaired",
+              description: "Successfully repaired the assessment data. Loading details...",
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[useSiteProspectorStepHandlers] Error during assessment repair:', error);
+        toast({
+          title: "Repair Warning",
+          description: "Could not repair the assessment data. Some sections may not display properly.",
+          variant: "default"
+        });
+        // Continue anyway - they can still view what's available
+      }
+    }
+    
     setActiveAssessmentId(assessment.id);
     setSelectedMetricSetId(assessment.target_metric_set_id);
     setCurrentStep('assessmentDetails');
   };
 
-  const handleEditAssessment = (assessment: SiteAssessment) => {
-    console.log('Editing assessment:', assessment.id);
+  const handleEditAssessment = async (assessment: SiteAssessment) => {
+    console.log('[useSiteProspectorStepHandlers] Editing assessment:', assessment.id);
+    
     setActiveAssessmentId(assessment.id);
+    
     if (assessment.target_metric_set_id) {
+      // Check if the metric set needs repair before editing
+      if (user?.id) {
+        try {
+          const needsRepair = await checkIfMetricSetNeedsRepair(assessment.target_metric_set_id, user.id);
+          console.log('[useSiteProspectorStepHandlers] Edit: metric set needs repair:', needsRepair);
+          
+          if (needsRepair) {
+            console.log('[useSiteProspectorStepHandlers] Attempting to repair metric set before editing');
+            toast({
+              title: "Repairing Assessment Data",
+              description: "This assessment's metric set needs repair. Importing standard metrics...",
+            });
+            
+            const accountId = await getAccountForUser(user.id);
+            if (accountId) {
+              await repairTargetMetricSet(assessment.target_metric_set_id, user.id, accountId);
+              
+              // Invalidate queries to refresh the data
+              queryClient.invalidateQueries({ queryKey: ['targetMetricSet', assessment.target_metric_set_id] });
+              queryClient.invalidateQueries({ queryKey: ['targetMetricSetForDetailsView', assessment.target_metric_set_id] });
+              
+              toast({
+                title: "Assessment Data Repaired",
+                description: "Successfully repaired the assessment data. Loading editor...",
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[useSiteProspectorStepHandlers] Error during edit repair:', error);
+          toast({
+            title: "Repair Warning",
+            description: "Could not repair the assessment data. Some metric sections may not be available.",
+            variant: "default"
+          });
+          // Continue anyway - they can still edit what's available
+        }
+      }
+      
       setSelectedMetricSetId(assessment.target_metric_set_id);
       setCurrentStep('inputMetrics'); 
     } else {

@@ -46,7 +46,7 @@ export const getTargetMetricSets = async (accountId: string) => {
 };
 
 export const getTargetMetricSetById = async (id: string, userId?: string) => {
-  console.log('[getTargetMetricSetById] Fetching metric set:', id);
+  console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);
   
   const { data, error } = await supabase
     .from('target_metric_sets')
@@ -66,18 +66,33 @@ export const getTargetMetricSetById = async (id: string, userId?: string) => {
     metricSetId: data?.id,
     metricSetName: data?.name,
     settingsCount: data?.user_custom_metrics_settings?.length || 0,
+    hasSettings: !!data?.user_custom_metrics_settings,
     settings: data?.user_custom_metrics_settings
   });
+
+  // If no settings found and we have a user ID, this might be a data integrity issue
+  if ((!data?.user_custom_metrics_settings || data.user_custom_metrics_settings.length === 0) && userId) {
+    console.warn('[getTargetMetricSetById] No user_custom_metrics_settings found for metric set. This may indicate a data integrity issue.');
+    console.warn('[getTargetMetricSetById] Metric set was likely created without proper standard metrics import.');
+    
+    // Return the metric set anyway, but log the issue for debugging
+    return {
+      ...data,
+      user_custom_metrics_settings: []
+    };
+  }
   
   return data;
 };
 
 export const createTargetMetricSet = async (name: string, account: any) => {
+  console.log('[createTargetMetricSet] Creating target metric set:', name, 'for account:', account?.id);
+  
   const { data, error } = await supabase
     .from('target_metric_sets')
     .insert({
       name,
-      account_id: account.id, // Use account.id instead of passing account object
+      account_id: account.id,
     })
     .select()
     .single();
@@ -87,6 +102,7 @@ export const createTargetMetricSet = async (name: string, account: any) => {
     throw error;
   }
 
+  console.log('[createTargetMetricSet] Created target metric set:', data.id);
   return data;
 };
 
@@ -156,6 +172,8 @@ export const deleteTargetMetricSet = async (setId: string, accountId: string) =>
 };
 
 export const getUserCustomMetricSettings = async (metricSetId: string) => {
+  console.log('[getUserCustomMetricSettings] Fetching settings for metric set:', metricSetId);
+  
   const { data, error } = await supabase
     .from('user_custom_metrics_settings')
     .select('*')
@@ -166,6 +184,7 @@ export const getUserCustomMetricSettings = async (metricSetId: string) => {
     return [];
   }
   
+  console.log('[getUserCustomMetricSettings] Found settings:', data?.length || 0);
   return data || [];
 };
 
@@ -247,7 +266,7 @@ export const saveUserCustomMetricSettings = async (userId: string, metricSetId: 
 };
 
 export const saveUserStandardMetricsPreference = async (userId: string, accountId: string) => {
-  console.log('Saving standard metrics preference for user:', userId, 'account:', accountId);
+  console.log('[saveUserStandardMetricsPreference] Saving standard metrics preference for user:', userId, 'account:', accountId);
   
   try {
     // Get the most recent standard metric set (as default)
@@ -267,12 +286,12 @@ export const saveUserStandardMetricsPreference = async (userId: string, accountI
     }
 
     const defaultStandardSet = standardSets[0];
-    console.log('Using default standard metric set:', defaultStandardSet.name);
+    console.log('[saveUserStandardMetricsPreference] Using default standard metric set:', defaultStandardSet.name);
 
     // Check if user already has metrics
     const hasExistingMetrics = await hasUserSetAnyMetrics(userId, accountId);
     if (hasExistingMetrics) {
-      console.log('User already has metrics, proceeding anyway to add standard metrics');
+      console.log('[saveUserStandardMetricsPreference] User already has metrics, proceeding anyway to add standard metrics');
     }
 
     // Copy the standard metric set to the user's account
@@ -283,11 +302,18 @@ export const saveUserStandardMetricsPreference = async (userId: string, accountI
       `${defaultStandardSet.name} (Standard)`
     );
 
-    console.log('Successfully copied standard metrics to user account:', copiedSet.name);
-    return { success: true, metricSetName: copiedSet.name };
+    console.log('[saveUserStandardMetricsPreference] Successfully copied standard metrics to user account:', copiedSet.name);
+    console.log('[saveUserStandardMetricsPreference] Copied set has settings:', copiedSet.user_custom_metrics_settings?.length || 0);
+    
+    return { 
+      success: true, 
+      metricSetName: copiedSet.name,
+      metricSetId: copiedSet.id,
+      settingsCount: copiedSet.user_custom_metrics_settings?.length || 0
+    };
 
   } catch (error) {
-    console.error('Error saving standard metrics preference:', error);
+    console.error('[saveUserStandardMetricsPreference] Error saving standard metrics preference:', error);
     throw error;
   }
 };

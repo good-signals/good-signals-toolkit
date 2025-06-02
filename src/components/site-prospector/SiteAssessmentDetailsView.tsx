@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle } from 'lucide-react';
+import { Loader2, MapPin, Edit3, ArrowLeft, Eye, Map as MapIcon, FileText, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -68,7 +68,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isCalculatingScores, setIsCalculatingScores] = useState(false);
 
-  console.log('SiteAssessmentDetailsView props:', { assessmentId, selectedMetricSetId });
+  console.log('[SiteAssessmentDetailsView] Component rendered with props:', { assessmentId, selectedMetricSetId });
 
   // Default signal thresholds since they were removed from the database
   const defaultGoodThreshold = 0.75;
@@ -78,23 +78,24 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const { data: assessment, isLoading: isLoadingAssessment, error: assessmentError, refetch: refetchAssessment } = useQuery<SiteAssessment, Error>({
     queryKey: ['assessmentDetails', assessmentId],
     queryFn: async () => {
-      console.log('Fetching assessment details for ID:', assessmentId);
+      console.log('[SiteAssessmentDetailsView] Fetching assessment details for ID:', assessmentId);
       if (!assessmentId) {
         throw new Error('Assessment ID is required');
       }
       
       try {
         const result = await getAssessmentDetails(assessmentId);
-        console.log('Assessment details fetched successfully:', {
+        console.log('[SiteAssessmentDetailsView] Assessment details fetched successfully:', {
           id: result.id,
           name: result.assessment_name,
           score: result.site_signal_score,
           completion: result.completion_percentage,
-          metricValuesCount: result.assessment_metric_values?.length || 0
+          metricValuesCount: result.assessment_metric_values?.length || 0,
+          targetMetricSetId: result.target_metric_set_id
         });
         return result;
       } catch (error) {
-        console.error('Error fetching assessment details:', error);
+        console.error('[SiteAssessmentDetailsView] Error fetching assessment details:', error);
         // Clear potentially stale cache entries on error
         queryClient.removeQueries({ queryKey: ['assessmentDetails', assessmentId] });
         queryClient.removeQueries({ queryKey: ['siteAssessments'] });
@@ -103,7 +104,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     },
     enabled: !!assessmentId,
     retry: (failureCount, error) => {
-      console.log('Query retry attempt:', failureCount, error?.message);
+      console.log('[SiteAssessmentDetailsView] Query retry attempt:', failureCount, error?.message);
       // Retry up to 2 times for network errors, but not for 404s or auth errors
       if (failureCount < 2 && error?.message?.includes('Failed to fetch')) {
         return true;
@@ -119,16 +120,16 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const { data: documents, isLoading: isLoadingDocuments, error: documentsError, refetch: refetchDocuments } = useQuery<AssessmentDocument[]>({
     queryKey: ['assessmentDocuments', assessmentId],
     queryFn: async () => {
-      console.log('Fetching documents for assessment:', assessmentId);
+      console.log('[SiteAssessmentDetailsView] Fetching documents for assessment:', assessmentId);
       if (!assessmentId) {
         return [];
       }
       try {
         const result = await getAssessmentDocuments(assessmentId);
-        console.log('Documents fetched:', result);
+        console.log('[SiteAssessmentDetailsView] Documents fetched:', result);
         return result;
       } catch (error) {
-        console.error('Documents fetch error:', error);
+        console.error('[SiteAssessmentDetailsView] Documents fetch error:', error);
         return [];
       }
     },
@@ -137,15 +138,28 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     staleTime: 2 * 60 * 1000,
   });
 
-  // Fetch TargetMetricSet with improved error handling
+  // Fetch TargetMetricSet with improved error handling and debugging
   const { data: targetMetricSet, isLoading: isLoadingTargetMetricSet, error: targetMetricSetError } = useQuery<TargetMetricSet | null, Error>({
     queryKey: ['targetMetricSetForDetailsView', selectedMetricSetId, user?.id],
     queryFn: async () => {
-      if (!user?.id || !selectedMetricSetId) return null;
+      if (!user?.id || !selectedMetricSetId) {
+        console.log('[SiteAssessmentDetailsView] Missing user ID or metric set ID for fetching target metric set');
+        return null;
+      }
       try {
-        return await getTargetMetricSetById(selectedMetricSetId, user.id);
+        console.log('[SiteAssessmentDetailsView] Fetching target metric set:', selectedMetricSetId, 'for user:', user.id);
+        const result = await getTargetMetricSetById(selectedMetricSetId, user.id);
+        
+        console.log('[SiteAssessmentDetailsView] Target metric set fetch result:', {
+          found: !!result,
+          name: result?.name,
+          settingsCount: result?.user_custom_metrics_settings?.length || 0,
+          hasSettings: !!result?.user_custom_metrics_settings,
+        });
+        
+        return result;
       } catch (error) {
-        console.error('Target metric set fetch error:', error);
+        console.error('[SiteAssessmentDetailsView] Target metric set fetch error:', error);
         throw error;
       }
     },
@@ -182,15 +196,38 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     return !!assessment && !!targetMetricSet && !isLoadingAccounts;
   }, [assessment, targetMetricSet, isLoadingAccounts]);
 
+  // Data integrity diagnostics
+  const dataIntegrityIssues = useMemo(() => {
+    const issues = [];
+    
+    if (targetMetricSet && (!targetMetricSet.user_custom_metrics_settings || targetMetricSet.user_custom_metrics_settings.length === 0)) {
+      issues.push({
+        type: 'no_metric_settings',
+        message: 'This metric set has no associated metric definitions. This usually indicates the standard metrics were not properly imported when the set was created.',
+        severity: 'high' as const
+      });
+    }
+    
+    if (assessment && !assessment.target_metric_set_id) {
+      issues.push({
+        type: 'no_metric_set',
+        message: 'This assessment has no associated target metric set.',
+        severity: 'medium' as const
+      });
+    }
+    
+    return issues;
+  }, [targetMetricSet, assessment]);
+
   // Fixed mutation with proper return type handling
-  const updateScoresMutation = useMutation({
+  const metricsMutation = useMutation({
     mutationFn: async (params: { assessmentId: string; overallSiteSignalScore: number | null; completionPercentage: number | null }) => {
-      console.log('Updating scores via mutation:', params);
+      console.log('[SiteAssessmentDetailsView] Updating scores via mutation:', params);
       const updatedAssessment = await updateAssessmentScores(params.assessmentId, params.overallSiteSignalScore, params.completionPercentage);
       return updatedAssessment;
     },
     onSuccess: (updatedAssessment) => {
-      console.log('Scores updated successfully:', {
+      console.log('[SiteAssessmentDetailsView] Scores updated successfully:', {
         id: updatedAssessment.id,
         newScore: updatedAssessment.site_signal_score,
         newCompletion: updatedAssessment.completion_percentage
@@ -202,7 +239,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
     },
     onError: (error: Error) => {
-      console.error("Score update failed:", error);
+      console.error("[SiteAssessmentDetailsView] Score update failed:", error);
       toast({
         title: "Score Update Failed",
         description: `Could not save updated scores: ${error.message}`,
@@ -264,13 +301,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   const { overallSiteSignalScore, completionPercentage, detailedMetricScores } = useMemo(() => {
     // Don't calculate if data isn't ready yet
     if (!isDataReadyForCalculation) {
-      console.log('Data not ready for score calculation, returning nulls');
+      console.log('[SiteAssessmentDetailsView] Data not ready for score calculation, returning nulls');
       setIsCalculatingScores(true);
       return { overallSiteSignalScore: null, completionPercentage: 0, detailedMetricScores: new Map() };
     }
 
     setIsCalculatingScores(false);
-    console.log('Calculating scores with:', {
+    console.log('[SiteAssessmentDetailsView] Calculating scores with:', {
       settingsCount: targetMetricSet.user_custom_metrics_settings?.length || 0,
       metricValuesCount: metricValues.length
     });
@@ -305,7 +342,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     
     const overallScore = calculateOverallSiteSignalScore(Array.from(details.values()).map(d => d.score));
 
-    console.log('Calculated scores:', {
+    console.log('[SiteAssessmentDetailsView] Calculated scores:', {
       overallScore,
       completion,
       numMetricsWithValues,
@@ -317,11 +354,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   // Enhanced useEffect with debouncing and better score comparison
   useEffect(() => {
-    if (assessment && targetMetricSet && user && !updateScoresMutation.isPending && !isCalculatingScores) {
+    if (assessment && targetMetricSet && user && !metricsMutation.isPending && !isCalculatingScores) {
       const storedScore = assessment.site_signal_score;
       const storedCompletion = assessment.completion_percentage;
 
-      console.log('Score comparison check:', {
+      console.log('[SiteAssessmentDetailsView] Score comparison check:', {
         assessmentId: assessment.id,
         calculatedScore: overallSiteSignalScore,
         storedScore,
@@ -336,7 +373,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
       const completionDiffers = completionPercentage !== storedCompletion;
 
       if (scoresDiffer || completionDiffers) {
-        console.log("Scores differ from database, updating:", {
+        console.log("[SiteAssessmentDetailsView] Scores differ from database, updating:", {
           assessmentId,
           scoresDiffer,
           completionDiffers,
@@ -346,7 +383,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         
         // Debounce the update to prevent rapid fire updates
         const timeoutId = setTimeout(() => {
-          updateScoresMutation.mutate({ 
+          metricsMutation.mutate({ 
             assessmentId, 
             overallSiteSignalScore, 
             completionPercentage 
@@ -356,7 +393,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         return () => clearTimeout(timeoutId);
       }
     }
-  }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, updateScoresMutation, user, isCalculatingScores]);
+  }, [assessment, targetMetricSet, overallSiteSignalScore, completionPercentage, assessmentId, metricsMutation, user, isCalculatingScores]);
 
   const overallSignalStatus = getSignalStatus(
     overallSiteSignalScore,
@@ -384,7 +421,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     };
   }, [assessment, targetMetricSet, user, accountSettings, detailedMetricScores, overallSiteSignalScore, completionPercentage]);
 
-  console.log('Component state:', { 
+  console.log('[SiteAssessmentDetailsView] Component state:', { 
     isLoadingAssessment, 
     isLoadingAccounts, 
     isLoadingTargetMetricSet,
@@ -395,7 +432,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     documentsError: documentsError?.message,
     assessment: !!assessment,
     targetMetricSet: !!targetMetricSet,
-    documentsCount: documents?.length || 0
+    documentsCount: documents?.length || 0,
+    dataIntegrityIssuesCount: dataIntegrityIssues.length
   });
 
   if (isLoadingAssessment || isLoadingTargetMetricSet) {
@@ -403,7 +441,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
   }
 
   if (assessmentError) {
-    console.error('Assessment error details:', assessmentError);
+    console.error('[SiteAssessmentDetailsView] Assessment error details:', assessmentError);
     return (
       <div className="flex flex-col items-center justify-center h-screen space-y-4">
         <Alert variant="destructive" className="max-w-2xl mx-auto">
@@ -420,7 +458,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </Alert>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => {
-            console.log('Manual refetch triggered');
+            console.log('[SiteAssessmentDetailsView] Manual refetch triggered');
             refetchAssessment();
           }}>
             Try Again
@@ -513,6 +551,27 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
+      {/* Data Integrity Issues Alert */}
+      {dataIntegrityIssues.length > 0 && (
+        <Alert variant={dataIntegrityIssues.some(i => i.severity === 'high') ? "destructive" : "default"} className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Data Integrity Issues Detected</AlertTitle>
+          <AlertDescription>
+            <div className="space-y-2">
+              {dataIntegrityIssues.map((issue, index) => (
+                <div key={index} className="text-sm">
+                  • {issue.message}
+                </div>
+              ))}
+              <div className="text-sm mt-3 p-2 bg-muted rounded">
+                <strong>Recommended Action:</strong> Go back to the Site Prospector list and try to re-import standard metrics for this assessment, 
+                or contact your administrator to ensure the target metric set has properly configured metrics.
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex-1">
@@ -577,7 +636,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
           executiveSummary={assessment.executive_summary}
           lastSummaryGeneratedAt={assessment.last_summary_generated_at}
           onRegenerateClick={() => generateSummaryMutation.mutate()}
-          isRegenerating={isGeneratingSummary || updateScoresMutation.isPending}
+          isRegenerating={isGeneratingSummary || metricsMutation.isPending}
         />
       ) : (
         <>
@@ -594,7 +653,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
             <CardContent>
               <Button 
                 onClick={() => generateSummaryMutation.mutate()} 
-                disabled={isGeneratingSummary || updateScoresMutation.isPending}
+                disabled={isGeneratingSummary || metricsMutation.isPending}
               >
                 {isGeneratingSummary ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -637,21 +696,32 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         </Card>
       )}
 
-      {/* Render categories in the correct order */}
-      {allCategories.map(category => {
-        const metricsForCategory = getCategoryMetrics(category);
-        const categoryImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url;
-        
-        return (
-          <MetricCategorySection
-            key={category}
-            category={category}
-            metricsForCategory={metricsForCategory}
-            categoryImage={categoryImage}
-            accountSettings={accountSettings}
-          />
-        );
-      })}
+      {/* Render categories in the correct order - only if we have settings */}
+      {allCategories.length > 0 ? (
+        allCategories.map(category => {
+          const metricsForCategory = getCategoryMetrics(category);
+          const categoryImage = assessment.assessment_metric_values?.find(mv => mv.metric_identifier === getCategorySpecificImageIdentifier(category))?.image_url;
+          
+          return (
+            <MetricCategorySection
+              key={category}
+              category={category}
+              metricsForCategory={metricsForCategory}
+              categoryImage={categoryImage}
+              accountSettings={accountSettings}
+            />
+          );
+        })
+      ) : (
+        <Alert variant="default" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Metric Categories Available</AlertTitle>
+          <AlertDescription>
+            This assessment's target metric set has no configured metrics. 
+            Please edit the assessment to select a properly configured metric set or import standard metrics.
+          </AlertDescription>
+        </Alert>
+      )}
       
       <SiteVisitRatingsSection
         siteVisitRatings={siteVisitRatings}
