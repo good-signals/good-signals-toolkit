@@ -1,5 +1,8 @@
 
 import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 
 interface FinalExecutiveSummaryProps {
   executiveSummary: string | null;
@@ -21,18 +24,23 @@ const FinalExecutiveSummary: React.FC<FinalExecutiveSummaryProps> = ({
   if (!hasAnalysisData) return null;
 
   return (
-    <div className="mt-6">
-      <div className="bg-card border border-border rounded-lg p-6">
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Executive Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Executive Summary</h3>
           {!executiveSummary && (
-            <button
+            <Button
               onClick={() => onGenerateExecutiveSummary(cbsaData)}
               disabled={isGeneratingSummary}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+              className="ml-auto"
             >
               {isGeneratingSummary ? 'Generating...' : 'Generate AI Summary'}
-            </button>
+            </Button>
           )}
         </div>
         
@@ -55,8 +63,8 @@ const FinalExecutiveSummary: React.FC<FinalExecutiveSummaryProps> = ({
             Generate an AI-powered executive summary of your territory analysis results.
           </p>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 

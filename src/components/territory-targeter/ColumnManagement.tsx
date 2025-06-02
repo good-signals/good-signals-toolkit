@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Trash2, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CriteriaColumn } from '@/types/territoryTargeterTypes';
 import { Badge } from '@/components/ui/badge';
@@ -50,24 +50,22 @@ const ColumnManagement: React.FC<ColumnManagementProps> = ({
         <CardHeader>
           <CollapsibleTrigger asChild>
             <div className="flex items-center justify-between cursor-pointer">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Column Management
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Control which criteria columns are included in the Market Signal Score calculation</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardTitle>
-                <div className="text-sm text-muted-foreground">
-                  {includedCount} of {criteriaColumns.length} columns included in Market Signal Score
-                </div>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Column Management
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span className="text-sm text-muted-foreground font-normal">
+                        ({includedCount} of {criteriaColumns.length} columns included)
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Control which criteria columns are included in the Market Signal Score calculation</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardTitle>
               {isOpen ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
