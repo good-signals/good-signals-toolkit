@@ -12,12 +12,11 @@ export const useAuthState = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeOperations, setActiveOperations] = useState<Set<string>>(new Set());
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   const addActiveOperation = (operationId: string) => {
     console.log('[AuthContext] Adding active operation:', operationId);
     setActiveOperations(prev => new Set(prev).add(operationId));
-    // Set loading to true when operations start
-    setAuthLoading(true);
   };
 
   const removeActiveOperation = (operationId: string) => {
@@ -51,8 +50,6 @@ export const useAuthState = () => {
   useEffect(() => {
     console.log('[AuthContext] Initializing auth state');
     
-    let initialAuthResolved = false;
-
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('[AuthContext] Auth state changed:', { 
@@ -67,10 +64,9 @@ export const useAuthState = () => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       
-      // Mark initial auth as resolved after first auth state change
-      if (!initialAuthResolved) {
-        console.log('[AuthContext] Initial auth state resolved');
-        initialAuthResolved = true;
+      if (!authInitialized) {
+        console.log('[AuthContext] Auth initialized');
+        setAuthInitialized(true);
       }
       
       if (newSession?.user) {
@@ -104,7 +100,7 @@ export const useAuthState = () => {
         
         if (error) {
           console.error('[AuthContext] Error getting initial session:', error);
-          initialAuthResolved = true;
+          setAuthInitialized(true);
           return;
         }
         
@@ -128,19 +124,21 @@ export const useAuthState = () => {
           }
         }
         
-        // Mark initial auth as resolved
-        initialAuthResolved = true;
+        // Mark auth as initialized if not already
+        if (!authInitialized) {
+          setAuthInitialized(true);
+        }
       } catch (error) {
         console.error('[AuthContext] Exception during auth initialization:', error);
-        initialAuthResolved = true;
+        setAuthInitialized(true);
       }
     };
 
     // Add timeout protection - force resolve loading after 5 seconds
     const timeoutId = setTimeout(() => {
-      if (!initialAuthResolved) {
+      if (!authInitialized) {
         console.warn('[AuthContext] Auth loading timeout - forcing initial resolution');
-        initialAuthResolved = true;
+        setAuthInitialized(true);
       }
     }, 5000);
 
@@ -153,28 +151,31 @@ export const useAuthState = () => {
     };
   }, []); // No dependencies to avoid race conditions
 
-  // Effect to handle loading state based on auth resolution and active operations
+  // Effect to handle loading state based on auth initialization and active operations
   useEffect(() => {
     const hasActiveOps = activeOperations.size > 0;
-    const authStateResolved = session !== undefined; // session is either null or has a value
     
     console.log('[AuthContext] Loading state check:', { 
       hasActiveOps, 
-      authStateResolved,
+      authInitialized,
       currentAuthLoading: authLoading,
       activeOperationsCount: activeOperations.size,
       operations: Array.from(activeOperations)
     });
     
-    // Only resolve loading if auth state is resolved AND no active operations
-    if (authStateResolved && !hasActiveOps && authLoading) {
-      console.log('[AuthContext] Resolving auth loading - no active operations and auth state resolved');
-      setAuthLoading(false);
-    } else if (hasActiveOps && !authLoading) {
-      console.log('[AuthContext] Setting auth loading - active operations detected');
-      setAuthLoading(true);
+    // Resolve loading if auth is initialized AND no active operations
+    if (authInitialized && !hasActiveOps) {
+      if (authLoading) {
+        console.log('[AuthContext] Resolving auth loading - auth initialized and no active operations');
+        setAuthLoading(false);
+      }
+    } else if (hasActiveOps) {
+      if (!authLoading) {
+        console.log('[AuthContext] Setting auth loading - active operations detected');
+        setAuthLoading(true);
+      }
     }
-  }, [activeOperations.size, authLoading, session]);
+  }, [activeOperations.size, authInitialized, authLoading]);
 
   return {
     session,
