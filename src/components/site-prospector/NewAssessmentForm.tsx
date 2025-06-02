@@ -25,13 +25,13 @@ const siteStatusOptions = [
   'Closed'
 ] as const;
 
-// Updated schema to include site_status
+// Updated schema to make postal_code optional when empty
 const addressSchema = z.object({
   assessment_name: z.string().min(1, "Assessment name is required"),
   address_line1: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
   state_province: z.string().min(1, "State/Province is required"),
-  postal_code: z.string().min(1, "Postal Code is required"),
+  postal_code: z.string().optional(), // Made optional
   country: z.string().min(1, "Country is required"),
   site_status: z.enum(siteStatusOptions).default('Prospect'),
   latitude: z.number().optional(),
@@ -59,11 +59,11 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   });
 
   const handleAddressSelected = (addressDetails: AddressComponents) => {
-    console.log('Address selected:', addressDetails);
+    console.log('[NewAssessmentForm] Address selected:', addressDetails);
     setValue("address_line1", addressDetails.addressLine1, { shouldValidate: true });
     setValue("city", addressDetails.city, { shouldValidate: true });
     setValue("state_province", addressDetails.stateProvince, { shouldValidate: true });
-    setValue("postal_code", addressDetails.postalCode, { shouldValidate: true });
+    setValue("postal_code", addressDetails.postalCode || "", { shouldValidate: true }); // Default to empty string if undefined
     setValue("country", addressDetails.country, { shouldValidate: true });
     if (addressDetails.latitude && addressDetails.longitude) {
       setValue("latitude", addressDetails.latitude);
@@ -78,7 +78,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
   };
 
   const onSubmit: SubmitHandler<AddressFormData> = async (data) => {
-    console.log('Form submission started:', { data, user: user?.id });
+    console.log('[NewAssessmentForm] Form submission started:', { data, user: user?.id });
     
     if (!user) {
       console.error('User not authenticated');
@@ -89,12 +89,12 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
     setIsSubmitting(true);
     
     try {
-      console.log('Creating assessment with payload:', {
+      console.log('[NewAssessmentForm] Creating assessment with payload:', {
         assessment_name: data.assessment_name,
         address_line1: data.address_line1,
         city: data.city,
         state_province: data.state_province,
-        postal_code: data.postal_code,
+        postal_code: data.postal_code || "", // Ensure it's a string even if empty
         country: data.country,
         site_status: data.site_status,
         latitude: coordinates.lat, 
@@ -107,7 +107,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
         address_line1: data.address_line1,
         city: data.city,
         state_province: data.state_province,
-        postal_code: data.postal_code,
+        postal_code: data.postal_code || "", // Ensure it's a string even if empty
         country: data.country,
         site_status: data.site_status,
         latitude: coordinates.lat, 
@@ -115,7 +115,7 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       };
       
       const newAssessment = await createSiteAssessment(assessmentPayload, user.id);
-      console.log('Assessment created successfully:', newAssessment);
+      console.log('[NewAssessmentForm] Assessment created successfully:', newAssessment);
       
       if (!newAssessment?.id) {
         throw new Error('Assessment was created but no ID was returned');
@@ -123,11 +123,11 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
 
       toast({ title: "Success", description: "New site assessment initiated." });
       
-      console.log('Calling onAssessmentCreated with ID:', newAssessment.id);
+      console.log('[NewAssessmentForm] Calling onAssessmentCreated with ID:', newAssessment.id);
       onAssessmentCreated(newAssessment.id);
       
     } catch (error) {
-      console.error("Failed to create assessment:", error);
+      console.error("[NewAssessmentForm] Failed to create assessment:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({ 
         title: "Error", 
@@ -138,6 +138,11 @@ const NewAssessmentForm: React.FC<NewAssessmentFormProps> = ({ onAssessmentCreat
       setIsSubmitting(false);
     }
   };
+
+  // Debug: Log current form state
+  const formData = watch();
+  console.log('[NewAssessmentForm] Current form data:', formData);
+  console.log('[NewAssessmentForm] Form errors:', errors);
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
