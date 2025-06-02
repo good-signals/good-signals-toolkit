@@ -137,16 +137,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('[AuthContext] Sign in attempt for email:', email);
     setAuthLoading(true);
     try {
-      const { data, error } = await signInWithEmailService(email, password);
-      if (data?.session) {
+      // Get fresh session after sign in
+      const { data: { session: freshSession }, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      
+      if (error) {
+        console.error('[AuthContext] Sign in error:', error);
+        toast.error(error.message || 'Sign in failed. Please check your credentials.');
+        return;
+      }
+      
+      if (freshSession) {
+        console.log('[AuthContext] Fresh session obtained after sign in');
         // Ensure the session is properly set in Supabase client
         await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
+          access_token: freshSession.access_token,
+          refresh_token: freshSession.refresh_token,
         });
-        console.log('[AuthContext] Session set successfully after sign in');
+        
+        // Force a session refresh to ensure tokens are valid
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.warn('[AuthContext] Session refresh failed after sign in:', refreshError);
+        } else if (refreshedSession) {
+          console.log('[AuthContext] Session refreshed successfully after sign in');
+        }
+        
+        toast.success('Signed in successfully!');
       }
-      if (error) throw error;
+    } catch (error) {
+      console.error('[AuthContext] Sign in exception:', error);
+      toast.error('Sign in failed. Please try again.');
     } finally {
       // Don't set authLoading to false here - let the auth state change handler do it
     }
