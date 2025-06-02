@@ -15,7 +15,6 @@ const SignInForm: React.FC<SignInFormProps> = ({ onForgotPassword }) => {
   const { signInWithEmail, authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,10 +22,10 @@ const SignInForm: React.FC<SignInFormProps> = ({ onForgotPassword }) => {
       toast.error("Please enter both email and password for sign in.");
       return;
     }
-    setIsSubmitting(true);
+    
+    console.log('[SignInForm] Initiating sign in process');
     await signInWithEmail(email, password);
-    setIsSubmitting(false);
-    // Toasts for success/failure are handled by signInWithEmailService / AuthContext
+    console.log('[SignInForm] Sign in process completed');
   };
 
   return (
@@ -71,8 +70,8 @@ const SignInForm: React.FC<SignInFormProps> = ({ onForgotPassword }) => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
-            {isSubmitting || authLoading ? 'Signing In...' : 'Sign In'}
+          <Button type="submit" className="w-full" disabled={authLoading}>
+            {authLoading ? 'Signing In...' : 'Sign In'}
           </Button>
         </CardFooter>
       </form>

@@ -10,11 +10,15 @@ import { UserProfile } from '@/types/auth';
 export const useAuthOperations = (
   user: User | null,
   setProfile: (profile: UserProfile | null) => void,
-  setAuthLoading: (loading: boolean) => void
+  addActiveOperation: (operationId: string) => void,
+  removeActiveOperation: (operationId: string) => void
 ) => {
   const signInWithEmail = async (email: string, password: string) => {
-    console.log('[AuthContext] Sign in attempt for email:', email);
-    setAuthLoading(true);
+    const operationId = 'signin-' + Date.now();
+    console.log('[AuthContext] Sign in attempt for email:', email, 'operationId:', operationId);
+    
+    addActiveOperation(operationId);
+    
     try {
       // Get fresh session after sign in
       const { data: { session: freshSession }, error } = await supabase.auth.signInWithPassword({ 
@@ -50,25 +54,44 @@ export const useAuthOperations = (
       console.error('[AuthContext] Sign in exception:', error);
       toast.error('Sign in failed. Please try again.');
     } finally {
-      // Don't set authLoading to false here - let the auth state change handler do it
+      console.log('[AuthContext] Removing sign in operation:', operationId);
+      removeActiveOperation(operationId);
     }
   };
 
   const resetPassword = async (email: string) => {
-    await resetPasswordService(email);
+    const operationId = 'reset-password-' + Date.now();
+    addActiveOperation(operationId);
+    
+    try {
+      await resetPasswordService(email);
+    } finally {
+      removeActiveOperation(operationId);
+    }
   };
 
   const updatePassword = async (newPassword: string) => {
-    return await updatePasswordService(newPassword);
+    const operationId = 'update-password-' + Date.now();
+    addActiveOperation(operationId);
+    
+    try {
+      return await updatePasswordService(newPassword);
+    } finally {
+      removeActiveOperation(operationId);
+    }
   };
 
   const signOut = async () => {
-    console.log('[AuthContext] Sign out attempt');
-    setAuthLoading(true);
+    const operationId = 'signout-' + Date.now();
+    console.log('[AuthContext] Sign out attempt, operationId:', operationId);
+    
+    addActiveOperation(operationId);
+    
     try {
       await signOutService();
     } finally {
-      // Don't set authLoading to false here - let the auth state change handler do it
+      console.log('[AuthContext] Removing sign out operation:', operationId);
+      removeActiveOperation(operationId);
     }
   };
   
@@ -77,17 +100,22 @@ export const useAuthOperations = (
       toast.error("You must be logged in to update your profile.");
       return false;
     }
-    setAuthLoading(true);
-    const { data: updatedProfile, error } = await updateProfileService(user.id, updates);
-    if (error || !updatedProfile) {
-      toast.error(error?.message || 'Failed to update profile.');
-      setAuthLoading(false);
-      return false;
+    
+    const operationId = 'update-profile-' + Date.now();
+    addActiveOperation(operationId);
+    
+    try {
+      const { data: updatedProfile, error } = await updateProfileService(user.id, updates);
+      if (error || !updatedProfile) {
+        toast.error(error?.message || 'Failed to update profile.');
+        return false;
+      }
+      setProfile(updatedProfile);
+      toast.success('Profile updated successfully!');
+      return true;
+    } finally {
+      removeActiveOperation(operationId);
     }
-    setProfile(updatedProfile);
-    toast.success('Profile updated successfully!');
-    setAuthLoading(false);
-    return true;
   };
 
   const uploadAvatarAndUpdateProfile = async (file: File): Promise<boolean> => {
@@ -95,33 +123,37 @@ export const useAuthOperations = (
       toast.error("You must be logged in to upload an avatar.");
       return false;
     }
-    setAuthLoading(true);
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, { upsert: true });
-
-    if (uploadError) {
-      console.error('Error uploading avatar:', uploadError);
-      toast.error(uploadError.message || 'Failed to upload avatar.');
-      setAuthLoading(false);
-      return false;
-    }
-
-    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-
-    if (!publicUrl) {
-        toast.error('Failed to get public URL for avatar.');
-        setAuthLoading(false);
-        return false;
-    }
     
-    const success = await updateContextUserProfile({ avatar_url: publicUrl });
-    return success;
+    const operationId = 'upload-avatar-' + Date.now();
+    addActiveOperation(operationId);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error('Error uploading avatar:', uploadError);
+        toast.error(uploadError.message || 'Failed to upload avatar.');
+        return false;
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      if (!publicUrl) {
+          toast.error('Failed to get public URL for avatar.');
+          return false;
+      }
+      
+      const success = await updateContextUserProfile({ avatar_url: publicUrl });
+      return success;
+    } finally {
+      removeActiveOperation(operationId);
+    }
   };
 
   return {

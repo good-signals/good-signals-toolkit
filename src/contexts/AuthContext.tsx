@@ -20,6 +20,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authLoading,
     setProfile,
     setAuthLoading,
+    addActiveOperation,
+    removeActiveOperation,
   } = useAuthState();
 
   const {
@@ -29,7 +31,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut,
     updateContextUserProfile,
     uploadAvatarAndUpdateProfile,
-  } = useAuthOperations(user, setProfile, setAuthLoading);
+  } = useAuthOperations(user, setProfile, addActiveOperation, removeActiveOperation);
   
   const value = {
     session,
