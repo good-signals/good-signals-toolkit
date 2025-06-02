@@ -15,7 +15,7 @@ import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
 import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
 import ExportControls from '@/components/territory-targeter/ExportControls';
 import ProgressCounter from '@/components/territory-targeter/ProgressCounter';
-import { territoryExportService } from '@/services/territoryExportService';
+import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { toast } from '@/hooks/use-toast';
 
 const TerritoryTargeterPage: React.FC = () => {
@@ -94,7 +94,12 @@ const TerritoryTargeterPage: React.FC = () => {
         return;
       }
 
-      await territoryExportService.exportToCSV(cbsaData, currentAnalysis);
+      await exportTerritoryAnalysisToCSV({
+        cbsaData,
+        scores: [],
+        analysis: currentAnalysis,
+        executiveSummary
+      });
       
       toast({
         title: "Export Successful",
@@ -121,7 +126,12 @@ const TerritoryTargeterPage: React.FC = () => {
         return;
       }
 
-      await territoryExportService.exportToExcel(cbsaData, currentAnalysis);
+      await exportTerritoryAnalysisToExcel({
+        cbsaData,
+        scores: [],
+        analysis: currentAnalysis,
+        executiveSummary
+      });
       
       toast({
         title: "Export Successful", 
@@ -202,10 +212,11 @@ const TerritoryTargeterPage: React.FC = () => {
       {/* Progress Counter */}
       {isLoading && (
         <ProgressCounter
+          isActive={isLoading}
           startTime={analysisStartTime}
-          estimatedDuration={estimatedDuration}
-          onCancel={cancelAnalysis}
-          mode={scoringMode}
+          duration={estimatedDuration}
+          analysisMode={scoringMode}
+          onComplete={cancelAnalysis}
         />
       )}
 
@@ -253,7 +264,7 @@ const TerritoryTargeterPage: React.FC = () => {
             accountBadThreshold={accountBadThreshold}
             onStatusChange={handleStatusChange}
             onManualScoreOverride={applyManualOverride}
-            onRefreshColumn={refreshColumn}
+            onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
             refreshingColumnId={refreshingColumnId}
           />
         </div>
