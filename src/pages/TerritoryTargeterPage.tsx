@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
@@ -230,16 +231,14 @@ const TerritoryTargeterPage: React.FC = () => {
       {hasAnalysisData && (
         <CBSATable
           cbsaData={cbsaData}
-          currentAnalysis={currentAnalysis}
+          criteriaColumns={currentAnalysis.criteriaColumns}
+          marketSignalScore={currentAnalysis.marketSignalScore || 0}
           accountGoodThreshold={accountGoodThreshold}
           accountBadThreshold={accountBadThreshold}
           refreshingColumnId={refreshingColumnId}
           onStatusChange={handleStatusChange}
           onManualScoreOverride={applyManualOverride}
           onRefreshColumn={(columnId: string, type: 'all' | 'na-only') => refreshColumn(columnId, type, cbsaData)}
-          onClearAnalysis={handleClearAnalysis}
-          onExportCSV={handleExportCSV}
-          onExportExcel={handleExportExcel}
         />
       )}
     </div>
@@ -247,3 +246,4 @@ const TerritoryTargeterPage: React.FC = () => {
 };
 
 export default TerritoryTargeterPage;
+
