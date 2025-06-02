@@ -14,16 +14,6 @@ const TerritoryNotices: React.FC<TerritoryNoticesProps> = ({
 }) => {
   return (
     <>
-      {/* CBSA Data Info */}
-      <div className="mb-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Currently showing top {cbsaDataLength} U.S. CBSAs by population. You can upload your own CBSA dataset to replace this sample data.
-          </AlertDescription>
-        </Alert>
-      </div>
-
       {/* Authentication Notice */}
       {!user && (
         <Alert className="mb-6">
