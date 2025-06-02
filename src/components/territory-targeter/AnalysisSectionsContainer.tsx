@@ -69,11 +69,13 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
       />
 
       {/* Column Management */}
-      <ColumnManagement
-        criteriaColumns={currentAnalysis.criteriaColumns}
-        onToggleColumn={onToggleColumn}
-        onDeleteColumn={onDeleteColumn}
-      />
+      <div className="mt-6">
+        <ColumnManagement
+          criteriaColumns={currentAnalysis.criteriaColumns}
+          onToggleColumn={onToggleColumn}
+          onDeleteColumn={onDeleteColumn}
+        />
+      </div>
 
       {/* Export Controls */}
       <ExportControls
