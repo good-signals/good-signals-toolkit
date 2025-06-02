@@ -46,6 +46,8 @@ export const getTargetMetricSets = async (accountId: string) => {
 };
 
 export const getTargetMetricSetById = async (id: string, userId?: string) => {
+  console.log('[getTargetMetricSetById] Fetching metric set:', id);
+  
   const { data, error } = await supabase
     .from('target_metric_sets')
     .select(`
@@ -56,9 +58,16 @@ export const getTargetMetricSetById = async (id: string, userId?: string) => {
     .single();
   
   if (error) {
-    console.error('Error fetching target metric set:', error);
+    console.error('[getTargetMetricSetById] Error fetching target metric set:', error);
     return null;
   }
+  
+  console.log('[getTargetMetricSetById] Retrieved metric set with settings:', {
+    metricSetId: data?.id,
+    metricSetName: data?.name,
+    settingsCount: data?.user_custom_metrics_settings?.length || 0,
+    settings: data?.user_custom_metrics_settings
+  });
   
   return data;
 };

@@ -99,6 +99,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     queryKey: ['targetMetricSet', targetMetricSetId, user?.id],
     queryFn: () => {
       if (!user?.id) throw new Error('User not authenticated');
+      console.log('[InputMetricValuesStep] Fetching metric set:', targetMetricSetId);
       return getTargetMetricSetById(targetMetricSetId, user.id);
     },
     enabled: !!user?.id && !!targetMetricSetId,
@@ -200,12 +201,17 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   // Initialize form data
   useEffect(() => {
+    console.log('[InputMetricValuesStep] useEffect triggered - metricSet:', metricSet);
+    console.log('[InputMetricValuesStep] Available metrics:', metricSet?.user_custom_metrics_settings?.length || 0);
+    
     const savedFormData = loadSavedFormData();
     const allMetricsToSet: any[] = [];
     const currentImageOnlyIndices: Record<string, number> = {};
 
     // Process regular metrics from metricSet
-    if (metricSet?.user_custom_metrics_settings) {
+    if (metricSet?.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) {
+      console.log('[InputMetricValuesStep] Processing metrics from metric set:', metricSet.user_custom_metrics_settings);
+      
       metricSet.user_custom_metrics_settings.forEach(metric => {
         const existingValue = existingMetricValuesData?.find(ev => ev.metric_identifier === metric.metric_identifier);
         const savedMetricData = savedFormData?.metrics?.find(sm => sm.metric_identifier === metric.metric_identifier);
@@ -236,28 +242,29 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           image_file: null,
         });
       });
-    }
 
-    // Process category-specific images
-    const categories = metricSet?.user_custom_metrics_settings
-      ? [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))]
-      : [];
+      // Process category-specific images
+      const categories = [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))];
+      console.log('[InputMetricValuesStep] Processing categories for images:', categories);
 
-    categories.forEach(category => {
-      const identifier = getCategorySpecificImageIdentifier(category);
-      const existingImageMetric = existingMetricValuesData?.find(ev => ev.metric_identifier === identifier);
-      currentImageOnlyIndices[identifier] = allMetricsToSet.length;
-      allMetricsToSet.push({
-        metric_identifier: identifier,
-        label: `${category} Section Image`,
-        category: category,
-        entered_value: null,
-        measurement_type: 'image_placeholder_category',
-        notes: null,
-        image_url: existingImageMetric?.image_url ?? null,
-        image_file: null,
+      categories.forEach(category => {
+        const identifier = getCategorySpecificImageIdentifier(category);
+        const existingImageMetric = existingMetricValuesData?.find(ev => ev.metric_identifier === identifier);
+        currentImageOnlyIndices[identifier] = allMetricsToSet.length;
+        allMetricsToSet.push({
+          metric_identifier: identifier,
+          label: `${category} Section Image`,
+          category: category,
+          entered_value: null,
+          measurement_type: 'image_placeholder_category',
+          notes: null,
+          image_url: existingImageMetric?.image_url ?? null,
+          image_file: null,
+        });
       });
-    });
+    } else {
+      console.log('[InputMetricValuesStep] No custom metrics found in metric set');
+    }
 
     // Process Site Visit section image
     const siteVisitImageIdentifier = SITE_VISIT_SECTION_IMAGE_IDENTIFIER;
@@ -274,6 +281,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       image_file: null,
     });
     
+    console.log('[InputMetricValuesStep] Final metrics array length:', allMetricsToSet.length);
     replaceMetrics(allMetricsToSet);
     setImageOnlyMetricIndices(currentImageOnlyIndices);
 
@@ -489,7 +497,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       return acc;
     }
 
-    const originalMetricDef = metricSet?.user_custom_metrics_settings.find(m => m.metric_identifier === typedField.metric_identifier);
+    const originalMetricDef = metricSet?.user_custom_metrics_settings?.find(m => m.metric_identifier === typedField.metric_identifier);
     const category = typedField.category || 'Uncategorized';
     if (!acc[category]) {
       acc[category] = [];
@@ -513,8 +521,16 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     notes: (field as any).notes || '',
   }));
 
-   {/* Display message if no custom metrics but site visit ratings exist */}
-   if ((!metricSet?.user_custom_metrics_settings || metricSet?.user_custom_metrics_settings.length === 0) && siteVisitRatingFields.length > 0) {
+  console.log('[InputMetricValuesStep] Render check:', {
+    metricSetLoaded: !!metricSet,
+    customMetricsCount: metricSet?.user_custom_metrics_settings?.length || 0,
+    categoriesCount: sortedCategories.length,
+    siteVisitRatingsCount: siteVisitRatingFields.length
+  });
+
+  // Display message if no custom metrics but site visit ratings exist
+  if ((!metricSet?.user_custom_metrics_settings || metricSet?.user_custom_metrics_settings.length === 0) && siteVisitRatingFields.length > 0) {
+    console.log('[InputMetricValuesStep] Showing Site Visit only view');
     return (
       <TooltipProvider>
         <Card className="w-full max-w-3xl mx-auto">
@@ -589,6 +605,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   if (metricSetError) {
     return <p className="text-destructive text-center p-4">Error loading metric set: {metricSetError.message}</p>;
   }
+  
+  console.log('[InputMetricValuesStep] Rendering full assessment view with categories:', sortedCategories);
   
   return (
     <TooltipProvider>
