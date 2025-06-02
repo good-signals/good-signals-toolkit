@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { getTargetMetricSets } from '@/services/targetMetricsService';
 import { updateSiteAssessment } from '@/services/siteAssessmentService';
+import { getUserAccount } from '@/services/userAccountService';
 import { TargetMetricSet } from '@/types/targetMetrics';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -27,13 +29,25 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({
   const queryClient = useQueryClient();
   const [selectedMetricSetId, setSelectedMetricSetId] = useState<string | undefined>(undefined);
 
-  const { data: metricSets, isLoading: isLoadingMetricSets, error: metricSetsError } = useQuery<TargetMetricSet[], Error>({
-    queryKey: ['targetMetricSets', user?.id],
+  // First, get the user's account
+  const { data: userAccount, isLoading: isLoadingAccount, error: accountError } = useQuery({
+    queryKey: ['userAccount', user?.id],
     queryFn: () => {
       if (!user?.id) throw new Error('User not authenticated');
-      return getTargetMetricSets(user.id);
+      return getUserAccount(user.id);
     },
     enabled: !!user?.id,
+  });
+
+  // Then, get the target metric sets for that account
+  const { data: metricSets, isLoading: isLoadingMetricSets, error: metricSetsError } = useQuery<TargetMetricSet[], Error>({
+    queryKey: ['targetMetricSets', userAccount?.id],
+    queryFn: () => {
+      if (!userAccount?.id) throw new Error('Account not found');
+      console.log('[SelectTargetMetricSetStep] Fetching target metric sets for account:', userAccount.id);
+      return getTargetMetricSets(userAccount.id);
+    },
+    enabled: !!userAccount?.id,
   });
 
   const updateAssessmentMutation = useMutation({
@@ -57,6 +71,48 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({
     }
     updateAssessmentMutation.mutate(selectedMetricSetId);
   };
+
+  // Debug logging
+  console.log('[SelectTargetMetricSetStep] Debug info:', {
+    userId: user?.id,
+    userAccount,
+    isLoadingAccount,
+    accountError,
+    metricSets: metricSets?.length || 0,
+    isLoadingMetricSets,
+    metricSetsError
+  });
+
+  if (isLoadingAccount) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading account information...</p>
+      </div>
+    );
+  }
+
+  if (accountError) {
+    return <p className="text-destructive">Error loading account: {accountError.message}</p>;
+  }
+
+  if (!userAccount) {
+    return (
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Step 2: Select Target Metric Set</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>No account found for this user. Please contact support.</p>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button type="button" variant="outline" onClick={onBack}>
+            Back
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   if (isLoadingMetricSets) {
     return (
