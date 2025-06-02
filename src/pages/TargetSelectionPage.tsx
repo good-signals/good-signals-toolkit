@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CheckSquare, Edit3, ListChecks, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveUserStandardMetricsPreference, hasUserSetAnyMetrics } from '@/services/targetMetricsService';
+import { getUserAccount } from '@/services/userAccountService';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast as sonnerToast } from 'sonner';
 
@@ -14,12 +15,18 @@ const TargetSelectionPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Get account ID from user metadata
-  const accountId = user?.user_metadata?.account_id || '';
+  // Fetch user's account information
+  const { data: userAccount, isLoading: isLoadingAccount, error: accountError } = useQuery({
+    queryKey: ['userAccount', user?.id],
+    queryFn: () => user ? getUserAccount(user.id) : null,
+    enabled: !!user,
+  });
+
+  const accountId = userAccount?.id || '';
 
   const { data: hasMetrics, isLoading: isLoadingHasMetrics } = useQuery({
     queryKey: ['hasUserSetAnyMetrics', user?.id],
-    queryFn: () => user ? hasUserSetAnyMetrics(user.id, accountId) : false,
+    queryFn: () => user && accountId ? hasUserSetAnyMetrics(user.id, accountId) : false,
     enabled: !!user && !!accountId,
   });
   
@@ -48,8 +55,8 @@ const TargetSelectionPage: React.FC = () => {
     mutation.mutate();
   };
 
-  // Show loading or error state if user/account data is not ready
-  if (!user) {
+  // Show loading state while fetching user or account data
+  if (!user || isLoadingAccount) {
     return (
       <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-80px)]">
         <p>Loading user information...</p>
@@ -57,12 +64,18 @@ const TargetSelectionPage: React.FC = () => {
     );
   }
 
-  if (!accountId) {
+  // Show error state if account fetch failed or no account found
+  if (accountError || !userAccount) {
     return (
       <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-80px)]">
         <div className="text-center">
           <p className="text-lg mb-4">Account information not found.</p>
-          <p className="text-sm text-muted-foreground">Please contact support or try refreshing the page.</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            It looks like your company setup may not have completed successfully.
+          </p>
+          <Button onClick={() => navigate('/company-setup')}>
+            Complete Company Setup
+          </Button>
         </div>
       </div>
     );
@@ -75,8 +88,8 @@ const TargetSelectionPage: React.FC = () => {
           Define Your Target Metrics
         </h1>
         <p className="mt-4 text-xl text-muted-foreground max-w-2xl mx-auto">
-          Choose how you want to set up your target metrics. You can use our predefined standard metrics
-          or create your own custom sets.
+          Choose how you want to set up your target metrics for <strong>{userAccount.name}</strong>. 
+          You can use our predefined standard metrics or create your own custom sets.
         </p>
       </div>
 

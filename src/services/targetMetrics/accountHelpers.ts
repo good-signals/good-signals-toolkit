@@ -1,17 +1,21 @@
 
-import { Account } from '@/services/accountService';
+import { getUserAccount } from '@/services/userAccountService';
 
 // Simple helper to get default signal thresholds since they were removed from the database
-export const getAccountSignalThresholds = (account: Account | null) => {
+export const getAccountSignalThresholds = (account: any) => {
   return {
     goodThreshold: 0.75, // Default good threshold
     badThreshold: 0.50,  // Default bad threshold
   };
 };
 
-// Helper for backward compatibility
-export const getAccountForUser = async (userId: string): Promise<Account | null> => {
-  // This is a simplified version that just returns null
-  // In the future, this could be enhanced to return the user's account
-  return null;
+// Helper for backward compatibility - now uses the new getUserAccount service
+export const getAccountForUser = async (userId: string): Promise<string | null> => {
+  try {
+    const userAccount = await getUserAccount(userId);
+    return userAccount?.id || null;
+  } catch (error) {
+    console.error('Error getting account for user:', error);
+    return null;
+  }
 };
