@@ -8,7 +8,7 @@ export interface UserAccount {
   subcategory?: string | null;
   address?: string | null;
   logo_url?: string | null;
-  role: 'account_admin' | 'account_user';
+  role: 'account_admin' | 'account_user' | 'super_admin';
 }
 
 export const getUserAccount = async (userId: string): Promise<UserAccount | null> => {
