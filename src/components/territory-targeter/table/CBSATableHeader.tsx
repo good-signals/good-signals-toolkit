@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -149,7 +148,7 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
           </TableHead>
         )}
         {hasScores && (
-          <TableHead className="min-w-[300px]">
+          <TableHead className="min-w-[900px]">
             Combined Reasoning
           </TableHead>
         )}
