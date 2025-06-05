@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, MapPin } from 'lucide-react';
+import { Loader2, MapPin, AlertCircle } from 'lucide-react';
 
 interface AddressMapDisplayProps {
   latitude: number;
@@ -24,30 +24,16 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
 
   console.log('AddressMapDisplay initializing with coordinates:', { latitude, longitude });
 
-  // Initialize Google Maps API loading
+  // Load Google Maps API script independently
   useEffect(() => {
     let isMounted = true;
-    let checkInterval: NodeJS.Timeout;
+    let loadingTimeout: NodeJS.Timeout;
 
     const checkGoogleMapsLoaded = () => {
-      if (window.google && window.google.maps && window.google.maps.Map) {
-        console.log('Google Maps already loaded for map display');
-        if (isMounted) {
-          setIsGoogleLoaded(true);
-          setErrorMessage('');
-        }
-        return true;
-      }
-      return false;
+      return window.google && window.google.maps && window.google.maps.Map;
     };
 
-    // First check if it's already loaded
-    if (checkGoogleMapsLoaded()) {
-      return;
-    }
-
-    // Create global callback function with unique name for map display
-    window.initGoogleMapsForDisplay = () => {
+    const initializeGoogleMaps = () => {
       console.log('Google Maps API loaded for map display');
       if (isMounted && checkGoogleMapsLoaded()) {
         setIsGoogleLoaded(true);
@@ -55,57 +41,78 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       }
     };
 
-    // Check if script already exists
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]') as HTMLScriptElement;
-    if (existingScript) {
-      console.log('Google Maps script already exists for map display, waiting for load...');
-      
-      // Check periodically if it's loaded
-      checkInterval = setInterval(() => {
-        if (checkGoogleMapsLoaded() && isMounted) {
-          clearInterval(checkInterval);
-        }
-      }, 200);
-
-      // Cleanup after timeout
-      setTimeout(() => {
-        if (checkInterval) clearInterval(checkInterval);
-        if (!window.google || !window.google.maps) {
-          console.error('Google Maps failed to load within timeout for map display');
-          if (isMounted) {
-            setMapState('error');
-            setErrorMessage('Google Maps API failed to load');
-          }
-        }
-      }, 15000);
+    // Check if Google Maps is already loaded
+    if (checkGoogleMapsLoaded()) {
+      console.log('Google Maps already loaded for map display');
+      setIsGoogleLoaded(true);
+      setErrorMessage('');
       return;
     }
 
-    // If no script exists, wait for the autocomplete input to load it
-    // The autocomplete component should load the script first
-    console.log('Waiting for Google Maps script to be loaded by autocomplete component...');
-    checkInterval = setInterval(() => {
-      if (checkGoogleMapsLoaded() && isMounted) {
-        clearInterval(checkInterval);
-      }
-    }, 500);
-
-    // Cleanup after timeout
-    setTimeout(() => {
-      if (checkInterval) clearInterval(checkInterval);
-      if (!window.google || !window.google.maps) {
-        console.error('Google Maps not available for map display');
-        if (isMounted) {
-          setMapState('error');
-          setErrorMessage('Google Maps API not available');
+    // Check if script is already being loaded
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
+      console.log('Google Maps script already exists, waiting for load...');
+      
+      // Set up callback for when it loads
+      window.initGoogleMapsForDisplay = initializeGoogleMaps;
+      
+      // Check periodically if it's loaded
+      const checkInterval = setInterval(() => {
+        if (checkGoogleMapsLoaded() && isMounted) {
+          clearInterval(checkInterval);
+          initializeGoogleMaps();
         }
+      }, 200);
+
+      loadingTimeout = setTimeout(() => {
+        clearInterval(checkInterval);
+        if (!checkGoogleMapsLoaded() && isMounted) {
+          console.error('Google Maps failed to load within timeout');
+          setMapState('error');
+          setErrorMessage('Google Maps API failed to load');
+        }
+      }, 15000);
+
+      return () => {
+        clearInterval(checkInterval);
+        if (loadingTimeout) clearTimeout(loadingTimeout);
+      };
+    }
+
+    // Load Google Maps script if it doesn't exist
+    console.log('Loading Google Maps API script for map display...');
+    
+    // Set up callback
+    window.initGoogleMapsForDisplay = initializeGoogleMaps;
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&callback=initGoogleMapsForDisplay&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    
+    script.onerror = () => {
+      console.error('Failed to load Google Maps script');
+      if (isMounted) {
+        setMapState('error');
+        setErrorMessage('Failed to load Google Maps API script');
       }
-    }, 20000);
+    };
+
+    document.head.appendChild(script);
+
+    loadingTimeout = setTimeout(() => {
+      if (!checkGoogleMapsLoaded() && isMounted) {
+        console.error('Google Maps API failed to load within timeout');
+        setMapState('error');
+        setErrorMessage('Google Maps API failed to load within timeout');
+      }
+    }, 15000);
 
     return () => {
       isMounted = false;
-      if (checkInterval) {
-        clearInterval(checkInterval);
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
       }
       if (window.initGoogleMapsForDisplay) {
         delete window.initGoogleMapsForDisplay;
@@ -150,7 +157,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       markerRef.current = new window.google.maps.Marker({
         position: mapCenter,
         map: mapRef.current,
-        title: 'Selected Location',
+        title: 'Assessment Location',
         animation: google.maps.Animation.DROP,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
@@ -203,16 +210,20 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       {/* Error overlay */}
       {mapState === 'error' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 text-gray-600 p-4 z-10">
-          <MapPin className="h-8 w-8 mb-2" />
-          <p className="text-sm text-center mb-1">Interactive Map Unavailable</p>
-          <p className="text-xs text-center text-gray-500">
-            Coordinates: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+          <AlertCircle className="h-8 w-8 mb-2 text-red-500" />
+          <p className="text-sm text-center mb-1 font-medium">Map Unavailable</p>
+          <p className="text-xs text-center text-gray-500 mb-2">
+            Location: {latitude.toFixed(6)}, {longitude.toFixed(6)}
           </p>
           {errorMessage && (
-            <p className="text-xs text-center text-gray-400 mt-2">
+            <p className="text-xs text-center text-red-400 bg-red-50 px-2 py-1 rounded">
               {errorMessage}
             </p>
           )}
+          <div className="flex items-center mt-2 text-xs text-gray-400">
+            <MapPin className="h-3 w-3 mr-1" />
+            Static coordinates displayed above
+          </div>
         </div>
       )}
     </div>
