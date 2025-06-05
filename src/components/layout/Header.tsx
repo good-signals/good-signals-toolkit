@@ -15,7 +15,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-black shadow-sm border-b border-gray-800">
+    <header className="sticky top-0 z-50 bg-black shadow-sm border-b border-gray-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <HeaderLogo />
