@@ -87,7 +87,18 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     window.initGoogleMapsForDisplay = initializeGoogleMaps;
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&callback=initGoogleMapsForDisplay&libraries=places`;
+    // Use the actual API key from environment variable instead of placeholder
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error('Google Maps API key not found in environment variables');
+      if (isMounted) {
+        setMapState('error');
+        setErrorMessage('Google Maps API key not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment.');
+      }
+      return;
+    }
+    
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initGoogleMapsForDisplay&libraries=places`;
     script.async = true;
     script.defer = true;
     
