@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, MapPin, AlertCircle } from 'lucide-react';
-import { getValidatedEnvVar } from '@/utils/apiKeyValidation';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddressMapDisplayProps {
   latitude: number;
@@ -24,7 +24,7 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
 
   console.log('AddressMapDisplay initializing with coordinates:', { latitude, longitude });
 
-  // Load Google Maps API script independently
+  // Load Google Maps API script with key from Edge Function
   useEffect(() => {
     let isMounted = true;
     let loadingTimeout: NodeJS.Timeout;
@@ -80,37 +80,69 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
       };
     }
 
-    // Load Google Maps script if it doesn't exist
-    console.log('Loading Google Maps API script for map display...');
-    
-    // Set up callback
-    window.initGoogleMapsForDisplay = initializeGoogleMaps;
+    // Fetch API key and load Google Maps script
+    const loadGoogleMaps = async () => {
+      try {
+        console.log('Fetching Google Maps API key from Edge Function...');
+        
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        
+        if (error) {
+          console.error('Error fetching Google Maps API key:', error);
+          if (isMounted) {
+            setMapState('error');
+            setErrorMessage('Failed to fetch Google Maps API key');
+          }
+          return;
+        }
 
-    const script = document.createElement('script');
-    // Use hardcoded API key - this will be replaced by the actual key from Supabase secrets
-    const apiKey = 'AIzaSyBK5lTj9GF8QH2vX_pL3mR7nY4oE1sW6dC';
-    
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initGoogleMapsForDisplay&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    
-    script.onerror = () => {
-      console.error('Failed to load Google Maps script');
-      if (isMounted) {
-        setMapState('error');
-        setErrorMessage('Failed to load Google Maps API script');
+        if (!data?.apiKey) {
+          console.error('No API key returned from Edge Function');
+          if (isMounted) {
+            setMapState('error');
+            setErrorMessage('Google Maps API key not configured');
+          }
+          return;
+        }
+
+        console.log('Loading Google Maps API script with fetched key...');
+        
+        // Set up callback
+        window.initGoogleMapsForDisplay = initializeGoogleMaps;
+
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&callback=initGoogleMapsForDisplay&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        
+        script.onerror = () => {
+          console.error('Failed to load Google Maps script');
+          if (isMounted) {
+            setMapState('error');
+            setErrorMessage('Failed to load Google Maps API script');
+          }
+        };
+
+        document.head.appendChild(script);
+
+        loadingTimeout = setTimeout(() => {
+          if (!checkGoogleMapsLoaded() && isMounted) {
+            console.error('Google Maps API failed to load within timeout');
+            setMapState('error');
+            setErrorMessage('Google Maps API failed to load within timeout');
+          }
+        }, 15000);
+
+      } catch (error) {
+        console.error('Error in loadGoogleMaps:', error);
+        if (isMounted) {
+          setMapState('error');
+          setErrorMessage('Failed to initialize Google Maps');
+        }
       }
     };
 
-    document.head.appendChild(script);
-
-    loadingTimeout = setTimeout(() => {
-      if (!checkGoogleMapsLoaded() && isMounted) {
-        console.error('Google Maps API failed to load within timeout');
-        setMapState('error');
-        setErrorMessage('Google Maps API failed to load within timeout');
-      }
-    }, 15000);
+    loadGoogleMaps();
 
     return () => {
       isMounted = false;
