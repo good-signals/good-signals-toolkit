@@ -46,6 +46,25 @@ const EditableExecutiveSummary: React.FC<EditableExecutiveSummaryProps> = ({
     },
   });
 
+  const clearAndRegenerateMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("User not authenticated");
+      // First clear the existing summary
+      await updateSiteAssessmentSummary(assessmentId, '', user.id);
+      return true;
+    },
+    onSuccess: () => {
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+      // Then trigger the regeneration
+      onRegenerateClick();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Clear Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
     if (editedSummary.trim() === '') {
       toast({ title: "Invalid Input", description: "Summary cannot be empty.", variant: "destructive" });
@@ -62,6 +81,10 @@ const EditableExecutiveSummary: React.FC<EditableExecutiveSummaryProps> = ({
   const handleEdit = () => {
     setEditedSummary(executiveSummary);
     setIsEditing(true);
+  };
+
+  const handleRegenerate = () => {
+    clearAndRegenerateMutation.mutate();
   };
 
   return (
@@ -89,10 +112,10 @@ const EditableExecutiveSummary: React.FC<EditableExecutiveSummaryProps> = ({
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={onRegenerateClick} 
-                  disabled={isRegenerating}
+                  onClick={handleRegenerate} 
+                  disabled={isRegenerating || clearAndRegenerateMutation.isPending}
                 >
-                  {isRegenerating ? (
+                  {isRegenerating || clearAndRegenerateMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <FileText className="mr-2 h-4 w-4" />
