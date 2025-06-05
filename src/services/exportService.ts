@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -512,7 +511,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         yPosition = await addImageToPage(siteVisitImage, yPosition, 50);
       }
       
-      exportData.assessment.site_visit_ratings.forEach((rating: any) => {
+      for (const rating of exportData.assessment.site_visit_ratings) {
         if (yPosition > pageHeight - 40) {
           pdf.addPage();
           currentPage++;
@@ -557,7 +556,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         }
         
         yPosition += cardHeight + 4;
-      });
+      }
     }
 
     // Executive Summary - On its own page
