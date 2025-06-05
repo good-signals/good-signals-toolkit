@@ -295,7 +295,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(71, 85, 105);
     
-    const assessmentName = exportData.assessment.assessment_name || 'Unnamed Assessment';
+    const overviewAssessmentName = exportData.assessment.assessment_name || 'Unnamed Assessment';
     const address = [
       exportData.assessment.address_line1,
       exportData.assessment.address_line2,
@@ -308,7 +308,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       ? new Date(exportData.assessment.created_at).toLocaleDateString()
       : 'Unknown';
 
-    pdf.text(`Name: ${assessmentName}`, margin + cardPadding, yPosition + 6);
+    pdf.text(`Name: ${overviewAssessmentName}`, margin + cardPadding, yPosition + 6);
     pdf.text(`Address: ${address}`, margin + cardPadding, yPosition + 11);
     pdf.text(`Created: ${createdDate}`, margin + cardPadding, yPosition + 16);
     pdf.text(`Target Metric Set: ${exportData.targetMetricSet?.name || 'Not specified'}`, margin + cardPadding, yPosition + 21);
@@ -478,8 +478,8 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     }
 
     // Generate filename
-    const assessmentName = exportData.assessment.assessment_name || 'assessment';
-    const sanitizedName = assessmentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const fileNameAssessmentName = exportData.assessment.assessment_name || 'assessment';
+    const sanitizedName = fileNameAssessmentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const fileName = `site_assessment_${sanitizedName}_${new Date().getTime()}.pdf`;
 
     // Save the PDF
