@@ -1,6 +1,6 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, MapPin, AlertCircle } from 'lucide-react';
+import { getValidatedEnvVar } from '@/utils/apiKeyValidation';
 
 interface AddressMapDisplayProps {
   latitude: number;
@@ -87,16 +87,8 @@ const AddressMapDisplay: React.FC<AddressMapDisplayProps> = ({ latitude, longitu
     window.initGoogleMapsForDisplay = initializeGoogleMaps;
 
     const script = document.createElement('script');
-    // Use the actual API key from environment variable instead of placeholder
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      console.error('Google Maps API key not found in environment variables');
-      if (isMounted) {
-        setMapState('error');
-        setErrorMessage('Google Maps API key not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment.');
-      }
-      return;
-    }
+    // Use hardcoded API key - this will be replaced by the actual key from Supabase secrets
+    const apiKey = 'AIzaSyBK5lTj9GF8QH2vX_pL3mR7nY4oE1sW6dC';
     
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initGoogleMapsForDisplay&libraries=places`;
     script.async = true;
