@@ -164,59 +164,88 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
 
     // Enhanced color scheme matching web app
     const colors = {
-      primary: [59, 130, 246] as [number, number, number], // Blue
-      primaryLight: [147, 197, 253] as [number, number, number],
-      success: [34, 197, 94] as [number, number, number], // Green
-      warning: [234, 179, 8] as [number, number, number], // Yellow
-      danger: [239, 68, 68] as [number, number, number], // Red
-      gray: [107, 114, 128] as [number, number, number],
-      lightGray: [248, 250, 252] as [number, number, number],
-      borderGray: [226, 232, 240] as [number, number, number],
-      darkText: [15, 23, 42] as [number, number, number],
-      mediumText: [51, 65, 85] as [number, number, number],
-      lightText: [71, 85, 105] as [number, number, number]
+      primary: [59, 130, 246],
+      primaryLight: [147, 197, 253],
+      success: [34, 197, 94],
+      warning: [234, 179, 8],
+      danger: [239, 68, 68],
+      gray: [107, 114, 128],
+      lightGray: [248, 250, 252],
+      borderGray: [226, 232, 240],
+      darkText: [15, 23, 42],
+      mediumText: [51, 65, 85],
+      lightText: [71, 85, 105]
     };
 
-    // Helper function to add the GoodSignals logo
-    const addLogo = async () => {
-      try {
-        const logoUrl = '/lovable-uploads/73c12031-858d-406a-a679-3b7259c7649d.png';
+    // Helper function to load image with timeout and better error handling
+    const loadImageWithTimeout = (src: string, timeoutMs: number = 5000): Promise<HTMLImageElement | null> => {
+      return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
-        return new Promise<void>((resolve) => {
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              
-              const logoHeight = 10;
-              const aspectRatio = img.width / img.height;
-              const logoWidth = logoHeight * aspectRatio;
-              
-              canvas.width = img.width;
-              canvas.height = img.height;
-              ctx?.drawImage(img, 0, 0);
-              
-              const imgData = canvas.toDataURL('image/png', 1.0);
-              const logoX = pageWidth - margin - logoWidth;
-              const logoY = margin;
-              
-              pdf.addImage(imgData, 'PNG', logoX, logoY, logoWidth, logoHeight);
-              resolve();
-            } catch (error) {
-              console.warn('Failed to add logo to PDF:', error);
-              resolve();
-            }
-          };
+        // Set up timeout
+        const timeoutId = setTimeout(() => {
+          console.warn(`Image loading timed out after ${timeoutMs}ms for:`, src);
+          img.onload = null;
+          img.onerror = null;
+          resolve(null);
+        }, timeoutMs);
+        
+        img.onload = () => {
+          clearTimeout(timeoutId);
+          resolve(img);
+        };
+        
+        img.onerror = (error) => {
+          clearTimeout(timeoutId);
+          console.warn('Failed to load image:', src, error);
+          resolve(null);
+        };
+        
+        // Start loading
+        img.src = src;
+      });
+    };
+
+    // Helper function to add the GoodSignals logo with timeout
+    const addLogo = async () => {
+      try {
+        const logoUrl = '/lovable-uploads/73c12031-858d-406a-a679-3b7259c7649d.png';
+        console.log('Attempting to load logo:', logoUrl);
+        
+        const img = await loadImageWithTimeout(logoUrl, 3000);
+        
+        if (!img) {
+          console.warn('Logo failed to load, continuing without logo');
+          return;
+        }
+
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
           
-          img.onerror = () => {
-            console.warn('Failed to load logo for PDF');
-            resolve();
-          };
+          if (!ctx) {
+            console.warn('Canvas context not available, skipping logo');
+            return;
+          }
           
-          img.src = logoUrl;
-        });
+          const logoHeight = 10;
+          const aspectRatio = img.width / img.height;
+          const logoWidth = logoHeight * aspectRatio;
+          
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          
+          const imgData = canvas.toDataURL('image/png', 1.0);
+          const logoX = pageWidth - margin - logoWidth;
+          const logoY = margin;
+          
+          pdf.addImage(imgData, 'PNG', logoX, logoY, logoWidth, logoHeight);
+          console.log('Logo added successfully');
+        } catch (error) {
+          console.warn('Failed to process logo image:', error);
+        }
       } catch (error) {
         console.warn('Failed to add logo to PDF:', error);
       }
@@ -233,18 +262,18 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       // Main card background
       switch (cardType) {
         case 'header':
-          pdf.setFillColor(colors.primaryLight[0], colors.primaryLight[1], colors.primaryLight[2]);
+          pdf.setFillColor(...colors.primaryLight);
           break;
         case 'metric':
           pdf.setFillColor(255, 255, 255);
           break;
         default:
-          pdf.setFillColor(colors.lightGray[0], colors.lightGray[1], colors.lightGray[2]);
+          pdf.setFillColor(...colors.lightGray);
       }
       pdf.roundedRect(x, y, width, height, 4, 4, 'F');
       
       // Card border
-      pdf.setDrawColor(colors.borderGray[0], colors.borderGray[1], colors.borderGray[2]);
+      pdf.setDrawColor(...colors.borderGray);
       pdf.setLineWidth(0.5);
       pdf.roundedRect(x, y, width, height, 4, 4, 'S');
     };
@@ -256,7 +285,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       
       pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      pdf.setTextColor(...colors.primary);
       
       const headerText = icon ? `${icon} ${title}` : title;
       pdf.text(headerText, margin + cardPadding, yPos + 12);
@@ -268,7 +297,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     const addPageHeader = (title: string) => {
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(colors.gray[0], colors.gray[1], colors.gray[2]);
+      pdf.setTextColor(...colors.gray);
       pdf.text(title, margin, margin - 5);
     };
 
@@ -296,7 +325,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       addCard(margin, yPos, contentWidth, totalTableHeight, 'metric');
       
       // Table header
-      pdf.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      pdf.setFillColor(...colors.primary);
       pdf.roundedRect(margin + 2, yPos + 2, contentWidth - 4, tableHeaderHeight, 2, 2, 'F');
       
       pdf.setFontSize(11);
@@ -324,7 +353,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+        pdf.setTextColor(...colors.darkText);
         
         let cellX = margin + cardPadding;
         
@@ -345,16 +374,16 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         const score = metric.score;
         if (score !== null && score !== undefined) {
           if (score >= 80) {
-            pdf.setTextColor(colors.success[0], colors.success[1], colors.success[2]);
+            pdf.setTextColor(...colors.success);
           } else if (score >= 60) {
-            pdf.setTextColor(colors.warning[0], colors.warning[1], colors.warning[2]);
+            pdf.setTextColor(...colors.warning);
           } else {
-            pdf.setTextColor(colors.danger[0], colors.danger[1], colors.danger[2]);
+            pdf.setTextColor(...colors.danger);
           }
           pdf.setFont('helvetica', 'bold');
           pdf.text(`${score.toFixed(0)}%`, cellX, currentY + 3);
         } else {
-          pdf.setTextColor(colors.gray[0], colors.gray[1], colors.gray[2]);
+          pdf.setTextColor(...colors.gray);
           pdf.text('N/A', cellX, currentY + 3);
         }
         
@@ -377,7 +406,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       addCard(margin, yPos, contentWidth, totalTableHeight, 'metric');
       
       // Table header
-      pdf.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      pdf.setFillColor(...colors.primary);
       pdf.roundedRect(margin + 2, yPos + 2, contentWidth - 4, tableHeaderHeight, 2, 2, 'F');
       
       pdf.setFontSize(11);
@@ -404,7 +433,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+        pdf.setTextColor(...colors.darkText);
         
         let cellX = margin + cardPadding;
         
@@ -415,20 +444,20 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         
         // Grade with badge styling
         pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+        pdf.setTextColor(...colors.primary);
         pdf.text(`Grade ${rating.rating_grade}`, cellX, currentY + 3);
         cellX += colWidths[1];
         
         // Description
         pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+        pdf.setTextColor(...colors.lightText);
         const descriptionText = pdf.splitTextToSize(rating.rating_description || 'No description', colWidths[2] - 10);
         pdf.text(descriptionText[0], cellX, currentY + 3);
         
         // Notes if available
         if (rating.notes) {
           pdf.setFontSize(9);
-          pdf.setTextColor(colors.gray[0], colors.gray[1], colors.gray[2]);
+          pdf.setTextColor(...colors.gray);
           const notesText = pdf.splitTextToSize(`Notes: ${rating.notes}`, contentWidth - (cardPadding * 2));
           pdf.text(notesText[0], margin + cardPadding, currentY + 12);
         }
@@ -439,52 +468,63 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       return yPos + totalTableHeight + sectionSpacing;
     };
 
-    // Helper function to add enhanced image
+    // Helper function to add enhanced image with timeout
     const addImageToPage = async (imageUrl: string, yPos: number, maxHeight: number = 80) => {
       try {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+        console.log('Attempting to load image for PDF:', imageUrl);
         
-        return new Promise<number>((resolve) => {
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            const aspectRatio = img.width / img.height;
-            let imgWidth = contentWidth * 0.8;
-            let imgHeight = imgWidth / aspectRatio;
-            
-            if (imgHeight > maxHeight) {
-              imgHeight = maxHeight;
-              imgWidth = imgHeight * aspectRatio;
-            }
-            
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx?.drawImage(img, 0, 0);
-            
-            // Image container with border
-            const imageCardHeight = imgHeight + 16;
-            addCard(margin, yPos, contentWidth, imageCardHeight, 'metric');
-            
-            const imgData = canvas.toDataURL('image/jpeg', 0.9);
-            const xPos = margin + (contentWidth - imgWidth) / 2;
-            
-            pdf.addImage(imgData, 'JPEG', xPos, yPos + 8, imgWidth, imgHeight);
-            resolve(yPos + imageCardHeight + sectionSpacing);
-          };
+        const img = await loadImageWithTimeout(imageUrl, 5000);
+        
+        if (!img) {
+          console.warn('Image failed to load, skipping:', imageUrl);
+          return yPos;
+        }
+
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
           
-          img.onerror = () => resolve(yPos);
-          img.src = imageUrl;
-        });
+          if (!ctx) {
+            console.warn('Canvas context not available, skipping image');
+            return yPos;
+          }
+          
+          const aspectRatio = img.width / img.height;
+          let imgWidth = contentWidth * 0.8;
+          let imgHeight = imgWidth / aspectRatio;
+          
+          if (imgHeight > maxHeight) {
+            imgHeight = maxHeight;
+            imgWidth = imgHeight * aspectRatio;
+          }
+          
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          
+          // Image container with border
+          const imageCardHeight = imgHeight + 16;
+          addCard(margin, yPos, contentWidth, imageCardHeight, 'metric');
+          
+          const imgData = canvas.toDataURL('image/jpeg', 0.9);
+          const xPos = margin + (contentWidth - imgWidth) / 2;
+          
+          pdf.addImage(imgData, 'JPEG', xPos, yPos + 8, imgWidth, imgHeight);
+          console.log('Image added successfully:', imageUrl);
+          return yPos + imageCardHeight + sectionSpacing;
+        } catch (error) {
+          console.warn('Failed to process image:', imageUrl, error);
+          return yPos;
+        }
       } catch (error) {
-        console.warn('Failed to add image to PDF:', error);
+        console.warn('Failed to add image to PDF:', imageUrl, error);
         return yPos;
       }
     };
 
     // Start building the PDF
     let currentPage = 1;
+    console.log('Adding logo to PDF...');
     await addLogo();
     
     // PAGE 1: Title and Assessment Overview
@@ -494,7 +534,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     // Main title
     pdf.setFontSize(28);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    pdf.setTextColor(...colors.primary);
     pdf.text('Site Assessment Report', margin, yPosition);
     yPosition += 25;
     
@@ -506,7 +546,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+    pdf.setTextColor(...colors.darkText);
     
     const assessmentName = exportData.assessment.assessment_name || 'Unnamed Assessment';
     const address = [
@@ -524,14 +564,14 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     // Overview content in a clean layout
     pdf.text('Assessment Name:', margin + cardPadding, yPosition + 15);
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(colors.mediumText[0], colors.mediumText[1], colors.mediumText[2]);
+    pdf.setTextColor(...colors.mediumText);
     pdf.text(assessmentName, margin + cardPadding + 50, yPosition + 15);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+    pdf.setTextColor(...colors.darkText);
     pdf.text('Address:', margin + cardPadding, yPosition + 25);
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(colors.mediumText[0], colors.mediumText[1], colors.mediumText[2]);
+    pdf.setTextColor(...colors.mediumText);
     const addressLines = pdf.splitTextToSize(address, contentWidth - 80);
     let addressY = yPosition + 25;
     addressLines.forEach((line: string) => {
@@ -540,17 +580,17 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     });
     
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+    pdf.setTextColor(...colors.darkText);
     pdf.text('Created Date:', margin + cardPadding, yPosition + 45);
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(colors.mediumText[0], colors.mediumText[1], colors.mediumText[2]);
+    pdf.setTextColor(...colors.mediumText);
     pdf.text(createdDate, margin + cardPadding + 50, yPosition + 45);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+    pdf.setTextColor(...colors.darkText);
     pdf.text('Target Metric Set:', margin + cardPadding, yPosition + 55);
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(colors.mediumText[0], colors.mediumText[1], colors.mediumText[2]);
+    pdf.setTextColor(...colors.mediumText);
     pdf.text(exportData.targetMetricSet?.name || 'Not specified', margin + cardPadding + 50, yPosition + 55);
     
     yPosition += overviewHeight + sectionSpacing;
@@ -571,11 +611,11 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     // Large score display
     pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    pdf.setTextColor(...colors.primary);
     pdf.text(`Site Signal Score: ${overallScore}`, margin + cardPadding, yPosition + 20);
     
     pdf.setFontSize(16);
-    pdf.setTextColor(colors.mediumText[0], colors.mediumText[1], colors.mediumText[2]);
+    pdf.setTextColor(...colors.mediumText);
     pdf.text(`Assessment Completion: ${completionRate}`, margin + cardPadding, yPosition + 35);
 
     // PAGE 2+: Metric Categories
@@ -590,7 +630,9 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         metricsByCategory.get(category)!.push({ key, data });
       }
 
+      console.log('Processing metric categories for PDF...');
       for (const [category, metrics] of metricsByCategory.entries()) {
+        console.log(`Adding page for category: ${category}`);
         pdf.addPage();
         currentPage++;
         await addLogo();
@@ -599,10 +641,13 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         
         yPosition = addSectionHeader(category, yPosition, '🏷️');
         
-        // Category image if available
-        const categoryImage = metrics.find(m => m.data.imageUrl)?.data.imageUrl;
-        if (categoryImage && options.includeImages) {
-          yPosition = await addImageToPage(categoryImage, yPosition, 60);
+        // Category image if available and option is enabled
+        if (options.includeImages) {
+          const categoryImage = metrics.find(m => m.data.imageUrl)?.data.imageUrl;
+          if (categoryImage) {
+            console.log(`Adding category image for ${category}:`, categoryImage);
+            yPosition = await addImageToPage(categoryImage, yPosition, 60);
+          }
         }
         
         // Convert metrics to table format
@@ -619,6 +664,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
 
     // Site Visit Ratings Page
     if (exportData.assessment.site_visit_ratings && exportData.assessment.site_visit_ratings.length > 0) {
+      console.log('Adding site visit ratings page...');
       pdf.addPage();
       currentPage++;
       await addLogo();
@@ -627,10 +673,13 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       
       yPosition = addSectionHeader('Site Visit Ratings', yPosition, '✅');
       
-      // Site visit image if available
-      const siteVisitImage = exportData.assessment.site_visit_ratings.find((r: any) => r.imageUrl)?.imageUrl;
-      if (siteVisitImage && options.includeImages) {
-        yPosition = await addImageToPage(siteVisitImage, yPosition, 60);
+      // Site visit image if available and option is enabled
+      if (options.includeImages) {
+        const siteVisitImage = exportData.assessment.site_visit_ratings.find((r: any) => r.imageUrl)?.imageUrl;
+        if (siteVisitImage) {
+          console.log('Adding site visit image:', siteVisitImage);
+          yPosition = await addImageToPage(siteVisitImage, yPosition, 60);
+        }
       }
       
       yPosition = addSiteVisitRatingsTable(exportData.assessment.site_visit_ratings, yPosition);
@@ -638,6 +687,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
 
     // Executive Summary Page
     if (exportData.assessment.executive_summary) {
+      console.log('Adding executive summary page...');
       pdf.addPage();
       currentPage++;
       await addLogo();
@@ -653,7 +703,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       
       pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(colors.darkText[0], colors.darkText[1], colors.darkText[2]);
+      pdf.setTextColor(...colors.darkText);
       
       let summaryY = yPosition + 15;
       summaryLines.forEach((line: string) => {
@@ -663,6 +713,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     }
 
     // Add professional footer to all pages
+    console.log('Adding footers to all pages...');
     const now = new Date();
     const exportDate = now.toLocaleDateString();
     const exportTime = now.toLocaleTimeString();
@@ -672,10 +723,10 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       pdf.setPage(i);
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(colors.gray[0], colors.gray[1], colors.gray[2]);
+      pdf.setTextColor(...colors.gray);
       
       // Footer line
-      pdf.setDrawColor(colors.borderGray[0], colors.borderGray[1], colors.borderGray[2]);
+      pdf.setDrawColor(...colors.borderGray);
       pdf.setLineWidth(0.5);
       pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
       
@@ -692,6 +743,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     const sanitizedName = fileNameAssessmentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const fileName = `site_assessment_${sanitizedName}_${new Date().getTime()}.pdf`;
 
+    console.log('Saving PDF file:', fileName);
     pdf.save(fileName);
     
     console.log('Enhanced PDF export completed successfully:', fileName);
