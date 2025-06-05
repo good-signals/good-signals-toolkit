@@ -162,65 +162,157 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     const cardPadding = 10;
     const sectionSpacing = 8;
 
+    // Helper function to add the GoodSignals logo
+    const addLogo = async () => {
+      try {
+        const logoUrl = '/lovable-uploads/73c12031-858d-406a-a679-3b7259c7649d.png';
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        return new Promise<void>((resolve) => {
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              
+              const logoHeight = 8; // 8mm height
+              const aspectRatio = img.width / img.height;
+              const logoWidth = logoHeight * aspectRatio;
+              
+              canvas.width = img.width;
+              canvas.height = img.height;
+              ctx?.drawImage(img, 0, 0);
+              
+              const imgData = canvas.toDataURL('image/png', 1.0);
+              const logoX = pageWidth - margin - logoWidth;
+              const logoY = margin;
+              
+              pdf.addImage(imgData, 'PNG', logoX, logoY, logoWidth, logoHeight);
+              resolve();
+            } catch (error) {
+              console.warn('Failed to add logo to PDF:', error);
+              resolve();
+            }
+          };
+          
+          img.onerror = () => {
+            console.warn('Failed to load logo for PDF');
+            resolve();
+          };
+          
+          img.src = logoUrl;
+        });
+      } catch (error) {
+        console.warn('Failed to add logo to PDF:', error);
+      }
+    };
+
     // Helper function to add a card-style border and background
     const addCard = (x: number, y: number, width: number, height: number) => {
       // Card background
       pdf.setFillColor(248, 250, 252); // Light gray background
-      pdf.roundedRect(x, y, width, height, 2, 2, 'F');
+      pdf.roundedRect(x, y, width, height, 3, 3, 'F');
       
       // Card border
       pdf.setDrawColor(226, 232, 240); // Light border
       pdf.setLineWidth(0.5);
-      pdf.roundedRect(x, y, width, height, 2, 2, 'S');
+      pdf.roundedRect(x, y, width, height, 3, 3, 'S');
     };
 
-    // Helper function to add section header with icon styling
+    // Helper function to add section header with styling matching the web app
     const addSectionHeader = (title: string, yPos: number, icon?: string) => {
-      const headerHeight = 12;
+      const headerHeight = 14;
       addCard(margin, yPos, contentWidth, headerHeight);
       
-      pdf.setFontSize(14);
+      pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(59, 130, 246); // Blue color for headers
+      pdf.setTextColor(59, 130, 246); // Blue color matching web app
       
       const headerText = icon ? `${icon} ${title}` : title;
-      pdf.text(headerText, margin + cardPadding, yPos + 8);
+      pdf.text(headerText, margin + cardPadding, yPos + 9);
       
       return yPos + headerHeight + sectionSpacing;
     };
 
-    // Helper function to add metric data in card format
+    // Helper function to get display label for metrics
+    const getMetricDisplayLabel = (metricKey: string, targetMetricSet: any) => {
+      if (targetMetricSet?.user_custom_metrics_settings) {
+        const setting = targetMetricSet.user_custom_metrics_settings.find(
+          (s: any) => s.metric_identifier === metricKey
+        );
+        if (setting?.label) {
+          return setting.label;
+        }
+      }
+      
+      // Fallback to formatted version of the key
+      return metricKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
+
+    // Helper function to add metric card matching web app styling
     const addMetricCard = (label: string, value: string, target: string, score: number | null, notes: string | null, yPos: number) => {
-      const cardHeight = notes ? 25 : 18;
+      const baseCardHeight = 22;
+      const notesHeight = notes ? 8 : 0;
+      const cardHeight = baseCardHeight + notesHeight;
+      
       addCard(margin, yPos, contentWidth, cardHeight);
       
-      // Metric label
-      pdf.setFontSize(11);
+      // Metric label - larger and bold like web app
+      pdf.setFontSize(12);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(label, margin + cardPadding, yPos + 6);
+      pdf.setTextColor(51, 65, 85); // Darker text for label
+      pdf.text(label, margin + cardPadding, yPos + 8);
       
-      // Values section
-      pdf.setFontSize(10);
+      // Value, Target, Score layout in a row like web app
+      pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(100, 116, 139);
       
-      const valueText = `Value: ${value}`;
-      const targetText = `Target: ${target}`;
-      const scoreText = score !== null ? `Score: ${score.toFixed(0)}%` : 'Score: N/A';
+      // Value
+      pdf.setTextColor(71, 85, 105);
+      pdf.text('Value:', margin + cardPadding, yPos + 14);
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(value, margin + cardPadding + 18, yPos + 14);
       
-      pdf.text(valueText, margin + cardPadding, yPos + 11);
-      pdf.text(targetText, margin + cardPadding + 50, yPos + 11);
-      pdf.text(scoreText, margin + cardPadding + 100, yPos + 11);
+      // Target
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(71, 85, 105);
+      pdf.text('Target:', margin + cardPadding + 60, yPos + 14);
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(target, margin + cardPadding + 78, yPos + 14);
+      
+      // Score with color coding like web app
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(71, 85, 105);
+      pdf.text('Score:', margin + cardPadding + 120, yPos + 14);
+      
+      const scoreText = score !== null ? `${score.toFixed(0)}%` : 'N/A';
+      // Color code the score
+      if (score !== null) {
+        if (score >= 80) {
+          pdf.setTextColor(34, 197, 94); // Green
+        } else if (score >= 60) {
+          pdf.setTextColor(234, 179, 8); // Yellow
+        } else {
+          pdf.setTextColor(239, 68, 68); // Red
+        }
+      } else {
+        pdf.setTextColor(107, 114, 128); // Gray
+      }
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(scoreText, margin + cardPadding + 138, yPos + 14);
       
       // Notes if available
       if (notes) {
-        pdf.setFontSize(9);
-        pdf.setTextColor(75, 85, 99);
-        const notesLines = pdf.splitTextToSize(`Notes: ${notes}`, contentWidth - (cardPadding * 2));
-        let notesY = yPos + 16;
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(107, 114, 128);
+        pdf.text('Notes:', margin + cardPadding, yPos + 20);
+        const notesLines = pdf.splitTextToSize(notes, contentWidth - (cardPadding * 2) - 20);
+        let notesY = yPos + 20;
         notesLines.forEach((line: string) => {
-          pdf.text(line, margin + cardPadding, notesY);
+          pdf.text(line, margin + cardPadding + 20, notesY);
           notesY += 3;
         });
       }
@@ -241,7 +333,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
             
             // Calculate dimensions maintaining aspect ratio
             const aspectRatio = img.width / img.height;
-            let imgWidth = contentWidth * 0.6; // 60% of content width
+            let imgWidth = contentWidth * 0.7; // 70% of content width
             let imgHeight = imgWidth / aspectRatio;
             
             if (imgHeight > maxHeight) {
@@ -275,20 +367,23 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
 
     let currentPage = 1;
     
+    // Add logo to first page
+    await addLogo();
+    
     // Page 1: Assessment Overview
-    let yPosition = margin + 10;
+    let yPosition = margin + 20; // Leave space for logo
     
     // Title
-    pdf.setFontSize(20);
+    pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(30, 41, 59);
+    pdf.setTextColor(15, 23, 42);
     pdf.text('Site Assessment Report', margin, yPosition);
-    yPosition += 15;
+    yPosition += 20;
     
     // Assessment details card
     yPosition = addSectionHeader('Assessment Overview', yPosition, '📋');
     
-    const overviewHeight = 35;
+    const overviewHeight = 40;
     addCard(margin, yPosition, contentWidth, overviewHeight);
     
     pdf.setFontSize(11);
@@ -308,17 +403,37 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       ? new Date(exportData.assessment.created_at).toLocaleDateString()
       : 'Unknown';
 
-    pdf.text(`Name: ${overviewAssessmentName}`, margin + cardPadding, yPosition + 6);
-    pdf.text(`Address: ${address}`, margin + cardPadding, yPosition + 11);
-    pdf.text(`Created: ${createdDate}`, margin + cardPadding, yPosition + 16);
-    pdf.text(`Target Metric Set: ${exportData.targetMetricSet?.name || 'Not specified'}`, margin + cardPadding, yPosition + 21);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Name:', margin + cardPadding, yPosition + 8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(overviewAssessmentName, margin + cardPadding + 20, yPosition + 8);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Address:', margin + cardPadding, yPosition + 14);
+    pdf.setFont('helvetica', 'normal');
+    const addressLines = pdf.splitTextToSize(address, contentWidth - (cardPadding * 2) - 25);
+    let addressY = yPosition + 14;
+    addressLines.forEach((line: string) => {
+      pdf.text(line, margin + cardPadding + 25, addressY);
+      addressY += 4;
+    });
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Created:', margin + cardPadding, yPosition + 26);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(createdDate, margin + cardPadding + 25, yPosition + 26);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Target Metric Set:', margin + cardPadding, yPosition + 32);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(exportData.targetMetricSet?.name || 'Not specified', margin + cardPadding + 45, yPosition + 32);
     
     yPosition += overviewHeight + sectionSpacing;
     
     // Overall scores card
     yPosition = addSectionHeader('Overall Performance', yPosition, '📊');
     
-    const scoresHeight = 20;
+    const scoresHeight = 25;
     addCard(margin, yPosition, contentWidth, scoresHeight);
     
     const overallScore = exportData.overallSiteSignalScore !== null 
@@ -328,11 +443,11 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       ? exportData.completionPercentage.toFixed(1) + '%' 
       : 'Unknown';
     
-    pdf.setFontSize(12);
+    pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(59, 130, 246);
-    pdf.text(`Site Signal Score: ${overallScore}`, margin + cardPadding, yPosition + 8);
-    pdf.text(`Completion: ${completionRate}`, margin + cardPadding + 80, yPosition + 8);
+    pdf.text(`Site Signal Score: ${overallScore}`, margin + cardPadding, yPosition + 12);
+    pdf.text(`Completion: ${completionRate}`, margin + cardPadding + 90, yPosition + 12);
     
     // Metric Categories - Each on its own page
     if (exportData.detailedMetricScores && exportData.detailedMetricScores.size > 0) {
@@ -351,7 +466,8 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       for (const [category, metrics] of metricsByCategory.entries()) {
         pdf.addPage();
         currentPage++;
-        yPosition = margin + 10;
+        await addLogo(); // Add logo to each page
+        yPosition = margin + 20; // Leave space for logo
         
         yPosition = addSectionHeader(category, yPosition, '🏷️');
         
@@ -363,13 +479,14 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         
         // Add metrics for this category
         for (const { key, data } of metrics) {
-          if (yPosition > pageHeight - 40) {
+          if (yPosition > pageHeight - 50) {
             pdf.addPage();
             currentPage++;
-            yPosition = margin + 10;
+            await addLogo();
+            yPosition = margin + 20;
           }
           
-          const label = data.label || key;
+          const label = getMetricDisplayLabel(key, exportData.targetMetricSet);
           const enteredValue = data.enteredValue ?? 'N/A';
           const targetValue = data.targetValue ?? 'N/A';
           const score = data.score;
@@ -384,7 +501,8 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     if (exportData.assessment.site_visit_ratings && exportData.assessment.site_visit_ratings.length > 0) {
       pdf.addPage();
       currentPage++;
-      yPosition = margin + 10;
+      await addLogo();
+      yPosition = margin + 20;
       
       yPosition = addSectionHeader('Site Visit Ratings', yPosition, '✅');
       
@@ -395,36 +513,45 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       }
       
       exportData.assessment.site_visit_ratings.forEach((rating: any) => {
-        if (yPosition > pageHeight - 30) {
+        if (yPosition > pageHeight - 40) {
           pdf.addPage();
           currentPage++;
-          yPosition = margin + 10;
+          await addLogo();
+          yPosition = margin + 20;
         }
         
-        const cardHeight = rating.notes ? 20 : 15;
+        const cardHeight = rating.notes ? 25 : 20;
         addCard(margin, yPosition, contentWidth, cardHeight);
         
         const label = rating.label || rating.criterion_key;
         const grade = rating.rating_grade;
         const description = rating.rating_description || 'No description';
         
-        pdf.setFontSize(11);
+        pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(71, 85, 105);
-        pdf.text(`${label}: Grade ${grade}`, margin + cardPadding, yPosition + 6);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text(`${label}`, margin + cardPadding, yPosition + 8);
         
-        pdf.setFontSize(10);
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(71, 85, 105);
+        pdf.text('Rating:', margin + cardPadding, yPosition + 14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(59, 130, 246);
+        pdf.text(`Grade ${grade}`, margin + cardPadding + 25, yPosition + 14);
+        
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(100, 116, 139);
-        pdf.text(description, margin + cardPadding, yPosition + 11);
+        pdf.text(description, margin + cardPadding + 60, yPosition + 14);
         
         if (rating.notes) {
-          pdf.setFontSize(9);
-          pdf.setTextColor(75, 85, 99);
-          const notesLines = pdf.splitTextToSize(`Notes: ${rating.notes}`, contentWidth - (cardPadding * 2));
-          let notesY = yPosition + 15;
+          pdf.setFontSize(10);
+          pdf.setTextColor(107, 114, 128);
+          pdf.text('Notes:', margin + cardPadding, yPosition + 20);
+          const notesLines = pdf.splitTextToSize(rating.notes, contentWidth - (cardPadding * 2) - 20);
+          let notesY = yPosition + 20;
           notesLines.forEach((line: string) => {
-            pdf.text(line, margin + cardPadding, notesY);
+            pdf.text(line, margin + cardPadding + 20, notesY);
             notesY += 3;
           });
         }
@@ -437,23 +564,24 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     if (exportData.assessment.executive_summary) {
       pdf.addPage();
       currentPage++;
-      yPosition = margin + 10;
+      await addLogo();
+      yPosition = margin + 20;
       
       yPosition = addSectionHeader('Executive Summary', yPosition, '📄');
       
       const summaryLines = pdf.splitTextToSize(exportData.assessment.executive_summary, contentWidth - (cardPadding * 2));
-      const summaryHeight = Math.max(30, summaryLines.length * 4 + 10);
+      const summaryHeight = Math.max(35, summaryLines.length * 5 + 15);
       
       addCard(margin, yPosition, contentWidth, summaryHeight);
       
-      pdf.setFontSize(10);
+      pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(71, 85, 105);
+      pdf.setTextColor(51, 65, 85);
       
-      let summaryY = yPosition + 6;
+      let summaryY = yPosition + 8;
       summaryLines.forEach((line: string) => {
         pdf.text(line, margin + cardPadding, summaryY);
-        summaryY += 4;
+        summaryY += 5;
       });
     }
 
