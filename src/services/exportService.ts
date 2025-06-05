@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -140,7 +141,7 @@ export const exportSiteAssessmentsToCSV = async (
 
 export const exportAssessmentToPDF = async (exportData: ExportData, options: ExportOptions = { format: 'pdf' }) => {
   try {
-    console.log('Starting PDF export for assessment:', exportData.assessment?.id);
+    console.log('Starting enhanced PDF export for assessment:', exportData.assessment?.id);
     
     // Validate required data
     if (!exportData.assessment) {
@@ -156,10 +157,25 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
 
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = 20;
     const contentWidth = pageWidth - (margin * 2);
-    const cardPadding = 10;
-    const sectionSpacing = 8;
+    const cardPadding = 12;
+    const sectionSpacing = 15;
+
+    // Enhanced color scheme matching web app
+    const colors = {
+      primary: [59, 130, 246], // Blue
+      primaryLight: [147, 197, 253],
+      success: [34, 197, 94], // Green
+      warning: [234, 179, 8], // Yellow
+      danger: [239, 68, 68], // Red
+      gray: [107, 114, 128],
+      lightGray: [248, 250, 252],
+      borderGray: [226, 232, 240],
+      darkText: [15, 23, 42],
+      mediumText: [51, 65, 85],
+      lightText: [71, 85, 105]
+    };
 
     // Helper function to add the GoodSignals logo
     const addLogo = async () => {
@@ -174,7 +190,7 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
               const canvas = document.createElement('canvas');
               const ctx = canvas.getContext('2d');
               
-              const logoHeight = 8; // 8mm height
+              const logoHeight = 10;
               const aspectRatio = img.width / img.height;
               const logoWidth = logoHeight * aspectRatio;
               
@@ -206,31 +222,54 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       }
     };
 
-    // Helper function to add a card-style border and background
-    const addCard = (x: number, y: number, width: number, height: number) => {
-      // Card background
-      pdf.setFillColor(248, 250, 252); // Light gray background
-      pdf.roundedRect(x, y, width, height, 3, 3, 'F');
+    // Enhanced card styling function
+    const addCard = (x: number, y: number, width: number, height: number, cardType: 'default' | 'header' | 'metric' | 'rating' = 'default') => {
+      // Drop shadow effect
+      pdf.setFillColor(0, 0, 0);
+      pdf.setGlobalAlpha(0.1);
+      pdf.roundedRect(x + 1, y + 1, width, height, 4, 4, 'F');
+      pdf.setGlobalAlpha(1);
+      
+      // Main card background
+      switch (cardType) {
+        case 'header':
+          pdf.setFillColor(...colors.primaryLight);
+          break;
+        case 'metric':
+          pdf.setFillColor(255, 255, 255);
+          break;
+        default:
+          pdf.setFillColor(...colors.lightGray);
+      }
+      pdf.roundedRect(x, y, width, height, 4, 4, 'F');
       
       // Card border
-      pdf.setDrawColor(226, 232, 240); // Light border
+      pdf.setDrawColor(...colors.borderGray);
       pdf.setLineWidth(0.5);
-      pdf.roundedRect(x, y, width, height, 3, 3, 'S');
+      pdf.roundedRect(x, y, width, height, 4, 4, 'S');
     };
 
-    // Helper function to add section header with styling matching the web app
+    // Enhanced section header with better styling
     const addSectionHeader = (title: string, yPos: number, icon?: string) => {
-      const headerHeight = 14;
-      addCard(margin, yPos, contentWidth, headerHeight);
+      const headerHeight = 18;
+      addCard(margin, yPos, contentWidth, headerHeight, 'header');
       
-      pdf.setFontSize(16);
+      pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(59, 130, 246); // Blue color matching web app
+      pdf.setTextColor(...colors.primary);
       
       const headerText = icon ? `${icon} ${title}` : title;
-      pdf.text(headerText, margin + cardPadding, yPos + 9);
+      pdf.text(headerText, margin + cardPadding, yPos + 12);
       
       return yPos + headerHeight + sectionSpacing;
+    };
+
+    // Enhanced page header function
+    const addPageHeader = (title: string) => {
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(...colors.gray);
+      pdf.text(title, margin, margin - 5);
     };
 
     // Helper function to get display label for metrics
@@ -244,83 +283,164 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         }
       }
       
-      // Fallback to formatted version of the key
       return metricKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     };
 
-    // Helper function to add metric card matching web app styling
-    const addMetricCard = (label: string, value: string, target: string, score: number | null, notes: string | null, yPos: number) => {
-      const baseCardHeight = 22;
-      const notesHeight = notes ? 8 : 0;
-      const cardHeight = baseCardHeight + notesHeight;
+    // Enhanced metric table layout
+    const addMetricTable = (metricsData: any[], yPos: number, categoryTitle: string) => {
+      const tableHeaderHeight = 12;
+      const rowHeight = 16;
+      const totalTableHeight = tableHeaderHeight + (metricsData.length * rowHeight) + 8;
       
-      addCard(margin, yPos, contentWidth, cardHeight);
+      // Table container card
+      addCard(margin, yPos, contentWidth, totalTableHeight, 'metric');
       
-      // Metric label - larger and bold like web app
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(51, 65, 85); // Darker text for label
-      pdf.text(label, margin + cardPadding, yPos + 8);
+      // Table header
+      pdf.setFillColor(...colors.primary);
+      pdf.roundedRect(margin + 2, yPos + 2, contentWidth - 4, tableHeaderHeight, 2, 2, 'F');
       
-      // Value, Target, Score layout in a row like web app
       pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'normal');
-      
-      // Value
-      pdf.setTextColor(71, 85, 105);
-      pdf.text('Value:', margin + cardPadding, yPos + 14);
-      pdf.setTextColor(15, 23, 42);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(value, margin + cardPadding + 18, yPos + 14);
+      pdf.setTextColor(255, 255, 255);
       
-      // Target
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(71, 85, 105);
-      pdf.text('Target:', margin + cardPadding + 60, yPos + 14);
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(target, margin + cardPadding + 78, yPos + 14);
+      const colWidths = [contentWidth * 0.4, contentWidth * 0.2, contentWidth * 0.2, contentWidth * 0.2];
+      const headers = ['Metric', 'Value', 'Target', 'Score'];
+      let headerX = margin + cardPadding;
       
-      // Score with color coding like web app
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(71, 85, 105);
-      pdf.text('Score:', margin + cardPadding + 120, yPos + 14);
+      headers.forEach((header, index) => {
+        pdf.text(header, headerX, yPos + 9);
+        headerX += colWidths[index];
+      });
       
-      const scoreText = score !== null ? `${score.toFixed(0)}%` : 'N/A';
-      // Color code the score
-      if (score !== null) {
-        if (score >= 80) {
-          pdf.setTextColor(34, 197, 94); // Green
-        } else if (score >= 60) {
-          pdf.setTextColor(234, 179, 8); // Yellow
-        } else {
-          pdf.setTextColor(239, 68, 68); // Red
+      // Table rows
+      let currentY = yPos + tableHeaderHeight + 6;
+      
+      metricsData.forEach((metric, index) => {
+        // Alternating row colors
+        if (index % 2 === 0) {
+          pdf.setFillColor(249, 250, 251);
+          pdf.rect(margin + 2, currentY - 3, contentWidth - 4, rowHeight - 2, 'F');
         }
-      } else {
-        pdf.setTextColor(107, 114, 128); // Gray
-      }
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(scoreText, margin + cardPadding + 138, yPos + 14);
-      
-      // Notes if available
-      if (notes) {
+        
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(107, 114, 128);
-        pdf.text('Notes:', margin + cardPadding, yPos + 20);
-        const notesLines = pdf.splitTextToSize(notes, contentWidth - (cardPadding * 2) - 20);
-        let notesY = yPos + 20;
-        notesLines.forEach((line: string) => {
-          pdf.text(line, margin + cardPadding + 20, notesY);
-          notesY += 3;
-        });
-      }
+        pdf.setTextColor(...colors.darkText);
+        
+        let cellX = margin + cardPadding;
+        
+        // Metric name
+        const metricName = pdf.splitTextToSize(metric.label, colWidths[0] - 10);
+        pdf.text(metricName[0], cellX, currentY + 3);
+        cellX += colWidths[0];
+        
+        // Value
+        pdf.text(String(metric.enteredValue), cellX, currentY + 3);
+        cellX += colWidths[1];
+        
+        // Target
+        pdf.text(String(metric.targetValue), cellX, currentY + 3);
+        cellX += colWidths[2];
+        
+        // Score with color coding
+        const score = metric.score;
+        if (score !== null && score !== undefined) {
+          if (score >= 80) {
+            pdf.setTextColor(...colors.success);
+          } else if (score >= 60) {
+            pdf.setTextColor(...colors.warning);
+          } else {
+            pdf.setTextColor(...colors.danger);
+          }
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`${score.toFixed(0)}%`, cellX, currentY + 3);
+        } else {
+          pdf.setTextColor(...colors.gray);
+          pdf.text('N/A', cellX, currentY + 3);
+        }
+        
+        currentY += rowHeight;
+      });
       
-      return yPos + cardHeight + 4;
+      return yPos + totalTableHeight + sectionSpacing;
     };
 
-    // Helper function to add image to PDF
-    const addImageToPage = async (imageUrl: string, yPos: number, maxHeight: number = 60) => {
+    // Enhanced site visit ratings display
+    const addSiteVisitRatingsTable = (ratings: any[], yPos: number) => {
+      if (!ratings || ratings.length === 0) {
+        return yPos;
+      }
+      
+      const tableHeaderHeight = 12;
+      const rowHeight = 20;
+      const totalTableHeight = tableHeaderHeight + (ratings.length * rowHeight) + 8;
+      
+      addCard(margin, yPos, contentWidth, totalTableHeight, 'metric');
+      
+      // Table header
+      pdf.setFillColor(...colors.primary);
+      pdf.roundedRect(margin + 2, yPos + 2, contentWidth - 4, tableHeaderHeight, 2, 2, 'F');
+      
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(255, 255, 255);
+      
+      const colWidths = [contentWidth * 0.4, contentWidth * 0.15, contentWidth * 0.45];
+      const headers = ['Criterion', 'Grade', 'Description'];
+      let headerX = margin + cardPadding;
+      
+      headers.forEach((header, index) => {
+        pdf.text(header, headerX, yPos + 9);
+        headerX += colWidths[index];
+      });
+      
+      // Table rows
+      let currentY = yPos + tableHeaderHeight + 6;
+      
+      ratings.forEach((rating, index) => {
+        if (index % 2 === 0) {
+          pdf.setFillColor(249, 250, 251);
+          pdf.rect(margin + 2, currentY - 3, contentWidth - 4, rowHeight - 2, 'F');
+        }
+        
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...colors.darkText);
+        
+        let cellX = margin + cardPadding;
+        
+        // Criterion
+        const criterionText = pdf.splitTextToSize(rating.label || rating.criterion_key, colWidths[0] - 10);
+        pdf.text(criterionText[0], cellX, currentY + 3);
+        cellX += colWidths[0];
+        
+        // Grade with badge styling
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(...colors.primary);
+        pdf.text(`Grade ${rating.rating_grade}`, cellX, currentY + 3);
+        cellX += colWidths[1];
+        
+        // Description
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...colors.lightText);
+        const descriptionText = pdf.splitTextToSize(rating.rating_description || 'No description', colWidths[2] - 10);
+        pdf.text(descriptionText[0], cellX, currentY + 3);
+        
+        // Notes if available
+        if (rating.notes) {
+          pdf.setFontSize(9);
+          pdf.setTextColor(...colors.gray);
+          const notesText = pdf.splitTextToSize(`Notes: ${rating.notes}`, contentWidth - (cardPadding * 2));
+          pdf.text(notesText[0], margin + cardPadding, currentY + 12);
+        }
+        
+        currentY += rowHeight;
+      });
+      
+      return yPos + totalTableHeight + sectionSpacing;
+    };
+
+    // Helper function to add enhanced image
+    const addImageToPage = async (imageUrl: string, yPos: number, maxHeight: number = 80) => {
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -330,9 +450,8 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // Calculate dimensions maintaining aspect ratio
             const aspectRatio = img.width / img.height;
-            let imgWidth = contentWidth * 0.7; // 70% of content width
+            let imgWidth = contentWidth * 0.8;
             let imgHeight = imgWidth / aspectRatio;
             
             if (imgHeight > maxHeight) {
@@ -344,18 +463,18 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
             canvas.height = img.height;
             ctx?.drawImage(img, 0, 0);
             
-            const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            const xPos = margin + (contentWidth - imgWidth) / 2; // Center the image
+            // Image container with border
+            const imageCardHeight = imgHeight + 16;
+            addCard(margin, yPos, contentWidth, imageCardHeight, 'metric');
             
-            pdf.addImage(imgData, 'JPEG', xPos, yPos, imgWidth, imgHeight);
-            resolve(yPos + imgHeight + sectionSpacing);
+            const imgData = canvas.toDataURL('image/jpeg', 0.9);
+            const xPos = margin + (contentWidth - imgWidth) / 2;
+            
+            pdf.addImage(imgData, 'JPEG', xPos, yPos + 8, imgWidth, imgHeight);
+            resolve(yPos + imageCardHeight + sectionSpacing);
           };
           
-          img.onerror = () => {
-            // If image fails to load, just continue without it
-            resolve(yPos);
-          };
-          
+          img.onerror = () => resolve(yPos);
           img.src = imageUrl;
         });
       } catch (error) {
@@ -364,32 +483,32 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       }
     };
 
+    // Start building the PDF
     let currentPage = 1;
-    
-    // Add logo to first page
     await addLogo();
     
-    // Page 1: Assessment Overview
-    let yPosition = margin + 20; // Leave space for logo
+    // PAGE 1: Title and Assessment Overview
+    addPageHeader('Site Assessment Report');
+    let yPosition = margin + 25;
     
-    // Title
-    pdf.setFontSize(24);
+    // Main title
+    pdf.setFontSize(28);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(15, 23, 42);
+    pdf.setTextColor(...colors.primary);
     pdf.text('Site Assessment Report', margin, yPosition);
-    yPosition += 20;
+    yPosition += 25;
     
-    // Assessment details card
+    // Assessment overview section
     yPosition = addSectionHeader('Assessment Overview', yPosition, '📋');
     
-    const overviewHeight = 40;
-    addCard(margin, yPosition, contentWidth, overviewHeight);
+    const overviewHeight = 60;
+    addCard(margin, yPosition, contentWidth, overviewHeight, 'metric');
     
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(71, 85, 105);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...colors.darkText);
     
-    const overviewAssessmentName = exportData.assessment.assessment_name || 'Unnamed Assessment';
+    const assessmentName = exportData.assessment.assessment_name || 'Unnamed Assessment';
     const address = [
       exportData.assessment.address_line1,
       exportData.assessment.address_line2,
@@ -402,55 +521,65 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
       ? new Date(exportData.assessment.created_at).toLocaleDateString()
       : 'Unknown';
 
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Name:', margin + cardPadding, yPosition + 8);
+    // Overview content in a clean layout
+    pdf.text('Assessment Name:', margin + cardPadding, yPosition + 15);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(overviewAssessmentName, margin + cardPadding + 20, yPosition + 8);
+    pdf.setTextColor(...colors.mediumText);
+    pdf.text(assessmentName, margin + cardPadding + 50, yPosition + 15);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Address:', margin + cardPadding, yPosition + 14);
+    pdf.setTextColor(...colors.darkText);
+    pdf.text('Address:', margin + cardPadding, yPosition + 25);
     pdf.setFont('helvetica', 'normal');
-    const addressLines = pdf.splitTextToSize(address, contentWidth - (cardPadding * 2) - 25);
-    let addressY = yPosition + 14;
+    pdf.setTextColor(...colors.mediumText);
+    const addressLines = pdf.splitTextToSize(address, contentWidth - 80);
+    let addressY = yPosition + 25;
     addressLines.forEach((line: string) => {
-      pdf.text(line, margin + cardPadding + 25, addressY);
-      addressY += 4;
+      pdf.text(line, margin + cardPadding + 50, addressY);
+      addressY += 6;
     });
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Created:', margin + cardPadding, yPosition + 26);
+    pdf.setTextColor(...colors.darkText);
+    pdf.text('Created Date:', margin + cardPadding, yPosition + 45);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(createdDate, margin + cardPadding + 25, yPosition + 26);
+    pdf.setTextColor(...colors.mediumText);
+    pdf.text(createdDate, margin + cardPadding + 50, yPosition + 45);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Target Metric Set:', margin + cardPadding, yPosition + 32);
+    pdf.setTextColor(...colors.darkText);
+    pdf.text('Target Metric Set:', margin + cardPadding, yPosition + 55);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(exportData.targetMetricSet?.name || 'Not specified', margin + cardPadding + 45, yPosition + 32);
+    pdf.setTextColor(...colors.mediumText);
+    pdf.text(exportData.targetMetricSet?.name || 'Not specified', margin + cardPadding + 50, yPosition + 55);
     
     yPosition += overviewHeight + sectionSpacing;
-    
-    // Overall scores card
+
+    // Overall Performance section
     yPosition = addSectionHeader('Overall Performance', yPosition, '📊');
     
-    const scoresHeight = 25;
-    addCard(margin, yPosition, contentWidth, scoresHeight);
+    const performanceHeight = 45;
+    addCard(margin, yPosition, contentWidth, performanceHeight, 'metric');
     
     const overallScore = exportData.overallSiteSignalScore !== null 
-      ? `${exportData.overallSiteSignalScore.toFixed(0)}%` 
+      ? exportData.overallSiteSignalScore.toFixed(0) + '%' 
       : 'Not calculated';
     const completionRate = exportData.completionPercentage !== null 
       ? exportData.completionPercentage.toFixed(1) + '%' 
       : 'Unknown';
     
-    pdf.setFontSize(14);
+    // Large score display
+    pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(59, 130, 246);
-    pdf.text(`Site Signal Score: ${overallScore}`, margin + cardPadding, yPosition + 12);
-    pdf.text(`Completion: ${completionRate}`, margin + cardPadding + 90, yPosition + 12);
+    pdf.setTextColor(...colors.primary);
+    pdf.text(`Site Signal Score: ${overallScore}`, margin + cardPadding, yPosition + 20);
     
-    // Metric Categories - Each on its own page
+    pdf.setFontSize(16);
+    pdf.setTextColor(...colors.mediumText);
+    pdf.text(`Assessment Completion: ${completionRate}`, margin + cardPadding, yPosition + 35);
+
+    // PAGE 2+: Metric Categories
     if (exportData.detailedMetricScores && exportData.detailedMetricScores.size > 0) {
-      // Group metrics by category
       const metricsByCategory = new Map<string, Array<{ key: string; data: any }>>();
       
       for (const [key, data] of exportData.detailedMetricScores.entries()) {
@@ -461,130 +590,79 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
         metricsByCategory.get(category)!.push({ key, data });
       }
 
-      // Create a page for each category
       for (const [category, metrics] of metricsByCategory.entries()) {
         pdf.addPage();
         currentPage++;
-        await addLogo(); // Add logo to each page
-        yPosition = margin + 20; // Leave space for logo
+        await addLogo();
+        addPageHeader(`${category} Metrics`);
+        yPosition = margin + 25;
         
         yPosition = addSectionHeader(category, yPosition, '🏷️');
         
-        // Find category image if it exists
+        // Category image if available
         const categoryImage = metrics.find(m => m.data.imageUrl)?.data.imageUrl;
         if (categoryImage && options.includeImages) {
-          yPosition = await addImageToPage(categoryImage, yPosition, 50);
+          yPosition = await addImageToPage(categoryImage, yPosition, 60);
         }
         
-        // Add metrics for this category
-        for (const { key, data } of metrics) {
-          if (yPosition > pageHeight - 50) {
-            pdf.addPage();
-            currentPage++;
-            await addLogo();
-            yPosition = margin + 20;
-          }
-          
-          const label = getMetricDisplayLabel(key, exportData.targetMetricSet);
-          const enteredValue = data.enteredValue ?? 'N/A';
-          const targetValue = data.targetValue ?? 'N/A';
-          const score = data.score;
-          const notes = data.notes;
-          
-          yPosition = addMetricCard(label, String(enteredValue), String(targetValue), score, notes, yPosition);
-        }
+        // Convert metrics to table format
+        const metricsTableData = metrics.map(({ key, data }) => ({
+          label: getMetricDisplayLabel(key, exportData.targetMetricSet),
+          enteredValue: data.enteredValue ?? 'N/A',
+          targetValue: data.targetValue ?? 'N/A',
+          score: data.score
+        }));
+        
+        yPosition = addMetricTable(metricsTableData, yPosition, category);
       }
     }
 
-    // Site Visit Ratings - On its own page
+    // Site Visit Ratings Page
     if (exportData.assessment.site_visit_ratings && exportData.assessment.site_visit_ratings.length > 0) {
       pdf.addPage();
       currentPage++;
       await addLogo();
-      yPosition = margin + 20;
+      addPageHeader('Site Visit Ratings');
+      yPosition = margin + 25;
       
       yPosition = addSectionHeader('Site Visit Ratings', yPosition, '✅');
       
-      // Find site visit image if it exists
+      // Site visit image if available
       const siteVisitImage = exportData.assessment.site_visit_ratings.find((r: any) => r.imageUrl)?.imageUrl;
       if (siteVisitImage && options.includeImages) {
-        yPosition = await addImageToPage(siteVisitImage, yPosition, 50);
+        yPosition = await addImageToPage(siteVisitImage, yPosition, 60);
       }
       
-      for (const rating of exportData.assessment.site_visit_ratings) {
-        if (yPosition > pageHeight - 40) {
-          pdf.addPage();
-          currentPage++;
-          await addLogo();
-          yPosition = margin + 20;
-        }
-        
-        const cardHeight = rating.notes ? 25 : 20;
-        addCard(margin, yPosition, contentWidth, cardHeight);
-        
-        const label = rating.label || rating.criterion_key;
-        const grade = rating.rating_grade;
-        const description = rating.rating_description || 'No description';
-        
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(51, 65, 85);
-        pdf.text(`${label}`, margin + cardPadding, yPosition + 8);
-        
-        pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(71, 85, 105);
-        pdf.text('Rating:', margin + cardPadding, yPosition + 14);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(59, 130, 246);
-        pdf.text(`Grade ${grade}`, margin + cardPadding + 25, yPosition + 14);
-        
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(description, margin + cardPadding + 60, yPosition + 14);
-        
-        if (rating.notes) {
-          pdf.setFontSize(10);
-          pdf.setTextColor(107, 114, 128);
-          pdf.text('Notes:', margin + cardPadding, yPosition + 20);
-          const notesLines = pdf.splitTextToSize(rating.notes, contentWidth - (cardPadding * 2) - 20);
-          let notesY = yPosition + 20;
-          notesLines.forEach((line: string) => {
-            pdf.text(line, margin + cardPadding + 20, notesY);
-            notesY += 3;
-          });
-        }
-        
-        yPosition += cardHeight + 4;
-      }
+      yPosition = addSiteVisitRatingsTable(exportData.assessment.site_visit_ratings, yPosition);
     }
 
-    // Executive Summary - On its own page
+    // Executive Summary Page
     if (exportData.assessment.executive_summary) {
       pdf.addPage();
       currentPage++;
       await addLogo();
-      yPosition = margin + 20;
+      addPageHeader('Executive Summary');
+      yPosition = margin + 25;
       
       yPosition = addSectionHeader('Executive Summary', yPosition, '📄');
       
       const summaryLines = pdf.splitTextToSize(exportData.assessment.executive_summary, contentWidth - (cardPadding * 2));
-      const summaryHeight = Math.max(35, summaryLines.length * 5 + 15);
+      const summaryHeight = Math.max(60, summaryLines.length * 6 + 20);
       
-      addCard(margin, yPosition, contentWidth, summaryHeight);
+      addCard(margin, yPosition, contentWidth, summaryHeight, 'metric');
       
       pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(51, 65, 85);
+      pdf.setTextColor(...colors.darkText);
       
-      let summaryY = yPosition + 8;
+      let summaryY = yPosition + 15;
       summaryLines.forEach((line: string) => {
         pdf.text(line, margin + cardPadding, summaryY);
-        summaryY += 5;
+        summaryY += 6;
       });
     }
 
-    // Add page numbers and export info to each page
+    // Add professional footer to all pages
     const now = new Date();
     const exportDate = now.toLocaleDateString();
     const exportTime = now.toLocaleTimeString();
@@ -592,27 +670,31 @@ export const exportAssessmentToPDF = async (exportData: ExportData, options: Exp
     
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
-      pdf.setFontSize(8);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(156, 163, 175);
+      pdf.setTextColor(...colors.gray);
       
-      // Footer text
-      const footerText = `Exported on ${exportDate} at ${exportTime} | Page ${i} of ${totalPages}`;
-      const footerWidth = pdf.getTextWidth(footerText);
-      const footerX = (pageWidth - footerWidth) / 2;
+      // Footer line
+      pdf.setDrawColor(...colors.borderGray);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
       
-      pdf.text(footerText, footerX, pageHeight - 10);
+      const footerText = `Generated by Good Signals | ${exportDate} at ${exportTime}`;
+      pdf.text(footerText, margin, pageHeight - 12);
+      
+      const pageText = `Page ${i} of ${totalPages}`;
+      const pageTextWidth = pdf.getTextWidth(pageText);
+      pdf.text(pageText, pageWidth - margin - pageTextWidth, pageHeight - 12);
     }
 
-    // Generate filename
+    // Generate filename and save
     const fileNameAssessmentName = exportData.assessment.assessment_name || 'assessment';
     const sanitizedName = fileNameAssessmentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const fileName = `site_assessment_${sanitizedName}_${new Date().getTime()}.pdf`;
 
-    // Save the PDF
     pdf.save(fileName);
     
-    console.log('PDF export completed successfully:', fileName);
+    console.log('Enhanced PDF export completed successfully:', fileName);
     return { success: true, fileName };
     
   } catch (error) {
