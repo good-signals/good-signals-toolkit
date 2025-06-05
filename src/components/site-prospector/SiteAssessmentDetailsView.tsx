@@ -248,12 +248,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
     },
   });
 
-  // Enhanced mutation with better cache invalidation
+  // Enhanced mutation with better cache invalidation and AI integration
   const generateSummaryMutation = useMutation({
     mutationFn: async () => {
       if (!assessment || !targetMetricSet || !user) {
         throw new Error("Missing necessary data to generate summary.");
       }
+      console.log('[SiteAssessmentDetailsView] Starting AI summary generation for assessment:', assessment.id);
       setIsGeneratingSummary(true);
 
       const siteVisitRatingsWithLabels = (assessment.site_visit_ratings || []).map(rating => {
@@ -270,6 +271,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         ? [...new Set(targetMetricSet.user_custom_metrics_settings.map(m => m.category))]
         : [];
 
+      console.log('[SiteAssessmentDetailsView] Calling AI summary generation with:', {
+        metricsCount: detailedMetricScores.size,
+        categoriesCount: metricCategories.length,
+        ratingsCount: siteVisitRatingsWithLabels.length
+      });
+
       const summary = await generateExecutiveSummaryForAssessment(
         assessment,
         detailedMetricScores,
@@ -278,16 +285,28 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsViewProps> = ({
         targetMetricSet,
         metricCategories
       );
+      
+      console.log('[SiteAssessmentDetailsView] AI summary generated, saving to database');
       await updateSiteAssessmentSummary(assessmentId, summary, user.id);
+      console.log('[SiteAssessmentDetailsView] Summary saved successfully');
       return summary;
     },
     onSuccess: () => {
-      toast({ title: "Executive Summary Generated", description: "The summary has been successfully generated and saved." });
+      console.log('[SiteAssessmentDetailsView] Summary generation completed successfully');
+      toast({ 
+        title: "Executive Summary Generated", 
+        description: "AI-powered executive summary has been successfully generated and saved." 
+      });
       queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
-       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
     },
     onError: (error: Error) => {
-      toast({ title: "Summary Generation Failed", description: error.message, variant: "destructive" });
+      console.error('[SiteAssessmentDetailsView] Summary generation failed:', error);
+      toast({ 
+        title: "Summary Generation Failed", 
+        description: `AI summary generation encountered an error: ${error.message}`, 
+        variant: "destructive" 
+      });
     },
     onSettled: () => {
       setIsGeneratingSummary(false);

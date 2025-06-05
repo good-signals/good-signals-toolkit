@@ -101,7 +101,7 @@ export const generateExecutiveSummary = async (
   }
 };
 
-// Add the missing exports that components are trying to import
+// Updated function to properly call the AI Edge Function
 export const generateExecutiveSummaryForAssessment = async (
   assessment: SiteAssessment,
   detailedMetricScores: Map<string, { score: number | null; enteredValue: any; targetValue: any; higherIsBetter: boolean; notes: string | null; imageUrl: string | null }>,
@@ -110,19 +110,77 @@ export const generateExecutiveSummaryForAssessment = async (
   targetMetricSet: any,
   metricCategories: string[]
 ): Promise<string> => {
-  // Generate a basic executive summary
-  let summary = `Executive Summary for ${assessment.assessment_name}:\n\n`;
+  console.log('[Summary Service] Starting AI executive summary generation for assessment:', assessment.id);
   
-  if (assessment.site_signal_score !== null) {
-    summary += `Overall Site Signal Score: ${assessment.site_signal_score.toFixed(2)}\n\n`;
+  try {
+    // Convert Map to plain object for Edge Function
+    const detailedMetricScoresObject: Record<string, any> = {};
+    detailedMetricScores.forEach((value, key) => {
+      detailedMetricScoresObject[key] = {
+        ...value,
+        label: targetMetricSet?.user_custom_metrics_settings?.find((s: any) => s.metric_identifier === key)?.label || key,
+        category: targetMetricSet?.user_custom_metrics_settings?.find((s: any) => s.metric_identifier === key)?.category || 'Unknown'
+      };
+    });
+
+    // Prepare data for the Edge Function
+    const requestData = {
+      assessmentName: assessment.assessment_name,
+      address: assessment.address_line1,
+      overallSiteSignalScore: assessment.site_signal_score,
+      completionPercentage: assessment.completion_percentage,
+      detailedMetricScores: detailedMetricScoresObject,
+      siteVisitRatings: siteVisitRatingsWithLabels,
+      accountSignalGoodThreshold: accountSettings?.signal_good_threshold || 0.75,
+      accountSignalBadThreshold: accountSettings?.signal_bad_threshold || 0.50,
+      metricCategories,
+      targetMetricSet
+    };
+
+    console.log('[Summary Service] Calling generate-executive-summary Edge Function with data:', {
+      assessmentName: requestData.assessmentName,
+      metricsCount: Object.keys(detailedMetricScoresObject).length,
+      ratingsCount: siteVisitRatingsWithLabels.length,
+      categoriesCount: metricCategories.length
+    });
+
+    // Call the Edge Function
+    const { data, error } = await supabase.functions.invoke('generate-executive-summary', {
+      body: requestData
+    });
+
+    if (error) {
+      console.error('[Summary Service] Edge Function error:', error);
+      throw new Error(`AI summary generation failed: ${error.message}`);
+    }
+
+    if (!data || !data.executiveSummary) {
+      console.error('[Summary Service] No summary returned from Edge Function:', data);
+      throw new Error('AI summary generation did not return content.');
+    }
+
+    console.log('[Summary Service] AI executive summary generated successfully, length:', data.executiveSummary.length);
+    return data.executiveSummary;
+
+  } catch (error) {
+    console.error('[Summary Service] Error in generateExecutiveSummaryForAssessment:', error);
+    
+    // Fallback to basic summary if AI generation fails
+    console.log('[Summary Service] Falling back to basic summary generation');
+    let fallbackSummary = `Executive Summary for ${assessment.assessment_name}:\n\n`;
+    
+    if (assessment.site_signal_score !== null) {
+      fallbackSummary += `Overall Site Signal Score: ${assessment.site_signal_score.toFixed(2)}\n\n`;
+    }
+    
+    fallbackSummary += "Assessment completed with the following data:\n";
+    fallbackSummary += `- ${detailedMetricScores.size} metrics evaluated\n`;
+    fallbackSummary += `- ${siteVisitRatingsWithLabels.length} site visit ratings\n`;
+    fallbackSummary += `- Completion: ${assessment.completion_percentage || 0}%\n\n`;
+    fallbackSummary += "Note: This is a basic summary. AI-powered summary generation failed and may need administrator attention.\n";
+    
+    return fallbackSummary;
   }
-  
-  summary += "Assessment completed with the following data:\n";
-  summary += `- ${detailedMetricScores.size} metrics evaluated\n`;
-  summary += `- ${siteVisitRatingsWithLabels.length} site visit ratings\n`;
-  summary += `- Completion: ${assessment.completion_percentage || 0}%\n`;
-  
-  return summary;
 };
 
 export const updateSiteAssessmentSummary = async (
