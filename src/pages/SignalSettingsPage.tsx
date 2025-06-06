@@ -177,6 +177,11 @@ const SignalSettingsPage: React.FC = () => {
                   step={1}
                   className="w-full"
                 />
+                {/* Bad threshold dot indicator */}
+                <div 
+                  className="absolute top-1/2 w-2 h-2 bg-red-600 rounded-full transform -translate-y-1/2 -translate-x-1/2 z-10"
+                  style={{ left: `${badThreshold}%` }}
+                />
                 {/* Good threshold dot indicator */}
                 <div 
                   className="absolute top-1/2 w-2 h-2 bg-green-600 rounded-full transform -translate-y-1/2 -translate-x-1/2 z-10"
