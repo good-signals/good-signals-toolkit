@@ -1,8 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
-import { getAccountSignalThresholds } from './targetMetrics/accountHelpers';
+import { getAccountThresholds } from './targetMetrics/accountHelpers';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -35,7 +34,7 @@ export const exportCBSADataToCSV = async (
   fileName: string = 'cbsa_analysis_results',
   account: any = null
 ) => {
-  const { goodThreshold, badThreshold } = getAccountSignalThresholds(account);
+  const { goodThreshold, badThreshold } = await getAccountThresholds(account);
 
   const csvRows = [];
 
@@ -89,7 +88,7 @@ export const exportSiteAssessmentsToCSV = async (
   fileName: string = 'site_assessments',
   account: any = null
 ) => {
-  const { goodThreshold, badThreshold } = getAccountSignalThresholds(account);
+  const { goodThreshold, badThreshold } = await getAccountThresholds(account);
 
   const csvRows = [];
 
