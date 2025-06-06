@@ -7,7 +7,7 @@ export const DEFAULT_GOOD_THRESHOLD = 0.75;
 export const DEFAULT_BAD_THRESHOLD = 0.50;
 
 // Get account signal thresholds from database or return defaults
-export const getAccountSignalThresholds = async (accountId: string) => {
+export const getAccountThresholds = async (accountId: string) => {
   try {
     const thresholds = await getAccountSignalThresholds(accountId);
     

@@ -1,13 +1,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
-import { getAccountSignalThresholds } from '../targetMetrics/accountHelpers';
+import { getAccountThresholds } from '../targetMetrics/accountHelpers';
 
 export const generateExecutiveSummary = async (
   assessmentId: string,
   account: any = null
 ): Promise<{ success: boolean; summary?: string; error?: string }> => {
-  const { goodThreshold, badThreshold } = getAccountSignalThresholds(account);
+  const { goodThreshold, badThreshold } = await getAccountThresholds(account);
 
   try {
     const { data: assessment, error: assessmentError } = await supabase

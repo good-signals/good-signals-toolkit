@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { getAccountSignalThresholds } from '@/services/targetMetrics/accountHelpers';
+import { getAccountThresholds } from '@/services/targetMetrics/accountHelpers';
 
 const TreasureMapSettingsPage: React.FC = () => {
   const { user } = useAuth();
