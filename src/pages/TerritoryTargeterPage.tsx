@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
 import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
@@ -24,7 +24,23 @@ const TerritoryTargeterPage: React.FC = () => {
 
   const { user } = useAuth();
   const { cbsaData, isInitialized, handleStatusChange } = useCBSAStatus();
-  const { accountGoodThreshold, accountBadThreshold } = useAccountSettings();
+  const { accountGoodThreshold, accountBadThreshold, refreshThresholds } = useAccountSettings(user?.id);
+
+  // Refresh thresholds when the page becomes visible (user navigates back from settings)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Page became visible, refreshing thresholds...');
+        refreshThresholds();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshThresholds]);
 
   const {
     isLoading,
