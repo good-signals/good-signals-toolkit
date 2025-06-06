@@ -91,6 +91,33 @@ export type Database = {
           },
         ]
       }
+      account_signal_thresholds: {
+        Row: {
+          account_id: string
+          bad_threshold: number
+          created_at: string
+          good_threshold: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          bad_threshold?: number
+          created_at?: string
+          good_threshold?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          bad_threshold?: number
+          created_at?: string
+          good_threshold?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           address: string | null

@@ -1,43 +1,75 @@
 
 import { useState, useEffect } from 'react';
 import { fetchAccountById, Account } from '@/services/accountService';
+import { getAccountSignalThresholds } from '@/services/signalThresholdsService';
+import { getUserAccount } from '@/services/userAccountService';
 import { toast } from '@/hooks/use-toast';
 
 export const useAccountSettings = (userId?: string) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [accountGoodThreshold, setAccountGoodThreshold] = useState(0.75);
+  const [accountBadThreshold, setAccountBadThreshold] = useState(0.50);
 
   useEffect(() => {
-    const loadAccounts = async () => {
+    const loadAccountsAndThresholds = async () => {
       if (!userId) {
         setIsLoadingAccounts(false);
         return;
       }
 
       try {
-        // For the simplified version, we'll just use default thresholds
-        // since signal thresholds were removed from the accounts table
-        setAccounts([]);
+        // Get user's account
+        const userAccount = await getUserAccount(userId);
+        if (!userAccount) {
+          setAccounts([]);
+          setIsLoadingAccounts(false);
+          return;
+        }
+
+        // For simplified version, we'll create a minimal account object
+        const accountData: Account = {
+          id: userAccount.id,
+          name: userAccount.name,
+          category: userAccount.category || '',
+          subcategory: userAccount.subcategory || '',
+          address: userAccount.address || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          logo_url: userAccount.logo_url
+        };
+
+        setAccounts([accountData]);
+
+        // Fetch signal thresholds for this account
+        const thresholds = await getAccountSignalThresholds(userAccount.id);
+        if (thresholds) {
+          setAccountGoodThreshold(thresholds.good_threshold);
+          setAccountBadThreshold(thresholds.bad_threshold);
+        } else {
+          // Use defaults if no custom thresholds are set
+          setAccountGoodThreshold(0.75);
+          setAccountBadThreshold(0.50);
+        }
       } catch (error) {
-        console.error('Failed to fetch user accounts:', error);
+        console.error('Failed to fetch user accounts and thresholds:', error);
         toast({
           title: "Account Loading Failed",
           description: "Could not load account settings. Using default signal thresholds.",
           variant: "destructive",
         });
         setAccounts([]);
+        setAccountGoodThreshold(0.75);
+        setAccountBadThreshold(0.50);
       } finally {
         setIsLoadingAccounts(false);
       }
     };
 
-    loadAccounts();
+    loadAccountsAndThresholds();
   }, [userId]);
 
-  // Use default thresholds since signal thresholds were removed
   const currentAccount = accounts.length > 0 ? accounts[0] : null;
-  const accountGoodThreshold = 0.75;
-  const accountBadThreshold = 0.50;
 
   return {
     accounts,

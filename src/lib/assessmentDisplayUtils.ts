@@ -24,8 +24,9 @@ export const getSignalStatus = (
     // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
     const scoreDecimal = validScore / 100;
 
-    const goodThreshold = accountGoodThreshold ?? DEFAULT_GOOD_THRESHOLD;
-    const badThreshold = accountBadThreshold ?? DEFAULT_BAD_THRESHOLD;
+    // Use provided thresholds or fall back to defaults
+    const goodThreshold = typeof accountGoodThreshold === 'number' ? accountGoodThreshold : DEFAULT_GOOD_THRESHOLD;
+    const badThreshold = typeof accountBadThreshold === 'number' ? accountBadThreshold : DEFAULT_BAD_THRESHOLD;
 
     // Ensure thresholds are valid numbers
     const validGoodThreshold = isNaN(goodThreshold) ? DEFAULT_GOOD_THRESHOLD : goodThreshold;

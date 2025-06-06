@@ -1,12 +1,35 @@
 
 import { getUserAccount } from '@/services/userAccountService';
+import { getAccountSignalThresholds } from '@/services/signalThresholdsService';
 
-// Simple helper to get default signal thresholds since they were removed from the database
-export const getAccountSignalThresholds = (account: any) => {
-  return {
-    goodThreshold: 0.75, // Default good threshold
-    badThreshold: 0.50,  // Default bad threshold
-  };
+// Default thresholds to use as fallback
+export const DEFAULT_GOOD_THRESHOLD = 0.75;
+export const DEFAULT_BAD_THRESHOLD = 0.50;
+
+// Get account signal thresholds from database or return defaults
+export const getAccountSignalThresholds = async (accountId: string) => {
+  try {
+    const thresholds = await getAccountSignalThresholds(accountId);
+    
+    if (thresholds) {
+      return {
+        goodThreshold: thresholds.good_threshold,
+        badThreshold: thresholds.bad_threshold,
+      };
+    }
+    
+    // Return defaults if no custom thresholds are set
+    return {
+      goodThreshold: DEFAULT_GOOD_THRESHOLD,
+      badThreshold: DEFAULT_BAD_THRESHOLD,
+    };
+  } catch (error) {
+    console.error('Error getting account signal thresholds:', error);
+    return {
+      goodThreshold: DEFAULT_GOOD_THRESHOLD,
+      badThreshold: DEFAULT_BAD_THRESHOLD,
+    };
+  }
 };
 
 // Helper for backward compatibility - now uses the new getUserAccount service

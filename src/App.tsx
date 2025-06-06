@@ -1,3 +1,4 @@
+
 import { AuthProvider } from "@/contexts/AuthContext"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -24,6 +25,7 @@ import TargetMetricSetsListPage from "./pages/TargetMetricSetsListPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import StandardMetricsListPage from "./pages/StandardMetricsListPage";
 import StandardMetricsBuilderPage from "./pages/StandardMetricsBuilderPage";
+import SignalSettingsPage from "./pages/SignalSettingsPage";
 import UpdatePasswordForm from "./components/auth/UpdatePasswordForm";
 import { useAuth } from "./contexts/AuthContext";
 import CompanySetupPage from "./pages/CompanySetupPage";
@@ -77,6 +79,10 @@ const AppContent = () => {
           <Route 
             path="treasure-map-upload" 
             element={<ProtectedRoute><TreasureMapUploadPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="signal-settings" 
+            element={<ProtectedRoute><SignalSettingsPage /></ProtectedRoute>} 
           />
           <Route 
             path="profile-settings" 
