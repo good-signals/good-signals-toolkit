@@ -1,15 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserAccount } from '@/services/userAccountService';
 import { getAccountSignalThresholds, updateAccountSignalThresholds } from '@/services/signalThresholdsService';
-import { triggerAssessmentRecalculation } from '@/services/targetMetrics/metricRecalculationService';
-import { AlertTriangle, CheckCircle, Clock, Info } from 'lucide-react';
+import { ThresholdSlider } from '@/components/signal-settings/ThresholdSlider';
+import { PresetButtons } from '@/components/signal-settings/PresetButtons';
+import { SignalPreview } from '@/components/signal-settings/SignalPreview';
+import { InfoCard } from '@/components/signal-settings/InfoCard';
 
 const SignalSettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -81,8 +82,6 @@ const SignalSettingsPage: React.FC = () => {
           description: "Your signal thresholds have been updated successfully.",
         });
 
-        // Trigger recalculation of assessment scores
-        // Note: This would need a metric set ID, but we'll implement a simplified version
         console.log('Signal thresholds updated, scores will be recalculated on next assessment view');
       } else {
         throw new Error('Failed to save thresholds');
@@ -117,16 +116,6 @@ const SignalSettingsPage: React.FC = () => {
     setHasChanges(true);
   };
 
-  const getScorePreview = (score: number) => {
-    if (score >= goodThreshold) {
-      return { status: 'Good', color: 'bg-green-500', icon: CheckCircle };
-    } else if (score <= badThreshold) {
-      return { status: 'Bad', color: 'bg-red-500', icon: AlertTriangle };
-    } else {
-      return { status: 'Neutral', color: 'bg-yellow-500', icon: Clock };
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -150,92 +139,21 @@ const SignalSettingsPage: React.FC = () => {
         {/* Main Settings Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              Signal Score Thresholds
-            </CardTitle>
+            <CardTitle>Signal Score Thresholds</CardTitle>
             <CardDescription>
               Set the percentage thresholds that determine how signal scores are categorized.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Threshold Slider */}
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Bad</span>
-                <span>Neutral</span>
-                <span>Good</span>
-              </div>
-              
-              <div className="relative px-3">
-                <Slider
-                  value={[badThreshold, goodThreshold]}
-                  onValueChange={handleThresholdChange}
-                  max={100}
-                  min={0}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs mt-2 text-muted-foreground">
-                  <span>0%</span>
-                  <span>25%</span>
-                  <span>50%</span>
-                  <span>75%</span>
-                  <span>100%</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="space-y-2">
-                  <div className="text-red-600 font-medium">Bad Signal</div>
-                  <div className="text-sm text-muted-foreground">
-                    0% - {badThreshold}%
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-yellow-600 font-medium">Neutral Signal</div>
-                  <div className="text-sm text-muted-foreground">
-                    {badThreshold + 1}% - {goodThreshold - 1}%
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-green-600 font-medium">Good Signal</div>
-                  <div className="text-sm text-muted-foreground">
-                    {goodThreshold}% - 100%
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ThresholdSlider
+              goodThreshold={goodThreshold}
+              badThreshold={badThreshold}
+              onThresholdChange={handleThresholdChange}
+            />
 
             <Separator />
 
-            {/* Preset Buttons */}
-            <div className="space-y-3">
-              <h4 className="font-medium">Quick Presets</h4>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePreset('conservative')}
-                >
-                  Conservative (40% / 80%)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePreset('balanced')}
-                >
-                  Balanced (50% / 75%)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePreset('aggressive')}
-                >
-                  Aggressive (60% / 70%)
-                </Button>
-              </div>
-            </div>
+            <PresetButtons onPreset={handlePreset} />
 
             <Separator />
 
@@ -252,56 +170,12 @@ const SignalSettingsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Preview Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Signal Score Preview</CardTitle>
-            <CardDescription>
-              See how different scores would be categorized with your current thresholds.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[25, 45, 65, 85].map((score) => {
-                const preview = getScorePreview(score);
-                const Icon = preview.icon;
-                return (
-                  <div key={score} className="text-center space-y-2">
-                    <div className="text-2xl font-bold">{score}%</div>
-                    <Badge 
-                      variant="secondary" 
-                      className={`${preview.color} text-white flex items-center gap-1 justify-center`}
-                    >
-                      <Icon className="h-3 w-3" />
-                      {preview.status}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <SignalPreview
+          goodThreshold={goodThreshold}
+          badThreshold={badThreshold}
+        />
 
-        {/* Information Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>How Signal Thresholds Work</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              <strong>Good Threshold:</strong> Sites with signal scores at or above this percentage are considered to have "Good" signals.
-            </p>
-            <p>
-              <strong>Bad Threshold:</strong> Sites with signal scores at or below this percentage are considered to have "Bad" signals.
-            </p>
-            <p>
-              <strong>Neutral:</strong> Sites with scores between the bad and good thresholds are considered "Neutral."
-            </p>
-            <p className="text-amber-600">
-              <strong>Note:</strong> Changing these thresholds will immediately affect how scores are displayed throughout your account, including in assessments, reports, and the territory targeter.
-            </p>
-          </CardContent>
-        </Card>
+        <InfoCard />
       </div>
     </div>
   );
