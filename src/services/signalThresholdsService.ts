@@ -40,38 +40,28 @@ export const updateAccountSignalThresholds = async (
   thresholds: SignalThresholdsUpdate
 ): Promise<SignalThresholds | null> => {
   try {
-    // First try to update existing record
+    console.log('Upserting signal thresholds for account:', accountId, 'with data:', thresholds);
+    
+    // Use upsert to either update existing record or create new one
     const { data, error } = await supabase
       .from('account_signal_thresholds')
-      .update(thresholds)
-      .eq('account_id', accountId)
+      .upsert({
+        account_id: accountId,
+        good_threshold: thresholds.good_threshold,
+        bad_threshold: thresholds.bad_threshold,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'account_id'
+      })
       .select()
-      .maybeSingle();
-
-    if (error && error.code === 'PGRST116') {
-      // No existing record, create new one
-      const { data: newData, error: insertError } = await supabase
-        .from('account_signal_thresholds')
-        .insert({
-          account_id: accountId,
-          ...thresholds
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Error creating signal thresholds:', insertError);
-        return null;
-      }
-
-      return newData;
-    }
+      .single();
 
     if (error) {
-      console.error('Error updating signal thresholds:', error);
+      console.error('Error upserting signal thresholds:', error);
       return null;
     }
 
+    console.log('Successfully upserted signal thresholds:', data);
     return data;
   } catch (error) {
     console.error('Error in updateAccountSignalThresholds:', error);
