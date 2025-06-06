@@ -66,13 +66,7 @@ const SiteTreasureMapPage: React.FC = () => {
         <div className="space-y-6">
           {/* Display the configured map */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Map className="h-5 w-5" />
-                Your Treasure Map
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {mapUrl ? (
                 <div className="aspect-video">
                   <iframe
