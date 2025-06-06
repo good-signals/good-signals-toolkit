@@ -16,7 +16,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({ onPreset }) => {
           size="sm"
           onClick={() => onPreset('conservative')}
         >
-          Conservative (40% / 80%)
+          Conservative (60% / 80%)
         </Button>
         <Button
           variant="outline"
@@ -30,7 +30,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({ onPreset }) => {
           size="sm"
           onClick={() => onPreset('aggressive')}
         >
-          Aggressive (60% / 70%)
+          Aggressive (40% / 70%)
         </Button>
       </div>
     </div>

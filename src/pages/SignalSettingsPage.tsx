@@ -101,7 +101,7 @@ const SignalSettingsPage: React.FC = () => {
   const handlePreset = (preset: 'conservative' | 'balanced' | 'aggressive') => {
     switch (preset) {
       case 'conservative':
-        setBadThreshold(40);
+        setBadThreshold(60);
         setGoodThreshold(80);
         break;
       case 'balanced':
@@ -109,7 +109,7 @@ const SignalSettingsPage: React.FC = () => {
         setGoodThreshold(75);
         break;
       case 'aggressive':
-        setBadThreshold(60);
+        setBadThreshold(40);
         setGoodThreshold(70);
         break;
     }
