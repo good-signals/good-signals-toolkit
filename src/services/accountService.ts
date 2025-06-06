@@ -85,12 +85,33 @@ export const updateAccountDetailsService = async (
   updates: Partial<Pick<Account, 'name' | 'category' | 'subcategory' | 'address' | 'logo_url'>>
 ): Promise<Account | null> => {
   try {
+    console.log('Updating account with ID:', accountId, 'Updates:', updates);
+    
+    // First, check if the account exists
+    const { data: existingAccount, error: checkError } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', accountId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking account existence:', checkError);
+      toast.error(`Failed to verify account: ${checkError.message}`);
+      return null;
+    }
+
+    if (!existingAccount) {
+      console.error('Account not found with ID:', accountId);
+      toast.error('Account not found. Please refresh the page and try again.');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('accounts')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', accountId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error updating account details in service:', error);
