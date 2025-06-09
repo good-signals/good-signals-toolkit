@@ -85,50 +85,69 @@ export const updateAccountDetailsService = async (
   updates: Partial<Pick<Account, 'name' | 'category' | 'subcategory' | 'address' | 'logo_url'>>
 ): Promise<Account | null> => {
   try {
-    console.log('Updating account with ID:', accountId, 'Updates:', updates);
+    console.log('Starting account update for ID:', accountId, 'Updates:', Object.keys(updates));
     
-    // First, check if the account exists
-    const { data: existingAccount, error: checkError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('id', accountId)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Error checking account existence:', checkError);
-      toast.error(`Failed to verify account: ${checkError.message}`);
+    // Validate accountId
+    if (!accountId || typeof accountId !== 'string') {
+      console.error('Invalid account ID provided:', accountId);
+      toast.error('Invalid account ID. Please refresh the page and try again.');
       return null;
     }
 
-    if (!existingAccount) {
-      console.error('Account not found with ID:', accountId);
-      toast.error('Account not found. Please refresh the page and try again.');
-      return null;
-    }
+    // Prepare update data with timestamp
+    const updateData = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
 
+    console.log('Attempting to update account with data:', updateData);
+
+    // Perform the update with proper error handling
     const { data, error } = await supabase
       .from('accounts')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', accountId)
       .select()
-      .maybeSingle();
+      .single();
 
     if (error) {
-      console.error('Error updating account details in service:', error);
-      toast.error(`Failed to update account: ${error.message}`);
+      console.error('Database error during account update:', {
+        error,
+        accountId,
+        updateData,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details
+      });
+
+      // Provide specific error messages based on error type
+      if (error.code === 'PGRST116') {
+        toast.error('Account not found or you do not have permission to update it.');
+      } else if (error.code === '42501') {
+        toast.error('Permission denied. Please check your account access.');
+      } else {
+        toast.error(`Failed to update account: ${error.message}`);
+      }
       return null;
     }
     
-    if (data) {
-        toast.success('Account details updated successfully!');
-        return data;
-    } else {
-        console.error('Account update returned no data. Account ID:', accountId);
-        toast.error('Failed to update account details. Please try again.');
-        return null;
+    if (!data) {
+      console.error('Account update returned no data. This should not happen.');
+      toast.error('Update completed but failed to retrieve updated data. Please refresh the page.');
+      return null;
     }
+
+    console.log('Account update successful:', data);
+    toast.success('Account details updated successfully!');
+    return data;
+    
   } catch (error: any) {
-    console.error('Catch error updating account details in service:', error);
+    console.error('Unexpected error during account update:', {
+      error,
+      accountId,
+      updates,
+      stack: error.stack
+    });
     toast.error('An unexpected error occurred while updating account details.');
     return null;
   }
@@ -136,11 +155,17 @@ export const updateAccountDetailsService = async (
 
 export const uploadCompanyLogo = async (accountId: string, file: File): Promise<string | null> => {
   try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
+    console.log('Starting logo upload for account:', accountId, 'File:', file.name);
+
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const timestamp = Date.now();
+    const fileName = `logo_${timestamp}.${fileExt}`;
     const filePath = `${accountId}/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
+    console.log('Uploading to path:', filePath);
+
+    const { data, error: uploadError } = await supabase.storage
       .from('company-logos')
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -148,47 +173,82 @@ export const uploadCompanyLogo = async (accountId: string, file: File): Promise<
       });
 
     if (uploadError) {
-      console.error('Error uploading company logo:', uploadError);
+      console.error('Storage upload error:', {
+        error: uploadError,
+        filePath,
+        fileSize: file.size,
+        fileType: file.type
+      });
       toast.error(`Logo upload failed: ${uploadError.message}`);
       return null;
     }
 
-    const { data } = supabase.storage
-      .from('company-logos')
-      .getPublicUrl(filePath);
+    console.log('Upload successful, getting public URL for:', data.path);
 
-    if (!data.publicUrl) {
-        toast.error('Failed to get public URL for logo.');
-        return null;
+    const { data: urlData } = supabase.storage
+      .from('company-logos')
+      .getPublicUrl(data.path);
+
+    if (!urlData.publicUrl) {
+      console.error('Failed to get public URL for uploaded file');
+      toast.error('Upload succeeded but failed to get file URL.');
+      return null;
     }
     
-    return data.publicUrl;
+    console.log('Logo upload completed successfully:', urlData.publicUrl);
+    return urlData.publicUrl;
 
   } catch (error: any) {
-    console.error('Catch error during logo upload:', error);
+    console.error('Unexpected error during logo upload:', {
+      error,
+      accountId,
+      fileName: file.name,
+      stack: error.stack
+    });
     toast.error('An unexpected error occurred during logo upload.');
     return null;
   }
 };
 
 export const deleteCompanyLogo = async (logoPath: string): Promise<boolean> => {
-    if (!logoPath.includes('/')) {
-        console.error("Invalid logo path for deletion:", logoPath);
-        toast.error("Could not delete old logo: Invalid path.");
-        return false;
-    }
   try {
+    console.log('Deleting logo at path:', logoPath);
+
+    if (!logoPath || !logoPath.includes('/')) {
+      console.error("Invalid logo path for deletion:", logoPath);
+      toast.error("Could not delete old logo: Invalid path.");
+      return false;
+    }
+
     const { error } = await supabase.storage
       .from('company-logos')
       .remove([logoPath]);
 
     if (error) {
-      console.error('Error deleting old company logo:', error);
+      console.error('Error deleting company logo:', error);
       return false;
     }
+
+    console.log('Logo deletion successful');
     return true;
-  } catch (e: any) {
-    console.error('Catch error deleting old company logo:', e);
+  } catch (error: any) {
+    console.error('Unexpected error deleting company logo:', error);
     return false;
+  }
+};
+
+// Helper function to extract storage path from public URL
+export const extractPathFromUrl = (url: string): string | null => {
+  try {
+    const urlObject = new URL(url);
+    // Path for Supabase storage public URLs: /storage/v1/object/public/bucket_name/file_path
+    const pathParts = urlObject.pathname.split('/');
+    if (pathParts.length > 5 && pathParts[4] === 'company-logos') {
+      return pathParts.slice(5).join('/');
+    }
+    return null;
+  } catch (error) {
+    console.error("Error extracting path from URL:", error);
+    return null;
   }
 };
