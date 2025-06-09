@@ -13,6 +13,10 @@ import EditableExecutiveSummary from './EditableExecutiveSummary';
 import MetricDisplaySection from './display/MetricDisplaySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
+import { useSiteAssessmentDetails } from '@/hooks/useSiteAssessmentDetails';
+import { getUserCustomMetricSettings } from '@/services/targetMetricsService';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserAccount } from '@/services/userAccountService';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -25,8 +29,54 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   onEditGoToInputMetrics,
   onBackToList,
 }) => {
+  const { user } = useAuth();
   const [currentStatus, setCurrentStatus] = useState(assessment.site_status || 'Prospect');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [targetMetricsMap, setTargetMetricsMap] = useState<Record<string, {
+    target_value: number;
+    higher_is_better: boolean;
+    measurement_type?: string;
+  }>>({});
+  const [isLoadingTargetMetrics, setIsLoadingTargetMetrics] = useState(true);
+
+  // Fetch target metrics when component mounts
+  React.useEffect(() => {
+    const loadTargetMetrics = async () => {
+      if (!assessment.target_metric_set_id || !user?.id) {
+        setIsLoadingTargetMetrics(false);
+        return;
+      }
+
+      try {
+        console.log('Loading target metrics for set:', assessment.target_metric_set_id);
+        const targetSettings = await getUserCustomMetricSettings(assessment.target_metric_set_id);
+        
+        // Create a lookup map for target values
+        const metricsMap: Record<string, {
+          target_value: number;
+          higher_is_better: boolean;
+          measurement_type?: string;
+        }> = {};
+        
+        targetSettings.forEach(setting => {
+          metricsMap[setting.metric_identifier] = {
+            target_value: setting.target_value,
+            higher_is_better: setting.higher_is_better,
+            measurement_type: setting.measurement_type || undefined,
+          };
+        });
+        
+        console.log('Loaded target metrics map:', metricsMap);
+        setTargetMetricsMap(metricsMap);
+      } catch (error) {
+        console.error('Error loading target metrics:', error);
+      } finally {
+        setIsLoadingTargetMetrics(false);
+      }
+    };
+
+    loadTargetMetrics();
+  }, [assessment.target_metric_set_id, user?.id]);
 
   const handleEdit = () => {
     onEditGoToInputMetrics();
@@ -240,33 +290,42 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         </div>
       )}
 
-      {/* Metrics by Category - Now ordered according to predefined section order and excluding SiteVisitSectionImages */}
+      {/* Metrics by Category - Now with proper target values and signal scores */}
       {sortedCategories.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-6">Assessment Metrics</h2>
-          <div className="space-y-6">
-            {sortedCategories.map((category) => {
-              const metrics = metricsByCategory[category];
-              return (
-                <MetricDisplaySection
-                  key={category}
-                  categoryName={category}
-                  categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
-                  categoryMetrics={metrics.map(metric => ({
-                    id: metric.id || `${metric.category}-${metric.label}`,
-                    metric_identifier: metric.metric_identifier || metric.label,
-                    label: metric.label,
-                    category: metric.category,
-                    entered_value: metric.entered_value,
-                    notes: metric.notes,
-                    target_value: undefined, // This would need to come from metric definitions
-                    higher_is_better: undefined, // This would need to come from metric definitions
-                    measurement_type: undefined, // This would need to come from metric definitions
-                  }))}
-                />
-              );
-            })}
-          </div>
+          {isLoadingTargetMetrics ? (
+            <div className="text-center p-6">
+              <div className="text-lg">Loading target metrics...</div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {sortedCategories.map((category) => {
+                const metrics = metricsByCategory[category];
+                return (
+                  <MetricDisplaySection
+                    key={category}
+                    categoryName={category}
+                    categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
+                    categoryMetrics={metrics.map(metric => {
+                      const targetData = targetMetricsMap[metric.metric_identifier];
+                      return {
+                        id: metric.id || `${metric.category}-${metric.label}`,
+                        metric_identifier: metric.metric_identifier || metric.label,
+                        label: metric.label,
+                        category: metric.category,
+                        entered_value: metric.entered_value,
+                        notes: metric.notes,
+                        target_value: targetData?.target_value,
+                        higher_is_better: targetData?.higher_is_better,
+                        measurement_type: targetData?.measurement_type,
+                      };
+                    })}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
