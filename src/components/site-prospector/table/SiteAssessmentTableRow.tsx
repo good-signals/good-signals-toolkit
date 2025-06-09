@@ -35,17 +35,24 @@ const getSiteStatusColor = (status: string | null | undefined): "default" | "sec
   }
 };
 
-const getScorePillClasses = (signalStatus: { text: string; color: string; iconColor: string }) => {
-  switch (signalStatus.text) {
-    case 'Good':
-      return 'bg-green-500 text-white';
-    case 'Bad':
-      return 'bg-red-500 text-white';
-    case 'Neutral':
-      return 'bg-yellow-500 text-white';
-    default:
-      return 'bg-gray-400 text-white';
+const getSignalScoreBadgeVariant = (score: number | null, accountGoodThreshold?: number | null, accountBadThreshold?: number | null) => {
+  if (score === null || !accountGoodThreshold || !accountBadThreshold) {
+    return "secondary";
   }
+  
+  // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
+  const scoreDecimal = score / 100;
+  
+  // Apply threshold logic: Good >= goodThreshold, Bad <= badThreshold, Neutral = between
+  if (scoreDecimal >= accountGoodThreshold) {
+    return "success";
+  }
+  
+  if (scoreDecimal <= accountBadThreshold) {
+    return "destructive";
+  }
+  
+  return "default"; // This will be yellow for the neutral/warning state
 };
 
 const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
@@ -72,16 +79,14 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
     ? Math.round(assessment.completion_percentage)
     : null;
 
-  // Get signal status for color coding
-  const signalStatus = getSignalStatus(displayScore, accountGoodThreshold, accountBadThreshold);
-
   console.log('Table row display scores:', {
     assessmentId: assessment.id,
     rawScore: assessment.site_signal_score,
     displayScore,
     rawCompletion: assessment.completion_percentage,
     displayCompletion,
-    signalStatus
+    accountGoodThreshold,
+    accountBadThreshold
   });
 
   return (
@@ -110,9 +115,9 @@ const SiteAssessmentTableRow: React.FC<SiteAssessmentTableRowProps> = ({
       </TableCell>
       <TableCell className="text-center">
         {displayScore !== null ? (
-          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(signalStatus)}`}>
+          <Badge variant={getSignalScoreBadgeVariant(displayScore, accountGoodThreshold, accountBadThreshold)} className="text-sm">
             {displayScore}%
-          </span>
+          </Badge>
         ) : (
           <span className="text-xs text-muted-foreground">N/A</span>
         )}

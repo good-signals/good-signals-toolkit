@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,9 @@ import SiteAssessmentsTableHeader from './table/SiteAssessmentsTableHeader';
 import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { Search, FileText, Plus } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserAccount } from '@/services/userAccountService';
+import { getAccountSignalThresholds } from '@/services/signalThresholdsService';
 
 // Use the same SortableKeys type as the table content component
 type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage' | 'site_status';
@@ -32,12 +36,51 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   isDeleting,
   forceClearSelectionsKey,
 }) => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'asc' | 'desc' }>({
     key: 'created_at',
     direction: 'desc'
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [accountThresholds, setAccountThresholds] = useState<{
+    goodThreshold: number;
+    badThreshold: number;
+  } | null>(null);
+
+  React.useEffect(() => {
+    const loadAccountThresholds = async () => {
+      if (!user?.id) return;
+
+      try {
+        const userAccount = await getUserAccount(user.id);
+        if (!userAccount) return;
+
+        const thresholds = await getAccountSignalThresholds(userAccount.id);
+        if (thresholds) {
+          setAccountThresholds({
+            goodThreshold: thresholds.good_threshold,
+            badThreshold: thresholds.bad_threshold,
+          });
+        } else {
+          // Use defaults if no custom thresholds
+          setAccountThresholds({
+            goodThreshold: 0.75,
+            badThreshold: 0.50,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading account thresholds:', error);
+        // Use defaults on error
+        setAccountThresholds({
+          goodThreshold: 0.75,
+          badThreshold: 0.50,
+        });
+      }
+    };
+
+    loadAccountThresholds();
+  }, [user?.id]);
 
   const handleEdit = (assessment: SiteAssessment) => {
     onEdit(assessment);
@@ -175,8 +218,8 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
             isDeleting={isDeleting}
             assessmentToDelete={null}
             documentCounts={{}}
-            accountGoodThreshold={null}
-            accountBadThreshold={null}
+            accountGoodThreshold={accountThresholds?.goodThreshold}
+            accountBadThreshold={accountThresholds?.badThreshold}
           />
         </div>
 
