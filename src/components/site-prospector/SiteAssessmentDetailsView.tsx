@@ -12,6 +12,7 @@ import AddressMapDisplay from './AddressMapDisplay';
 import EditableExecutiveSummary from './EditableExecutiveSummary';
 import MetricDisplaySection from './display/MetricDisplaySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
+import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -56,19 +57,22 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     });
   }
 
+  // Sort categories according to the predefined order
+  const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
+
   const getSignalScoreColor = () => {
     const score = assessment.site_signal_score;
     if (score === null || score === undefined) return "text-muted-foreground";
-    if (score >= 0.75) return "text-green-600";
-    if (score >= 0.5) return "text-yellow-600";
+    if (score >= 75) return "text-green-600";
+    if (score >= 50) return "text-yellow-600";
     return "text-red-600";
   };
 
   const getSignalScoreLabel = () => {
     const score = assessment.site_signal_score;
     if (score === null || score === undefined) return "Not calculated";
-    if (score >= 0.75) return "Good";
-    if (score >= 0.5) return "Fair";
+    if (score >= 75) return "Good";
+    if (score >= 50) return "Fair";
     return "Poor";
   };
 
@@ -226,29 +230,32 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         </div>
       )}
 
-      {/* Metrics by Category */}
-      {Object.keys(metricsByCategory).length > 0 && (
+      {/* Metrics by Category - Now ordered according to predefined section order */}
+      {sortedCategories.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-6">Assessment Metrics</h2>
           <div className="space-y-6">
-            {Object.entries(metricsByCategory).map(([category, metrics]) => (
-              <MetricDisplaySection
-                key={category}
-                categoryName={category}
-                categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
-                categoryMetrics={metrics.map(metric => ({
-                  id: metric.id || `${metric.category}-${metric.label}`,
-                  metric_identifier: metric.metric_identifier || metric.label,
-                  label: metric.label,
-                  category: metric.category,
-                  entered_value: metric.entered_value,
-                  notes: metric.notes,
-                  target_value: undefined, // This would need to come from metric definitions
-                  higher_is_better: undefined, // This would need to come from metric definitions
-                  measurement_type: undefined, // This would need to come from metric definitions
-                }))}
-              />
-            ))}
+            {sortedCategories.map((category) => {
+              const metrics = metricsByCategory[category];
+              return (
+                <MetricDisplaySection
+                  key={category}
+                  categoryName={category}
+                  categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
+                  categoryMetrics={metrics.map(metric => ({
+                    id: metric.id || `${metric.category}-${metric.label}`,
+                    metric_identifier: metric.metric_identifier || metric.label,
+                    label: metric.label,
+                    category: metric.category,
+                    entered_value: metric.entered_value,
+                    notes: metric.notes,
+                    target_value: undefined, // This would need to come from metric definitions
+                    higher_is_better: undefined, // This would need to come from metric definitions
+                    measurement_type: undefined, // This would need to come from metric definitions
+                  }))}
+                />
+              );
+            })}
           </div>
         </div>
       )}
