@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2 } from 'lucide-react';
+import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2, TrendingUp, RefreshCcw, Export } from 'lucide-react';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import AddressMapDisplay from './AddressMapDisplay';
 import EditableExecutiveSummary from './EditableExecutiveSummary';
 import MetricDisplaySection from './display/MetricDisplaySection';
-import OverallScoreDisplay from './OverallScoreDisplay';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 
 interface SiteAssessmentDetailsProps {
@@ -60,10 +59,18 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
   const getSignalScoreColor = () => {
     const score = assessment.site_signal_score;
-    if (score === null || score === undefined) return "bg-gray-200 text-gray-700";
-    if (score >= 0.75) return "bg-green-100 text-green-800";
-    if (score >= 0.5) return "bg-yellow-100 text-yellow-800";
-    return "bg-red-100 text-red-800";
+    if (score === null || score === undefined) return "text-muted-foreground";
+    if (score >= 0.75) return "text-green-600";
+    if (score >= 0.5) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getSignalScoreLabel = () => {
+    const score = assessment.site_signal_score;
+    if (score === null || score === undefined) return "Not calculated";
+    if (score >= 0.75) return "Good";
+    if (score >= 0.5) return "Fair";
+    return "Poor";
   };
 
   const formatPercentage = (value: number | null | undefined) => {
@@ -75,82 +82,116 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-5xl">
       {/* Header Section */}
       <div className="mb-8">
-        <Button variant="ghost" onClick={onBackToList} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Assessments
-        </Button>
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-primary">{assessment.assessment_name}</h1>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <MapPin className="h-4 w-4 mr-1" />
-              <p>{assessment.address_line1}, {assessment.city}, {assessment.state_province} {assessment.postal_code}</p>
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+          <div className="flex-1">
+            <div className="flex items-center gap-4 mb-4">
+              <Button variant="ghost" onClick={onBackToList}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to List
+              </Button>
             </div>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <Calendar className="h-4 w-4 mr-1" />
-              <p>Created {formatDate(assessment.created_at)}</p>
+            
+            <h1 className="text-3xl font-bold text-foreground mb-2">Assessment: {assessment.assessment_name}</h1>
+            
+            <div className="flex items-center text-muted-foreground mb-1">
+              <span className="font-medium">Address:</span>
+              <span className="ml-2">{assessment.address_line1}</span>
+            </div>
+            
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center">
+                <span className="font-medium">Site Status:</span>
+                <SiteStatusSelector 
+                  value={currentStatus}
+                  onValueChange={handleStatusChange}
+                  showBadge={true}
+                  className="ml-2"
+                />
+              </div>
+              
+              <div className="flex items-center">
+                <span className="font-medium">Target Metric Set:</span>
+                <span className="ml-2">Test Targets 1</span>
+                <span className="ml-1 text-muted-foreground">(20 metrics)</span>
+              </div>
             </div>
           </div>
           
           <div className="flex gap-2">
-            <Button onClick={handleEdit}>
+            <Button variant="outline">
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Recalculate Scores
+            </Button>
+            <Button variant="outline">
+              <Export className="mr-2 h-4 w-4" />
+              Export Assessment
+            </Button>
+            <Button onClick={handleEdit} className="bg-foreground text-background hover:bg-foreground/90">
               <Edit className="mr-2 h-4 w-4" />
-              Edit Assessment
+              Edit Assessment Data
             </Button>
           </div>
         </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Site Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SiteStatusSelector 
-              value={currentStatus}
-              onValueChange={handleStatusChange}
-              showBadge={true}
-            />
-            {isUpdatingStatus && (
-              <p className="text-xs text-muted-foreground mt-1">Updating...</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Signal Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <BarChart2 className="h-5 w-5 mr-2 text-primary" />
-              <span className={`text-2xl font-bold px-2 py-1 rounded ${getSignalScoreColor()}`}>
-                {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined 
-                  ? formatPercentage(assessment.site_signal_score)
-                  : "Not calculated"}
-              </span>
+        {/* Score Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Overall Site Signal Score */}
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-4">Overall Site Signal Score</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center">
+                <TrendingUp className={`h-8 w-8 mr-3 ${getSignalScoreColor()}`} />
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-4xl font-bold ${getSignalScoreColor()}`}>
+                      {assessment.site_signal_score !== null && assessment.site_signal_score !== undefined 
+                        ? formatPercentage(assessment.site_signal_score)
+                        : "N/A"}
+                    </span>
+                    <span className={`text-lg ${getSignalScoreColor()}`}>
+                      - {getSignalScoreLabel()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    A measure of overall site suitability based on your targets. (Using custom thresholds.)
+                  </p>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completion</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <CheckCircle className="h-5 w-5 mr-2 text-primary" />
-              <span className="text-2xl font-bold">
-                {assessment.completion_percentage !== null && assessment.completion_percentage !== undefined 
-                  ? `${Math.round(assessment.completion_percentage)}%`
-                  : "Not calculated"}
-              </span>
+          {/* Assessment Completion */}
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-4">Assessment Completion</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center">
+                <CheckCircle className="h-8 w-8 mr-3 text-green-600" />
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-green-600">
+                      {assessment.completion_percentage !== null && assessment.completion_percentage !== undefined 
+                        ? `${Math.round(assessment.completion_percentage)}%`
+                        : "0%"}
+                    </span>
+                  </div>
+                  <div className="w-full bg-border rounded-full h-2 mt-2 mb-1">
+                    <div 
+                      className="bg-foreground h-2 rounded-full transition-all duration-300" 
+                      style={{ 
+                        width: `${assessment.completion_percentage !== null && assessment.completion_percentage !== undefined 
+                          ? Math.round(assessment.completion_percentage) 
+                          : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Percentage of metrics with entered values.
+                  </p>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Executive Summary Section */}
@@ -188,14 +229,6 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
           </Card>
         </div>
       )}
-
-      {/* Overall Score Display */}
-      <div className="mb-8">
-        <OverallScoreDisplay 
-          overallScore={assessment.site_signal_score ? assessment.site_signal_score * 100 : null}
-          scoreChange={null}
-        />
-      </div>
 
       {/* Metrics by Category */}
       {Object.keys(metricsByCategory).length > 0 && (
