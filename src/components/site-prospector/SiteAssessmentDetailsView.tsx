@@ -144,7 +144,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
                         ? formatPercentage(assessment.site_signal_score)
                         : "N/A"}
                     </span>
-                    <span className={`text-lg ${getSignalScoreColor()}`}>
+                    <span className={`text-4xl font-bold ${getSignalScoreColor()}`}>
                       - {getSignalScoreLabel()}
                     </span>
                   </div>
