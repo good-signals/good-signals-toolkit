@@ -46,10 +46,20 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     }
   };
 
-  // Organize metric values by category if they exist
+  // Organize metric values by category if they exist, but exclude SiteVisitSectionImages
   const metricsByCategory: Record<string, typeof assessment.assessment_metric_values> = {};
+  let siteVisitSectionImage: string | null = null;
+  
   if (assessment.assessment_metric_values && assessment.assessment_metric_values.length > 0) {
     assessment.assessment_metric_values.forEach((metric) => {
+      // Extract the Site Visit section image but don't display it as a metric category
+      if (metric.category === 'SiteVisitSectionImages') {
+        if (metric.image_url) {
+          siteVisitSectionImage = metric.image_url;
+        }
+        return; // Skip adding to metricsByCategory
+      }
+      
       if (!metricsByCategory[metric.category]) {
         metricsByCategory[metric.category] = [];
       }
@@ -230,7 +240,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         </div>
       )}
 
-      {/* Metrics by Category - Now ordered according to predefined section order */}
+      {/* Metrics by Category - Now ordered according to predefined section order and excluding SiteVisitSectionImages */}
       {sortedCategories.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-6">Assessment Metrics</h2>
@@ -260,12 +270,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         </div>
       )}
 
-      {/* Site Visit Ratings */}
+      {/* Site Visit Ratings - Now with the actual image */}
       {assessment.site_visit_ratings && assessment.site_visit_ratings.length > 0 && (
         <div className="mb-8">
           <SiteVisitRatingsSection
             siteVisitRatings={assessment.site_visit_ratings}
-            siteVisitSectionImage={null}
+            siteVisitSectionImage={siteVisitSectionImage}
           />
         </div>
       )}
