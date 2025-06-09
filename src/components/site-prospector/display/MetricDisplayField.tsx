@@ -1,9 +1,6 @@
 
 import React from 'react';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
 import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
 
 interface MetricDisplayFieldProps {
@@ -38,38 +35,73 @@ const MetricDisplayField: React.FC<MetricDisplayFieldProps> = ({
     return String(metricField.entered_value);
   };
 
-  return (
-    <div className="p-4 border rounded-md shadow-sm bg-card">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-        <div>
-          <Label className="flex items-center text-sm font-medium">
-            {metricField.label}
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <Info className="h-3 w-3 ml-1.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <p>Target: {metricField.target_value ?? 'N/A'} ({metricField.higher_is_better ? "Higher is better" : "Lower is better"})</p>
-                {metricField.measurement_type && <p>Type: {metricField.measurement_type}</p>}
-              </TooltipContent>
-            </Tooltip>
-          </Label>
-          
-          <div className="mt-1 p-2 bg-muted rounded-md">
-            <span className="text-sm font-medium">
-              {getDisplayValue()}
-            </span>
-          </div>
-        </div>
+  const getTargetValue = () => {
+    if (metricField.target_value === null || metricField.target_value === undefined) {
+      return "N/A";
+    }
+    return String(metricField.target_value);
+  };
 
-        <div>
-          <Label className="text-sm font-medium">Notes</Label>
-          <div className="mt-1 p-2 bg-muted rounded-md min-h-[2.5rem]">
-            <span className="text-sm text-muted-foreground">
-              {metricField.notes || "No notes provided"}
-            </span>
-          </div>
-        </div>
+  const getSignalScore = () => {
+    if (metricField.entered_value === null || metricField.entered_value === undefined || 
+        metricField.target_value === null || metricField.target_value === undefined) {
+      return null;
+    }
+
+    const enteredValue = metricField.entered_value;
+    const targetValue = metricField.target_value;
+    const higherIsBetter = metricField.higher_is_better ?? true;
+
+    let score: number;
+    if (higherIsBetter) {
+      score = enteredValue >= targetValue ? 100 : Math.round((enteredValue / targetValue) * 100);
+    } else {
+      score = enteredValue <= targetValue ? 100 : Math.round((targetValue / enteredValue) * 100);
+    }
+
+    return Math.max(0, Math.min(100, score));
+  };
+
+  const getSignalScoreColor = (score: number | null) => {
+    if (score === null) return "secondary";
+    if (score >= 80) return "success";
+    if (score >= 60) return "default";
+    return "destructive";
+  };
+
+  const signalScore = getSignalScore();
+
+  return (
+    <div className="grid grid-cols-5 gap-4 py-3 border-b border-border last:border-b-0">
+      {/* Metric Name */}
+      <div className="font-medium text-foreground">
+        {metricField.label}
+      </div>
+
+      {/* Entered Value */}
+      <div className="text-foreground">
+        {getDisplayValue()}
+      </div>
+
+      {/* Target Value */}
+      <div className="text-foreground">
+        {getTargetValue()}
+      </div>
+
+      {/* Signal Score */}
+      <div>
+        {signalScore !== null ? (
+          <Badge variant={getSignalScoreColor(signalScore)} className="text-sm">
+            {signalScore}%
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">N/A</span>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div className="text-muted-foreground text-sm">
+        {metricField.notes || "-"}
       </div>
     </div>
   );

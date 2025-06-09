@@ -33,13 +33,25 @@ const MetricDisplaySection: React.FC<MetricDisplaySectionProps> = ({
           <Badge variant="secondary">{categoryDescription}</Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {categoryMetrics.map((metric) => (
-          <MetricDisplayField
-            key={metric.id}
-            metricField={metric}
-          />
-        ))}
+      <CardContent className="p-6">
+        {/* Column Headers */}
+        <div className="grid grid-cols-5 gap-4 pb-3 border-b border-border mb-4">
+          <div className="font-medium text-muted-foreground">Metric</div>
+          <div className="font-medium text-muted-foreground">Entered Value</div>
+          <div className="font-medium text-muted-foreground">Target Value</div>
+          <div className="font-medium text-muted-foreground">Signal Score</div>
+          <div className="font-medium text-muted-foreground">Notes</div>
+        </div>
+        
+        {/* Metric Rows */}
+        <div>
+          {categoryMetrics.map((metric) => (
+            <MetricDisplayField
+              key={metric.id}
+              metricField={metric}
+            />
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
