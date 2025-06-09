@@ -8,7 +8,7 @@ const DRAFT_KEY = 'target-metrics-draft';
 const AUTOSAVE_DELAY = 1000; // 1 second debounce
 
 export const useTargetMetricsDraft = (
-  form: UseFormReturn<TargetMetricsFormData>,
+  form: UseFormReturn<TargetMetricsFormData> | null,
   metricSetId?: string
 ) => {
   const timeoutRef = useRef<NodeJS.Timeout>();
@@ -56,9 +56,9 @@ export const useTargetMetricsDraft = (
     return draftData !== null;
   }, [metricSetId]);
 
-  // Watch form changes and auto-save
+  // Watch form changes and auto-save - only if form is not null
   useEffect(() => {
-    if (metricSetId) return; // Don't auto-save for existing metric sets
+    if (!form || metricSetId) return; // Don't auto-save if form is null or for existing metric sets
 
     const subscription = form.watch((data) => {
       // Only save if there's meaningful content
