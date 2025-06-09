@@ -113,6 +113,7 @@ export const useAuthState = () => {
         user: newSession?.user ?? null 
       });
       
+      // Check if auth is already initialized before setting it again
       if (!authState.authInitialized) {
         console.log('[AuthContext] Auth initialized');
         dispatch({ type: 'SET_INITIALIZED', initialized: true });
@@ -178,7 +179,7 @@ export const useAuthState = () => {
       clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, []);
+  }, []); // Empty dependency array to prevent recreation
 
   // Handle loading state based on operations
   useEffect(() => {
@@ -191,12 +192,15 @@ export const useAuthState = () => {
       activeOperationsCount: activeOperations.size
     });
     
-    if (authState.authInitialized && hasActiveOps && !authState.authLoading) {
-      console.log('[AuthContext] Setting loading - operations detected');
-      dispatch({ type: 'SET_LOADING', loading: true });
-    } else if (authState.authInitialized && !hasActiveOps && authState.authLoading) {
-      console.log('[AuthContext] Clearing loading - no operations');
-      dispatch({ type: 'SET_LOADING', loading: false });
+    // Only update loading state if auth is initialized
+    if (authState.authInitialized) {
+      if (hasActiveOps && !authState.authLoading) {
+        console.log('[AuthContext] Setting loading - operations detected');
+        dispatch({ type: 'SET_LOADING', loading: true });
+      } else if (!hasActiveOps && authState.authLoading) {
+        console.log('[AuthContext] Clearing loading - no operations');
+        dispatch({ type: 'SET_LOADING', loading: false });
+      }
     }
   }, [activeOperations.size, authState.authInitialized, authState.authLoading]);
 

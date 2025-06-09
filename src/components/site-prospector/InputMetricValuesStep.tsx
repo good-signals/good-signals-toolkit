@@ -150,8 +150,46 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     },
   });
 
+  // Safe session storage functions
+  const safeGetSessionStorage = (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        return sessionStorage.getItem(key);
+      }
+    } catch (error) {
+      console.warn('Failed to access sessionStorage:', error);
+    }
+    return null;
+  };
+
+  const safeSetSessionStorage = (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.warn('Failed to set sessionStorage:', error);
+    }
+  };
+
+  const safeRemoveSessionStorage = (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn('Failed to remove from sessionStorage:', error);
+    }
+  };
+
   // Save form data to session storage whenever form data changes - with debouncing
   useEffect(() => {
+    // Only set up watcher if watch function is available
+    if (!watch) {
+      console.warn('[InputMetricValuesStep] Watch function not available yet');
+      return;
+    }
+
     const subscription = watch((value) => {
       const timeoutId = setTimeout(() => {
         try {
@@ -164,7 +202,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             siteStatus: value.siteStatus || 'Prospect',
           };
           
-          sessionStorage.setItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
+          safeSetSessionStorage(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
           console.log('Form data saved to session storage:', serializableData);
         } catch (error) {
           console.warn('Failed to save form data to session storage:', error);
@@ -174,20 +212,20 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       return () => clearTimeout(timeoutId);
     });
     
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe();
   }, [watch, assessmentId]);
 
   // Clear session storage on completion
   const clearSessionStorageOnCompletion = () => {
-    sessionStorage.removeItem(getFormDataSessionKey(assessmentId));
-    sessionStorage.removeItem(getImageDataSessionKey(assessmentId));
+    safeRemoveSessionStorage(getFormDataSessionKey(assessmentId));
+    safeRemoveSessionStorage(getImageDataSessionKey(assessmentId));
     console.log('Session storage cleared after assessment completion');
   };
 
   // Load saved form data from session storage
   const loadSavedFormData = () => {
     try {
-      const savedDataJson = sessionStorage.getItem(getFormDataSessionKey(assessmentId));
+      const savedDataJson = safeGetSessionStorage(getFormDataSessionKey(assessmentId));
       if (savedDataJson) {
         const savedData = JSON.parse(savedDataJson) as Partial<MetricValuesFormData>;
         console.log('Loaded saved form data from session storage:', savedData);

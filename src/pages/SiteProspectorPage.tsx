@@ -4,11 +4,14 @@ import { BarChart3, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SiteAssessmentsTable from '@/components/site-prospector/SiteAssessmentsTable';
 import SiteProspectorStepRenderer from '@/components/site-prospector/SiteProspectorStepRenderer';
+import SiteProspectorErrorBoundary from '@/components/site-prospector/SiteProspectorErrorBoundary';
 import { useSiteProspectorSession } from '@/hooks/useSiteProspectorSession';
 import { useSiteAssessmentOperations } from '@/hooks/useSiteAssessmentOperations';
 import { useSiteProspectorStepHandlers } from '@/hooks/useSiteProspectorStepHandlers';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SiteProspectorPage = () => {
+  const { user, authLoading } = useAuth();
   const {
     currentStep,
     setCurrentStep,
@@ -72,55 +75,90 @@ const SiteProspectorPage = () => {
     selectedMetricSetId,
     isPending: deleteMutation.isPending,
     assessmentsCount: assessments.length,
-    clearSelectionsKey
+    clearSelectionsKey,
+    authLoading,
+    user: !!user
   });
+
+  // Show loading state while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <BarChart3 size={48} className="text-primary mx-auto mb-4 animate-pulse" />
+            <p className="text-lg">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if user is not authenticated after loading
+  if (!user) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <BarChart3 size={48} className="text-destructive mx-auto mb-4" />
+            <p className="text-lg text-destructive">Authentication required</p>
+            <p className="text-sm text-muted-foreground">Please sign in to access the Site Prospector</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // If we're in a step other than idle, render the step component
   if (currentStep !== 'idle') {
     return (
-      <SiteProspectorStepRenderer
-        currentStep={currentStep}
-        activeAssessmentId={activeAssessmentId}
-        selectedMetricSetId={selectedMetricSetId}
-        onAddressStepCompleted={handleAddressStepCompleted}
-        onMetricSetSelected={handleMetricSetSelected}
-        onMetricValuesSubmitted={handleMetricValuesSubmitted}
-        onCancelAssessmentProcess={handleCancelAssessmentProcess}
-        onBackFromMetricSelection={handleBackFromMetricSelection}
-        onBackFromMetricInput={handleBackFromMetricInput}
-        setCurrentStep={setCurrentStep}
-      />
+      <SiteProspectorErrorBoundary>
+        <SiteProspectorStepRenderer
+          currentStep={currentStep}
+          activeAssessmentId={activeAssessmentId}
+          selectedMetricSetId={selectedMetricSetId}
+          onAddressStepCompleted={handleAddressStepCompleted}
+          onMetricSetSelected={handleMetricSetSelected}
+          onMetricValuesSubmitted={handleMetricValuesSubmitted}
+          onCancelAssessmentProcess={handleCancelAssessmentProcess}
+          onBackFromMetricSelection={handleBackFromMetricSelection}
+          onBackFromMetricInput={handleBackFromMetricInput}
+          setCurrentStep={setCurrentStep}
+        />
+      </SiteProspectorErrorBoundary>
     );
   }
   
   return (
-    <div className="container mx-auto py-10 px-4">
-      <div className="flex flex-col items-center text-center mb-8">
-        <BarChart3 size={48} className="text-primary mx-auto mb-4" />
-        <h1 className="text-3xl font-bold text-primary mb-2">Site Prospector</h1>
-        <p className="text-lg text-foreground/80 max-w-2xl">
-          Evaluate specific sites, track assessments, and compare potential locations using your custom metrics.
-        </p>
-      </div>
+    <SiteProspectorErrorBoundary>
+      <div className="container mx-auto py-10 px-4">
+        <div className="flex flex-col items-center text-center mb-8">
+          <BarChart3 size={48} className="text-primary mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-primary mb-2">Site Prospector</h1>
+          <p className="text-lg text-foreground/80 max-w-2xl">
+            Evaluate specific sites, track assessments, and compare potential locations using your custom metrics.
+          </p>
+        </div>
 
-      <div className="flex justify-center mb-8">
-        <Button size="lg" onClick={handleStartNewAssessment}>
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Start New Site Assessment
-        </Button>
+        <div className="flex justify-center mb-8">
+          <Button size="lg" onClick={handleStartNewAssessment}>
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Start New Site Assessment
+          </Button>
+        </div>
+        
+        <SiteAssessmentsTable
+          assessments={assessments}
+          isLoading={isLoadingAssessments}
+          errorLoading={assessmentsError}
+          onViewDetails={handleViewAssessment}
+          onEdit={handleEditAssessment}
+          onDeleteCommit={handleDeleteCommit}
+          isDeleting={deleteMutation.isPending}
+          forceClearSelectionsKey={clearSelectionsKey}
+        />
       </div>
-      
-      <SiteAssessmentsTable
-        assessments={assessments}
-        isLoading={isLoadingAssessments}
-        errorLoading={assessmentsError}
-        onViewDetails={handleViewAssessment}
-        onEdit={handleEditAssessment}
-        onDeleteCommit={handleDeleteCommit}
-        isDeleting={deleteMutation.isPending}
-        forceClearSelectionsKey={clearSelectionsKey}
-      />
-    </div>
+    </SiteProspectorErrorBoundary>
   );
 };
 
