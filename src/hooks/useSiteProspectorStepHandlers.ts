@@ -3,12 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { toast } from "@/components/ui/use-toast";
-import { AssessmentStep } from './useSiteProspectorSession';
+import { SiteProspectorStep } from './useSiteProspectorSession';
 import { repairTargetMetricSet, checkIfMetricSetNeedsRepair } from '@/services/targetMetrics/metricSetRepairService';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 
 interface StepHandlersProps {
-  setCurrentStep: (step: AssessmentStep) => void;
+  setCurrentStep: (step: SiteProspectorStep) => void;
   setActiveAssessmentId: (id: string | null) => void;
   setSelectedMetricSetId: (id: string | null) => void;
   clearSessionStorage: () => void;
@@ -29,7 +29,7 @@ export const useSiteProspectorStepHandlers = ({
     console.log('Starting new assessment');
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null);
-    setCurrentStep('newAddress');
+    setCurrentStep('address');
   };
 
   const handleAddressStepCompleted = (assessmentId: string) => {
@@ -47,9 +47,9 @@ export const useSiteProspectorStepHandlers = ({
     
     try {
       setActiveAssessmentId(assessmentId);
-      setCurrentStep('selectMetrics');
+      setCurrentStep('metric-set-selection');
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
-      console.log('Successfully moved to selectMetrics step');
+      console.log('Successfully moved to metric-set-selection step');
     } catch (error) {
       console.error('Error in handleAddressStepCompleted:', error);
       toast({
@@ -60,8 +60,8 @@ export const useSiteProspectorStepHandlers = ({
     }
   };
 
-  const handleMetricSetSelected = async (assessmentId: string, metricSetId: string) => {
-    console.log('[useSiteProspectorStepHandlers] Metric set selected:', { assessmentId, metricSetId });
+  const handleMetricSetSelected = async (metricSetId: string) => {
+    console.log('[useSiteProspectorStepHandlers] Metric set selected:', { metricSetId });
     
     // Check if the metric set needs repair before proceeding
     if (user?.id) {
@@ -101,13 +101,12 @@ export const useSiteProspectorStepHandlers = ({
       }
     }
     
-    setActiveAssessmentId(assessmentId); 
     setSelectedMetricSetId(metricSetId);
-    setCurrentStep('inputMetrics');
+    setCurrentStep('metric-input');
   };
 
-  const handleMetricValuesSubmitted = (assessmentId: string) => {
-    console.log('Metric values submitted for:', assessmentId);
+  const handleMetricValuesSubmitted = () => {
+    console.log('Metric values submitted');
     setActiveAssessmentId(null);
     setSelectedMetricSetId(null); 
     setCurrentStep('idle');
@@ -134,12 +133,12 @@ export const useSiteProspectorStepHandlers = ({
   
   const handleBackFromMetricSelection = () => {
     console.log('Going back from metric selection');
-    setCurrentStep('newAddress');
+    setCurrentStep('address');
   };
 
   const handleBackFromMetricInput = () => {
     console.log('Going back from metric input');
-    setCurrentStep('selectMetrics');
+    setCurrentStep('metric-set-selection');
   };
   
   const handleViewAssessment = async (assessment: SiteAssessment) => {
@@ -194,7 +193,7 @@ export const useSiteProspectorStepHandlers = ({
     
     setActiveAssessmentId(assessment.id);
     setSelectedMetricSetId(assessment.target_metric_set_id);
-    setCurrentStep('assessmentDetails');
+    setCurrentStep('view-details');
   };
 
   const handleEditAssessment = async (assessment: SiteAssessment) => {
@@ -242,10 +241,10 @@ export const useSiteProspectorStepHandlers = ({
       }
       
       setSelectedMetricSetId(assessment.target_metric_set_id);
-      setCurrentStep('inputMetrics'); 
+      setCurrentStep('metric-input'); 
     } else {
       setSelectedMetricSetId(null);
-      setCurrentStep('selectMetrics');
+      setCurrentStep('metric-set-selection');
     }
   };
 

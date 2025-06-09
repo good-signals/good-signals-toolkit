@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExportButton } from '@/components/export/ExportButton';
-import { SiteAssessmentsTableHeader } from './table/SiteAssessmentsTableHeader';
-import { SiteAssessmentsTableContent } from './table/SiteAssessmentsTableContent';
+import ExportButton from '@/components/export/ExportButton';
+import SiteAssessmentsTableHeader from './table/SiteAssessmentsTableHeader';
+import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
 import { Search, FileText, Plus } from 'lucide-react';
@@ -45,14 +45,14 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
 
   const handleEdit = (assessment: SiteAssessment) => {
     if (assessment.target_metric_set_id) {
-      loadDraft(assessment.target_metric_set_id);
+      loadDraft();
     }
     onEdit(assessment);
   };
 
   const handleViewDetails = (assessment: SiteAssessment) => {
     if (assessment.target_metric_set_id) {
-      loadDraft(assessment.target_metric_set_id);
+      loadDraft();
     }
     onViewDetails(assessment);
   };
@@ -152,7 +152,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <ExportButton 
               exportData={mockExportData}
-              filename="site-assessments"
             />
             {selectedIds.length > 0 && (
               <Button 
@@ -180,7 +179,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
 
         <div className="rounded-md border">
           <SiteAssessmentsTableHeader
-            sortConfig={{ key: sortConfig.key as SortableKeys, direction: sortConfig.direction }}
+            sortConfig={sortConfig}
             onSort={handleSort}
             onSelectAll={handleSelectAll}
             allSelected={selectedIds.length === filteredAndSortedAssessments.length && filteredAndSortedAssessments.length > 0}

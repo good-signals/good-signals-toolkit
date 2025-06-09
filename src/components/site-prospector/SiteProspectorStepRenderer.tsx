@@ -43,6 +43,7 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
     case 'metric-set-selection':
       return (
         <SelectTargetMetricSetStep
+          assessmentId={activeAssessmentId!}
           onMetricSetSelected={onMetricSetSelected}
           onBack={onBackFromMetricSelection}
         />

@@ -22,7 +22,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
   const handleEdit = () => {
     if (assessment.target_metric_set_id) {
-      loadDraft(assessment.target_metric_set_id);
+      loadDraft();
     }
     onEditGoToInputMetrics();
   };

@@ -33,12 +33,19 @@ const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
         {Object.entries(categoryMetrics).map(([metricKey, metricValue]) => (
           <MetricInputField
             key={metricKey}
-            metricName={metricKey}
+            metricKey={metricKey}
             metricValue={metricValue}
             onMetricChange={onMetricChange}
           />
         ))}
-        <CategoryImageUpload />
+        <CategoryImageUpload 
+          category={categoryName}
+          imageMetricIndex={0}
+          control={null}
+          watch={() => null}
+          setValue={() => {}}
+          getValues={() => ({})}
+        />
       </CardContent>
     </Card>
   );
