@@ -6,6 +6,7 @@ import InputMetricValuesStep from './InputMetricValuesStep';
 import SiteAssessmentDetailsView from './SiteAssessmentDetailsView';
 import SiteProspectorErrorBoundary from './SiteProspectorErrorBoundary';
 import { SiteProspectorStep } from '@/hooks/useSiteProspectorSession';
+import { useSiteAssessmentDetails } from '@/hooks/useSiteAssessmentDetails';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
@@ -34,6 +35,13 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   onBackFromMetricInput,
   setCurrentStep,
 }) => {
+  
+  // Fetch assessment details when viewing details
+  const { 
+    data: assessmentDetails, 
+    isLoading: isLoadingDetails, 
+    error: detailsError 
+  } = useSiteAssessmentDetails(currentStep === 'view-details' ? activeAssessmentId : undefined);
   
   // Validation helpers
   const validateStepRequirements = (step: SiteProspectorStep): string | null => {
@@ -123,11 +131,28 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
       case 'view-details':
         return (
           <SiteProspectorErrorBoundary onReset={() => setCurrentStep('idle')}>
-            <SiteAssessmentDetailsView
-              assessment={{} as any}
-              onEditGoToInputMetrics={() => setCurrentStep('metric-input')}
-              onBackToList={() => setCurrentStep('idle')}
-            />
+            {isLoadingDetails && (
+              <div className="container mx-auto py-8 px-4 text-center">
+                <div className="animate-pulse">Loading assessment details...</div>
+              </div>
+            )}
+            
+            {detailsError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Error loading assessment details: {detailsError instanceof Error ? detailsError.message : 'Unknown error'}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {!isLoadingDetails && !detailsError && assessmentDetails && (
+              <SiteAssessmentDetailsView
+                assessment={assessmentDetails}
+                onEditGoToInputMetrics={() => setCurrentStep('metric-input')}
+                onBackToList={() => setCurrentStep('idle')}
+              />
+            )}
           </SiteProspectorErrorBoundary>
         );
 
