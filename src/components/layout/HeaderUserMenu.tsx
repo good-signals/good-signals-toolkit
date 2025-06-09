@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import UserAvatar from '@/components/auth/UserAvatar';
-import { Account } from '@/services/accountService';
+import { Account } from '@/services/account';
 
 interface HeaderUserMenuProps {
   user: any;

@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserAccountsWithAdminRole, Account } from '@/services/accountService';
+import { fetchUserAccountsWithAdminRole, Account } from '@/services/account';
 import { useSuperAdmin } from './useSuperAdmin';
 
 export const useHeaderData = () => {

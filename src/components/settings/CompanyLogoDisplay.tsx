@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { Briefcase, Building } from 'lucide-react';
 import UserAvatar from '@/components/auth/UserAvatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Account } from '@/services/accountService';
+import { Account } from '@/services/account';
 
 interface CompanyLogoDisplayProps {
   displayAccount: Account | null;

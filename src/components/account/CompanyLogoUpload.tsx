@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { UploadCloud, Image as ImageIcon, AlertCircle } from 'lucide-react';
-import { Account, updateAccountDetailsService, uploadCompanyLogo, deleteCompanyLogo, extractPathFromUrl } from '@/services/accountService';
+import { Account, updateAccountDetailsService, uploadCompanyLogo, deleteCompanyLogo, extractPathFromUrl } from '@/services/account';
 import { validateAndSanitizeImage } from '@/utils/imageValidation';
 
 interface CompanyLogoUploadProps {
