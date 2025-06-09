@@ -1,10 +1,8 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import ExportButton from '@/components/export/ExportButton';
 import SiteAssessmentsTableHeader from './table/SiteAssessmentsTableHeader';
 import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
@@ -119,17 +117,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     );
   }
 
-  const mockExportData = {
-    assessment: assessments[0] || {} as SiteAssessment,
-    targetMetricSet: null,
-    accountSettings: null,
-    detailedMetricScores: new Map(),
-    siteVisitRatings: [],
-    additionalImages: [],
-    overallSiteSignalScore: 0,
-    completionPercentage: 0
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -137,16 +124,13 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Site Assessments
+              Site Pipeline
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               {assessments.length} assessment{assessments.length !== 1 ? 's' : ''} total
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <ExportButton 
-              exportData={mockExportData}
-            />
             {selectedIds.length > 0 && (
               <Button 
                 variant="destructive" 
