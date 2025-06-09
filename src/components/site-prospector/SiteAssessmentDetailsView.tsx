@@ -11,7 +11,7 @@ import { updateSiteStatus } from '@/services/siteAssessment/statusUpdates';
 import { toast } from 'sonner';
 import AddressMapDisplay from './AddressMapDisplay';
 import EditableExecutiveSummary from './EditableExecutiveSummary';
-import MetricCategorySection from './MetricCategorySection';
+import MetricDisplaySection from './display/MetricDisplaySection';
 import OverallScoreDisplay from './OverallScoreDisplay';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 
@@ -203,17 +203,21 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
           <h2 className="text-2xl font-bold mb-6">Assessment Metrics</h2>
           <div className="space-y-6">
             {Object.entries(metricsByCategory).map(([category, metrics]) => (
-              <MetricCategorySection
+              <MetricDisplaySection
                 key={category}
                 categoryName={category}
                 categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
-                categoryMetrics={metrics.reduce((acc, metric) => {
-                  acc[metric.label] = metric.entered_value;
-                  return acc;
-                }, {} as { [key: string]: any })}
-                onMetricChange={() => {}} // Read-only in details view
-                onImageUpload={() => {}} // Read-only in details view
-                account={null}
+                categoryMetrics={metrics.map(metric => ({
+                  id: metric.id || `${metric.category}-${metric.label}`,
+                  metric_identifier: metric.metric_identifier || metric.label,
+                  label: metric.label,
+                  category: metric.category,
+                  entered_value: metric.entered_value,
+                  notes: metric.notes,
+                  target_value: undefined, // This would need to come from metric definitions
+                  higher_is_better: undefined, // This would need to come from metric definitions
+                  measurement_type: undefined, // This would need to come from metric definitions
+                }))}
               />
             ))}
           </div>
