@@ -18,11 +18,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   onEditGoToInputMetrics,
   onBackToList,
 }) => {
-  const { loadDraft } = useTargetMetricsDraft(null);
+  const { loadDraft } = useTargetMetricsDraft(null, null);
 
   const handleEdit = () => {
     if (assessment.target_metric_set_id) {
-      loadDraft(assessment.target_metric_set_id);
+      loadDraft();
     }
     onEditGoToInputMetrics();
   };

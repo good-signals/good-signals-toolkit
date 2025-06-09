@@ -54,7 +54,7 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
         <InputMetricValuesStep
           assessmentId={activeAssessmentId!}
           targetMetricSetId={selectedMetricSetId!}
-          onSubmitted={onMetricValuesSubmitted}
+          onSubmit={onMetricValuesSubmitted}
           onBack={onBackFromMetricInput}
           onCancel={onCancelAssessmentProcess}
         />
