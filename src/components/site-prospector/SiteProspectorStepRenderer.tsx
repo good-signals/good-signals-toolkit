@@ -35,7 +35,7 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
     case 'address':
       return (
         <NewAssessmentForm
-          onStepCompleted={onAddressStepCompleted}
+          onAssessmentCreated={onAddressStepCompleted}
           onCancel={onCancelAssessmentProcess}
         />
       );
@@ -45,7 +45,6 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
         <SelectTargetMetricSetStep
           onMetricSetSelected={onMetricSetSelected}
           onBack={onBackFromMetricSelection}
-          onCancel={onCancelAssessmentProcess}
         />
       );
 
@@ -53,7 +52,7 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
       return (
         <InputMetricValuesStep
           assessmentId={activeAssessmentId!}
-          selectedMetricSetId={selectedMetricSetId!}
+          metricSetId={selectedMetricSetId!}
           onSubmitted={onMetricValuesSubmitted}
           onBack={onBackFromMetricInput}
           onCancel={onCancelAssessmentProcess}

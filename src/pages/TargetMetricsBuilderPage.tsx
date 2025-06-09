@@ -65,7 +65,8 @@ const TargetMetricsBuilderPage: React.FC = () => {
       predefined_metrics: initialPredefinedMetricsConfig.map(config => {
         let targetValue;
         if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 50;
+          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand"))?.value ?? 
+                         50;
         } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
           targetValue = 50;
         } else {
@@ -126,7 +127,18 @@ const TargetMetricsBuilderPage: React.FC = () => {
   const createCustomMetricMutation = useMutation({
     mutationFn: async (metricData: CreateCustomMetricFormData) => {
       if (!user?.id) throw new Error('User not authenticated');
-      return createAccountCustomMetric(user.id, metricData);
+      
+      // Ensure all required fields are present
+      const completeMetricData: CreateCustomMetricFormData = {
+        name: metricData.name || '',
+        category: metricData.category || '',
+        higher_is_better: metricData.higher_is_better ?? true,
+        units: metricData.units,
+        description: metricData.description,
+        default_target_value: metricData.default_target_value,
+      };
+      
+      return createAccountCustomMetric(user.id, completeMetricData);
     },
     onSuccess: (newMetric) => {
       sonnerToast.success("Custom metric created successfully!");

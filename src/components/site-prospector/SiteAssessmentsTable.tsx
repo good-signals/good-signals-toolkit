@@ -1,21 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
-import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2, FileText, Target, MapPin, Calendar, Building, ExternalLink } from 'lucide-react';
-import { useSiteAssessmentOperations } from '@/hooks/useSiteAssessmentOperations';
-import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
+import { ExportButton } from '@/components/export/ExportButton';
+import { SiteAssessmentsTableHeader } from './table/SiteAssessmentsTableHeader';
+import { SiteAssessmentsTableContent } from './table/SiteAssessmentsTableContent';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
-import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
-import ExportButton from '@/components/export/ExportButton';
-import { Account } from '@/services/account';
+import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
+import { Search, FileText, Plus } from 'lucide-react';
+
+export type SortableKeys = 'assessment_name' | 'address_line1' | 'city' | 'overall_score' | 'created_at';
 
 interface SiteAssessmentsTableProps {
   assessments: SiteAssessment[];
@@ -38,133 +34,185 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   isDeleting,
   forceClearSelectionsKey,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedAssessment, setSelectedAssessment] = useState<SiteAssessment | null>(null);
-  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
-  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
-  const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null);
-  const [documentCounts, setDocumentCounts] = useState<Record<string, number>>({});
-  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'asc' | 'desc' }>({
+    key: 'created_at',
+    direction: 'desc'
+  });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const { loadDraft } = useTargetMetricsDraft();
 
-  const filteredAssessments = assessments.filter(assessment => {
-    const searchMatch = assessment.assessment_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        assessment.address_line1?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        assessment.city?.toLowerCase().includes(searchQuery.toLowerCase());
-    const statusMatch = filterStatus ? assessment.site_status === filterStatus : true;
-    return searchMatch && statusMatch;
-  });
-
-  const handleCreateAssessment = () => {
-    loadDraft('');
-    setIsDialogOpen(true);
-  };
-
-  const handleEditAssessment = (assessment: SiteAssessment) => {
-    setSelectedAssessment(assessment);
-    loadDraft(assessment.target_metric_set_id || '');
+  const handleEdit = (assessment: SiteAssessment) => {
+    if (assessment.target_metric_set_id) {
+      loadDraft(assessment.target_metric_set_id);
+    }
     onEdit(assessment);
   };
 
-  const handleDeleteAssessment = async (assessment: SiteAssessment) => {
-    try {
-      onDeleteCommit([assessment.id]);
-      toast.success('Site assessment deleted successfully.');
-    } catch (error) {
-      console.error('Error deleting site assessment:', error);
-      toast.error('Failed to delete site assessment.');
+  const handleViewDetails = (assessment: SiteAssessment) => {
+    if (assessment.target_metric_set_id) {
+      loadDraft(assessment.target_metric_set_id);
     }
+    onViewDetails(assessment);
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedAssessment(null);
-  };
+  React.useEffect(() => {
+    setSelectedIds([]);
+  }, [forceClearSelectionsKey]);
 
-  const handleSelectAll = (checked: boolean | 'indeterminate') => {
-    if (checked === true) {
-      setSelectedAssessmentIds(filteredAssessments.map(a => a.id));
-    } else {
-      setSelectedAssessmentIds([]);
-    }
-  };
+  const filteredAndSortedAssessments = useMemo(() => {
+    let filtered = assessments.filter(assessment =>
+      assessment.assessment_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assessment.address_line1.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assessment.city.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  const handleSelectRow = (assessmentId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedAssessmentIds(prev => [...prev, assessmentId]);
-    } else {
-      setSelectedAssessmentIds(prev => prev.filter(id => id !== assessmentId));
-    }
-  };
+    return filtered.sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [assessments, searchTerm, sortConfig]);
 
-  const handleSort = (key: string) => {
-    setSortConfig(prevConfig => ({
+  const handleSort = (key: SortableKeys) => {
+    setSortConfig(prev => ({
       key,
-      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc',
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
-  const handleAttachmentsClick = (assessment: SiteAssessment) => {
-    // Handle attachments click
-    console.log('Attachments clicked for:', assessment.id);
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredAndSortedAssessments.map(a => a.id));
+    } else {
+      setSelectedIds([]);
+    }
   };
 
-  // Clear selections when forceClearSelectionsKey changes
-  useEffect(() => {
-    setSelectedAssessmentIds([]);
-  }, [forceClearSelectionsKey]);
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length > 0) {
+      onDeleteCommit(selectedIds);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <div className="text-muted-foreground">Loading assessments...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (errorLoading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <div className="text-destructive">Error loading assessments: {errorLoading.message}</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const mockExportData = {
+    assessment: assessments[0] || {} as SiteAssessment,
+    targetMetricSet: null,
+    accountSettings: null,
+    detailedMetricScores: [],
+    siteVisitRatings: [],
+    additionalImages: []
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Site Assessments</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-3 items-center">
-          <Input
-            type="text"
-            placeholder="Search assessments..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="md:col-span-1"
-          />
-          <Select onValueChange={setFilterStatus} defaultValue={filterStatus}>
-            <SelectTrigger className="w-full md:col-span-1">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex justify-end md:col-span-1">
-            <ExportButton exportData={assessments} filename="site-assessments" />
-            <Button onClick={handleCreateAssessment}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Assessment
-            </Button>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Site Assessments
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {assessments.length} assessment{assessments.length !== 1 ? 's' : ''} total
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <ExportButton 
+              exportData={mockExportData}
+              filename="site-assessments"
+            />
+            {selectedIds.length > 0 && (
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                size="sm"
+              >
+                Delete Selected ({selectedIds.length})
+              </Button>
+            )}
           </div>
         </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center space-x-2 mb-4">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search assessments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
 
-        <SiteAssessmentsTableContent
-          assessments={filteredAssessments}
-          selectedAssessmentIds={selectedAssessmentIds}
-          sortConfig={sortConfig}
-          onSort={handleSort}
-          onSelectAll={handleSelectAll}
-          onSelectRow={handleSelectRow}
-          onViewDetails={onViewDetails}
-          onEdit={handleEditAssessment}
-          onDelete={handleDeleteAssessment}
-          onAttachmentsClick={handleAttachmentsClick}
-          isDeleting={isDeleting}
-          assessmentToDelete={assessmentToDelete}
-          documentCounts={documentCounts}
-        />
+        <div className="rounded-md border">
+          <SiteAssessmentsTableHeader
+            sortConfig={{ key: sortConfig.key as SortableKeys, direction: sortConfig.direction }}
+            onSort={handleSort}
+            onSelectAll={handleSelectAll}
+            allSelected={selectedIds.length === filteredAndSortedAssessments.length && filteredAndSortedAssessments.length > 0}
+            someSelected={selectedIds.length > 0 && selectedIds.length < filteredAndSortedAssessments.length}
+          />
+          <SiteAssessmentsTableContent
+            assessments={filteredAndSortedAssessments}
+            isLoading={isLoading}
+            selectedIds={selectedIds}
+            onSelectOne={handleSelectOne}
+            onViewDetails={handleViewDetails}
+            onEdit={handleEdit}
+            onDelete={async (assessment: SiteAssessment) => {
+              onDeleteCommit([assessment.id]);
+            }}
+          />
+        </div>
+
+        {filteredAndSortedAssessments.length === 0 && !isLoading && (
+          <div className="text-center py-8">
+            <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-muted-foreground mb-2">
+              {searchTerm ? 'No assessments match your search' : 'No assessments yet'}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchTerm 
+                ? 'Try adjusting your search terms' 
+                : 'Get started by creating your first site assessment'
+              }
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

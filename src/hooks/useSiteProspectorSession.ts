@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 
-export type AssessmentStep = 'idle' | 'newAddress' | 'selectMetrics' | 'inputMetrics' | 'assessmentDetails';
+export type SiteProspectorStep = 'idle' | 'address' | 'metric-set-selection' | 'metric-input' | 'view-details';
 
 const SESSION_STORAGE_KEYS = {
   CURRENT_STEP: 'siteProspector_currentStep',
@@ -10,9 +10,9 @@ const SESSION_STORAGE_KEYS = {
 } as const;
 
 export const useSiteProspectorSession = () => {
-  const [currentStep, setCurrentStep] = useState<AssessmentStep>(() => {
+  const [currentStep, setCurrentStep] = useState<SiteProspectorStep>(() => {
     const storedStep = sessionStorage.getItem(SESSION_STORAGE_KEYS.CURRENT_STEP);
-    return (storedStep as AssessmentStep) || 'idle';
+    return (storedStep as SiteProspectorStep) || 'idle';
   });
   
   const [activeAssessmentId, setActiveAssessmentId] = useState<string | null>(() => {

@@ -1,11 +1,9 @@
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
-import { useSiteAssessmentOperations } from '@/hooks/useSiteAssessmentOperations';
 import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
 import { formatDate } from '@/lib/utils';
 
@@ -20,11 +18,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   onEditGoToInputMetrics,
   onBackToList,
 }) => {
-  const navigate = useNavigate();
   const { loadDraft } = useTargetMetricsDraft();
 
   const handleEdit = () => {
-    loadDraft(assessment.target_metric_set_id || '');
+    if (assessment.target_metric_set_id) {
+      loadDraft(assessment.target_metric_set_id);
+    }
     onEditGoToInputMetrics();
   };
 
