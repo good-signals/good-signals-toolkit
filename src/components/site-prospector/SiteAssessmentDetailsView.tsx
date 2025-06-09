@@ -94,22 +94,22 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
             
             <h1 className="text-3xl font-bold text-foreground mb-2">Assessment: {assessment.assessment_name}</h1>
             
-            <div className="flex items-center text-muted-foreground mb-1">
+            <div className="flex items-center text-muted-foreground mb-3">
               <span className="font-medium">Address:</span>
               <span className="ml-2">{assessment.address_line1}</span>
             </div>
             
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="w-full flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <span className="font-medium">Site Status:</span>
+                <span className="font-medium text-muted-foreground">Site Status:</span>
                 <Badge variant={getSiteStatusColor(currentStatus)} className="text-sm">
                   {currentStatus}
                 </Badge>
               </div>
               
               <div className="flex items-center gap-2">
-                <span className="font-medium">Target Metric Set:</span>
-                <span>Test Targets 1</span>
+                <span className="font-medium text-muted-foreground">Target Metric Set:</span>
+                <span className="text-foreground">Test Targets 1</span>
                 <span className="text-muted-foreground">(20 metrics)</span>
               </div>
             </div>
