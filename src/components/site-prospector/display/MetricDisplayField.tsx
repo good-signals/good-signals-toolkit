@@ -167,28 +167,30 @@ const MetricDisplayField: React.FC<MetricDisplayFieldProps> = ({
       return "secondary";
     }
     
-    const signalStatus = getSignalStatus(
-      score, 
-      accountThresholds.goodThreshold, 
-      accountThresholds.badThreshold
-    );
+    // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
+    const scoreDecimal = score / 100;
     
-    console.log('[MetricDisplayField] Signal status determined:', {
+    console.log('[MetricDisplayField] Score comparison:', {
       metric_identifier: metricField.metric_identifier,
       score,
-      signalStatus,
+      scoreDecimal,
       goodThreshold: accountThresholds.goodThreshold,
       badThreshold: accountThresholds.badThreshold
     });
     
-    switch (signalStatus.text) {
-      case 'Good':
-        return "success";
-      case 'Bad':
-        return "destructive";
-      default:
-        return "default";
+    // Apply threshold logic: Good >= goodThreshold, Bad <= badThreshold, Neutral = between
+    if (scoreDecimal >= accountThresholds.goodThreshold) {
+      console.log('[MetricDisplayField] Score is GOOD (>= good threshold)');
+      return "success";
     }
+    
+    if (scoreDecimal <= accountThresholds.badThreshold) {
+      console.log('[MetricDisplayField] Score is BAD (<= bad threshold)');
+      return "destructive";
+    }
+    
+    console.log('[MetricDisplayField] Score is NEUTRAL (between thresholds)');
+    return "default"; // This will be yellow for the neutral/warning state
   };
 
   const signalScore = getSignalScore();
