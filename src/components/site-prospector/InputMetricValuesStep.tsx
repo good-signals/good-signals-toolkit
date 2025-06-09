@@ -89,6 +89,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isFormReady, setIsFormReady] = useState(false);
+  const [formInitialized, setFormInitialized] = useState(false);
 
   // Add query for current assessment details to get site status
   const { data: currentAssessment } = useQuery({
@@ -125,6 +126,30 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   });
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = form;
+
+  // Add safety checks for form methods
+  const safeWatch = (...args: Parameters<typeof watch>) => {
+    if (!formInitialized || !watch) {
+      return undefined;
+    }
+    try {
+      return watch(...args);
+    } catch (error) {
+      console.error('[InputMetricValuesStep] Error in watch:', error);
+      return undefined;
+    }
+  };
+
+  const safeSetValue = (...args: Parameters<typeof setValue>) => {
+    if (!formInitialized || !setValue) {
+      return;
+    }
+    try {
+      return setValue(...args);
+    } catch (error) {
+      console.error('[InputMetricValuesStep] Error in setValue:', error);
+    }
+  };
 
   const { fields: metricFields, replace: replaceMetrics } = useFieldArray({
     control,
@@ -169,42 +194,49 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     return null;
   };
 
-  // Save form data to session storage with proper safety checks
+  // Save form data to session storage with enhanced safety checks
   useEffect(() => {
-    if (!isFormReady || !watch) {
+    if (!isFormReady || !formInitialized || !safeWatch) {
       console.log('[InputMetricValuesStep] Form not ready for watching yet');
       return;
     }
 
     console.log('[InputMetricValuesStep] Setting up form watcher');
     
-    const subscription = watch((value) => {
-      const timeoutId = setTimeout(() => {
-        try {
-          const serializableData = {
-            metrics: value.metrics?.map(metric => ({
-              ...metric,
-              image_file: null,
-            })) || [],
-            siteVisitRatings: value.siteVisitRatings || [],
-            siteStatus: value.siteStatus || 'Prospect',
-          };
-          
-          safeStorage.sessionSetItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
-          console.log('Form data saved to session storage:', serializableData);
-        } catch (error) {
-          console.warn('Failed to save form data to session storage:', error);
-        }
-      }, 500);
+    let subscription: any;
+    try {
+      subscription = safeWatch((value) => {
+        const timeoutId = setTimeout(() => {
+          try {
+            const serializableData = {
+              metrics: value.metrics?.map(metric => ({
+                ...metric,
+                image_file: null,
+              })) || [],
+              siteVisitRatings: value.siteVisitRatings || [],
+              siteStatus: value.siteStatus || 'Prospect',
+            };
+            
+            safeStorage.sessionSetItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
+            console.log('Form data saved to session storage:', serializableData);
+          } catch (error) {
+            console.warn('Failed to save form data to session storage:', error);
+          }
+        }, 500);
 
-      return () => clearTimeout(timeoutId);
-    });
+        return () => clearTimeout(timeoutId);
+      });
+    } catch (error) {
+      console.error('[InputMetricValuesStep] Error setting up form watcher:', error);
+    }
     
     return () => {
       console.log('[InputMetricValuesStep] Cleaning up form watcher');
-      subscription?.unsubscribe();
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe();
+      }
     };
-  }, [isFormReady, watch, assessmentId]);
+  }, [isFormReady, formInitialized, safeWatch, assessmentId]);
 
   // Clear session storage on completion
   const clearSessionStorageOnCompletion = () => {
@@ -213,114 +245,129 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     console.log('Session storage cleared after assessment completion');
   };
 
-  // Initialize form data
+  // Initialize form data with enhanced safety
   useEffect(() => {
     console.log('[InputMetricValuesStep] useEffect triggered - metricSet:', metricSet);
     console.log('[InputMetricValuesStep] Available metrics:', metricSet?.user_custom_metrics_settings?.length || 0);
     
-    const savedFormData = loadSavedFormData();
-    const allMetricsToSet: any[] = [];
-    const currentImageOnlyIndices: Record<string, number> = {};
+    // Don't initialize if we don't have the required data
+    if (!metricSet || isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings) {
+      return;
+    }
 
-    // Process regular metrics from metricSet
-    if (metricSet?.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) {
-      console.log('[InputMetricValuesStep] Processing metrics from metric set:', metricSet.user_custom_metrics_settings);
+    try {
+      const savedFormData = loadSavedFormData();
+      const allMetricsToSet: any[] = [];
+      const currentImageOnlyIndices: Record<string, number> = {};
+
+      // Process regular metrics from metricSet
+      if (metricSet?.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) {
+        console.log('[InputMetricValuesStep] Processing metrics from metric set:', metricSet.user_custom_metrics_settings);
+        
+        metricSet.user_custom_metrics_settings.forEach(metric => {
+          const existingValue = existingMetricValuesData?.find(ev => ev.metric_identifier === metric.metric_identifier);
+          const savedMetricData = savedFormData?.metrics?.find(sm => sm.metric_identifier === metric.metric_identifier);
+          
+          let defaultValue: number | null;
+          if (savedMetricData?.entered_value !== undefined && savedMetricData?.entered_value !== null) {
+            defaultValue = savedMetricData.entered_value;
+            console.log(`Using saved form data for ${metric.metric_identifier}:`, defaultValue);
+          } else if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
+            defaultValue = existingValue.entered_value;
+            console.log(`Using database value for ${metric.metric_identifier}:`, defaultValue);
+          } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
+            defaultValue = 50;
+          } else {
+            defaultValue = metric.measurement_type === 'Index' ? 50 : 0;
+          }
+
+          const notes = savedMetricData?.notes ?? existingValue?.notes ?? '';
+
+          allMetricsToSet.push({
+            metric_identifier: metric.metric_identifier,
+            label: metric.label,
+            category: metric.category,
+            entered_value: defaultValue,
+            measurement_type: metric.measurement_type,
+            notes: notes,
+            image_url: null,
+            image_file: null,
+          });
+        });
+
+        // Process category-specific images
+        const categories = [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))];
+        console.log('[InputMetricValuesStep] Processing categories for images:', categories);
+
+        categories.forEach(category => {
+          const identifier = getCategorySpecificImageIdentifier(category);
+          const existingImageMetric = existingMetricValuesData?.find(ev => ev.metric_identifier === identifier);
+          currentImageOnlyIndices[identifier] = allMetricsToSet.length;
+          allMetricsToSet.push({
+            metric_identifier: identifier,
+            label: `${category} Section Image`,
+            category: category,
+            entered_value: null,
+            measurement_type: 'image_placeholder_category',
+            notes: null,
+            image_url: existingImageMetric?.image_url ?? null,
+            image_file: null,
+          });
+        });
+      } else {
+        console.log('[InputMetricValuesStep] No custom metrics found in metric set');
+      }
+
+      // Process Site Visit section image
+      const siteVisitImageIdentifier = SITE_VISIT_SECTION_IMAGE_IDENTIFIER;
+      const existingSiteVisitSectionImage = existingMetricValuesData?.find(ev => ev.metric_identifier === siteVisitImageIdentifier);
+      currentImageOnlyIndices[siteVisitImageIdentifier] = allMetricsToSet.length;
+      allMetricsToSet.push({
+        metric_identifier: siteVisitImageIdentifier,
+        label: 'Site Visit Section Image',
+        category: 'SiteVisitSectionImages',
+        entered_value: null,
+        measurement_type: 'image_placeholder_section',
+        notes: null,
+        image_url: existingSiteVisitSectionImage?.image_url ?? null,
+        image_file: null,
+      });
       
-      metricSet.user_custom_metrics_settings.forEach(metric => {
-        const existingValue = existingMetricValuesData?.find(ev => ev.metric_identifier === metric.metric_identifier);
-        const savedMetricData = savedFormData?.metrics?.find(sm => sm.metric_identifier === metric.metric_identifier);
-        
-        let defaultValue: number | null;
-        if (savedMetricData?.entered_value !== undefined && savedMetricData?.entered_value !== null) {
-          defaultValue = savedMetricData.entered_value;
-          console.log(`Using saved form data for ${metric.metric_identifier}:`, defaultValue);
-        } else if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
-          defaultValue = existingValue.entered_value;
-          console.log(`Using database value for ${metric.metric_identifier}:`, defaultValue);
-        } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
-          defaultValue = 50;
-        } else {
-          defaultValue = metric.measurement_type === 'Index' ? 50 : 0;
-        }
+      console.log('[InputMetricValuesStep] Final metrics array length:', allMetricsToSet.length);
+      replaceMetrics(allMetricsToSet);
+      setImageOnlyMetricIndices(currentImageOnlyIndices);
 
-        const notes = savedMetricData?.notes ?? existingValue?.notes ?? '';
-
-        allMetricsToSet.push({
-          metric_identifier: metric.metric_identifier,
-          label: metric.label,
-          category: metric.category,
-          entered_value: defaultValue,
-          measurement_type: metric.measurement_type,
-          notes: notes,
-          image_url: null,
-          image_file: null,
+      if (siteVisitCriteria) {
+        const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
+          const existingRating = existingSiteVisitRatingsData?.find(r => r.criterion_key === criterion.key);
+          const savedRatingData = savedFormData?.siteVisitRatings?.find(sr => sr.criterion_key === criterion.key);
+          
+          return {
+            criterion_key: criterion.key,
+            grade: savedRatingData?.grade ?? existingRating?.rating_grade ?? '',
+            notes: savedRatingData?.notes ?? existingRating?.notes ?? '',
+          };
         });
-      });
+        replaceSiteVisitRatings(initialSiteVisitRatingsData);
+      }
 
-      // Process category-specific images
-      const categories = [...new Set(metricSet.user_custom_metrics_settings.map(m => m.category))];
-      console.log('[InputMetricValuesStep] Processing categories for images:', categories);
+      const siteStatus = savedFormData?.siteStatus ?? currentAssessment?.site_status ?? 'Prospect';
+      safeSetValue('siteStatus', siteStatus);
 
-      categories.forEach(category => {
-        const identifier = getCategorySpecificImageIdentifier(category);
-        const existingImageMetric = existingMetricValuesData?.find(ev => ev.metric_identifier === identifier);
-        currentImageOnlyIndices[identifier] = allMetricsToSet.length;
-        allMetricsToSet.push({
-          metric_identifier: identifier,
-          label: `${category} Section Image`,
-          category: category,
-          entered_value: null,
-          measurement_type: 'image_placeholder_category',
-          notes: null,
-          image_url: existingImageMetric?.image_url ?? null,
-          image_file: null,
-        });
+      // Mark form as ready and initialized after all setup is complete
+      setFormInitialized(true);
+      setIsFormReady(true);
+      console.log('[InputMetricValuesStep] Form initialization complete');
+    } catch (error) {
+      console.error('[InputMetricValuesStep] Error during form initialization:', error);
+      toast({
+        title: "Form Initialization Error",
+        description: "There was an error setting up the form. Please refresh the page.",
+        variant: "destructive"
       });
-    } else {
-      console.log('[InputMetricValuesStep] No custom metrics found in metric set');
     }
 
-    // Process Site Visit section image
-    const siteVisitImageIdentifier = SITE_VISIT_SECTION_IMAGE_IDENTIFIER;
-    const existingSiteVisitSectionImage = existingMetricValuesData?.find(ev => ev.metric_identifier === siteVisitImageIdentifier);
-    currentImageOnlyIndices[siteVisitImageIdentifier] = allMetricsToSet.length;
-    allMetricsToSet.push({
-      metric_identifier: siteVisitImageIdentifier,
-      label: 'Site Visit Section Image',
-      category: 'SiteVisitSectionImages',
-      entered_value: null,
-      measurement_type: 'image_placeholder_section',
-      notes: null,
-      image_url: existingSiteVisitSectionImage?.image_url ?? null,
-      image_file: null,
-    });
-    
-    console.log('[InputMetricValuesStep] Final metrics array length:', allMetricsToSet.length);
-    replaceMetrics(allMetricsToSet);
-    setImageOnlyMetricIndices(currentImageOnlyIndices);
-
-    if (siteVisitCriteria) {
-      const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
-        const existingRating = existingSiteVisitRatingsData?.find(r => r.criterion_key === criterion.key);
-        const savedRatingData = savedFormData?.siteVisitRatings?.find(sr => sr.criterion_key === criterion.key);
-        
-        return {
-          criterion_key: criterion.key,
-          grade: savedRatingData?.grade ?? existingRating?.rating_grade ?? '',
-          notes: savedRatingData?.notes ?? existingRating?.notes ?? '',
-        };
-      });
-      replaceSiteVisitRatings(initialSiteVisitRatingsData);
-    }
-
-    const siteStatus = savedFormData?.siteStatus ?? currentAssessment?.site_status ?? 'Prospect';
-    setValue('siteStatus', siteStatus);
-
-    // Mark form as ready after all initialization is complete
-    setIsFormReady(true);
-    console.log('[InputMetricValuesStep] Form initialization complete');
-
-  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, setValue, currentAssessment?.site_status]);
+  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, safeSetValue, currentAssessment?.site_status, isLoadingMetricSet, isLoadingExistingValues, isLoadingSiteVisitRatings]);
 
   const metricsMutation = useMutation({
     mutationFn: (data: AssessmentMetricValueInsert[]) => {
@@ -544,7 +591,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     customMetricsCount: metricSet?.user_custom_metrics_settings?.length || 0,
     categoriesCount: sortedCategories.length,
     siteVisitRatingsCount: siteVisitRatingFields.length,
-    isFormReady
+    isFormReady,
+    formInitialized
   });
 
   // Display message if no custom metrics but site visit ratings exist
@@ -585,8 +633,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                  siteVisitRatingFields={typedSiteVisitRatingFields}
                  siteVisitImageMetricIndex={imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER]}
                  control={control}
-                 watch={watch}
-                 setValue={setValue}
+                 watch={safeWatch}
+                 setValue={safeSetValue}
                  disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                />
             </CardContent>
@@ -617,7 +665,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     );
   }
 
-  if (isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings || !isFormReady) {
+  if (isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings || !formInitialized || !isFormReady) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading data...</p></div>;
   }
 
@@ -671,8 +719,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                   imageMetricIndex={imageMetricIndex}
                   control={control}
                   errors={errors}
-                  watch={watch}
-                  setValue={setValue}
+                  watch={safeWatch}
+                  setValue={safeSetValue}
                   disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
                 />
               );
@@ -683,8 +731,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                siteVisitRatingFields={typedSiteVisitRatingFields}
                siteVisitImageMetricIndex={imageOnlyMetricIndices[SITE_VISIT_SECTION_IMAGE_IDENTIFIER]}
                control={control}
-               watch={watch}
-               setValue={setValue}
+               watch={safeWatch}
+               setValue={safeSetValue}
                disabled={isSubmitting || metricsMutation.isPending || siteVisitRatingsMutation.isPending}
              />
           </CardContent>
