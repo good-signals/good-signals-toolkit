@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -106,10 +107,10 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
                 </Badge>
               </div>
               
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <span className="font-medium">Target Metric Set:</span>
-                <span className="ml-2">Test Targets 1</span>
-                <span className="ml-1 text-muted-foreground">(20 metrics)</span>
+                <span>Test Targets 1</span>
+                <span className="text-muted-foreground">(20 metrics)</span>
               </div>
             </div>
           </div>
@@ -295,3 +296,4 @@ const getSiteStatusColor = (status: string | null | undefined): "default" | "sec
 };
 
 export default SiteAssessmentDetailsView;
+
