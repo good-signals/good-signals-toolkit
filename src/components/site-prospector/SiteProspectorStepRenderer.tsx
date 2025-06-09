@@ -4,25 +4,22 @@ import NewAssessmentForm from './NewAssessmentForm';
 import SelectTargetMetricSetStep from './SelectTargetMetricSetStep';
 import InputMetricValuesStep from './InputMetricValuesStep';
 import SiteAssessmentDetailsView from './SiteAssessmentDetailsView';
-import { AssessmentStep } from '@/hooks/useSiteProspectorSession';
-import { toast } from "@/components/ui/use-toast";
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { SiteProspectorStep } from '@/hooks/useSiteProspectorSession';
 
-interface StepRendererProps {
-  currentStep: AssessmentStep;
-  activeAssessmentId: string | null;
-  selectedMetricSetId: string | null;
+interface SiteProspectorStepRendererProps {
+  currentStep: SiteProspectorStep;
+  activeAssessmentId?: string;
+  selectedMetricSetId?: string;
   onAddressStepCompleted: (assessmentId: string) => void;
-  onMetricSetSelected: (assessmentId: string, metricSetId: string) => void;
-  onMetricValuesSubmitted: (assessmentId: string) => void;
+  onMetricSetSelected: (metricSetId: string) => void;
+  onMetricValuesSubmitted: () => void;
   onCancelAssessmentProcess: () => void;
   onBackFromMetricSelection: () => void;
   onBackFromMetricInput: () => void;
-  setCurrentStep: (step: AssessmentStep) => void;
+  setCurrentStep: (step: SiteProspectorStep) => void;
 }
 
-const SiteProspectorStepRenderer: React.FC<StepRendererProps> = ({
+const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   currentStep,
   activeAssessmentId,
   selectedMetricSetId,
@@ -34,87 +31,47 @@ const SiteProspectorStepRenderer: React.FC<StepRendererProps> = ({
   onBackFromMetricInput,
   setCurrentStep,
 }) => {
-  try {
-    if (currentStep === 'newAddress') {
+  switch (currentStep) {
+    case 'address':
       return (
-        <NewAssessmentForm 
-          onAssessmentCreated={onAddressStepCompleted} 
+        <NewAssessmentForm
+          onStepCompleted={onAddressStepCompleted}
           onCancel={onCancelAssessmentProcess}
         />
       );
-    }
 
-    if (currentStep === 'selectMetrics' && activeAssessmentId) {
+    case 'metric-set-selection':
       return (
-        <SelectTargetMetricSetStep 
-          assessmentId={activeAssessmentId}
+        <SelectTargetMetricSetStep
           onMetricSetSelected={onMetricSetSelected}
           onBack={onBackFromMetricSelection}
+          onCancel={onCancelAssessmentProcess}
         />
       );
-    }
 
-    if (currentStep === 'inputMetrics' && activeAssessmentId && selectedMetricSetId) {
+    case 'metric-input':
       return (
         <InputMetricValuesStep
-          assessmentId={activeAssessmentId}
-          targetMetricSetId={selectedMetricSetId}
-          onMetricsSubmitted={onMetricValuesSubmitted}
+          assessmentId={activeAssessmentId!}
+          selectedMetricSetId={selectedMetricSetId!}
+          onSubmitted={onMetricValuesSubmitted}
           onBack={onBackFromMetricInput}
+          onCancel={onCancelAssessmentProcess}
         />
       );
-    }
-    
-    if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
+
+    case 'view-details':
       return (
         <SiteAssessmentDetailsView
-          account={null}
+          assessment={{} as any} // This will be populated by the parent component
+          onEditGoToInputMetrics={() => setCurrentStep('metric-input')}
+          onBackToList={() => setCurrentStep('idle')}
         />
       );
-    }
 
-    // Handle case where we have invalid state (e.g., missing assessment)
-    if (currentStep === 'assessmentDetails' && (!activeAssessmentId || !selectedMetricSetId)) {
-      console.error('Invalid state: missing assessment ID or metric set ID for details view');
-      return (
-        <div className="flex flex-col items-center justify-center p-8 space-y-4">
-          <div className="text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Assessment Not Found</h3>
-            <p className="text-gray-600 mb-4">
-              The requested assessment could not be loaded. It may have been deleted or you may not have access to it.
-            </p>
-            <Button onClick={onCancelAssessmentProcess} className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Assessments
-            </Button>
-          </div>
-        </div>
-      );
-    }
-  } catch (error) {
-    console.error('Error rendering step component:', error);
-    toast({
-      title: "Navigation Error", 
-      description: "An error occurred. Returning to the main view.",
-      variant: "destructive"
-    });
-    return (
-      <div className="flex flex-col items-center justify-center p-8 space-y-4">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Something went wrong</h3>
-          <p className="text-gray-600 mb-4">
-            An error occurred while loading this view. Please try again.
-          </p>
-          <Button onClick={onCancelAssessmentProcess} className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Assessments
-          </Button>
-        </div>
-      </div>
-    );
+    default:
+      return null;
   }
-
-  return null;
 };
 
 export default SiteProspectorStepRenderer;

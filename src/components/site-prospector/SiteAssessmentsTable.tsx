@@ -18,20 +18,35 @@ import ExportButton from '@/components/export/ExportButton';
 import { Account } from '@/services/account';
 
 interface SiteAssessmentsTableProps {
-  accountId: string;
+  assessments: SiteAssessment[];
+  isLoading: boolean;
+  errorLoading: Error | null;
+  onViewDetails: (assessment: SiteAssessment) => void;
+  onEdit: (assessment: SiteAssessment) => void;
+  onDeleteCommit: (idsToDelete: string[]) => void;
+  isDeleting: boolean;
+  forceClearSelectionsKey: number;
 }
 
-const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }) => {
+const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
+  assessments,
+  isLoading,
+  errorLoading,
+  onViewDetails,
+  onEdit,
+  onDeleteCommit,
+  isDeleting,
+  forceClearSelectionsKey,
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAssessment, setSelectedAssessment] = useState<SiteAssessment | null>(null);
+  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
+  const [assessmentToDelete, setAssessmentToDelete] = useState<SiteAssessment | null>(null);
+  const [documentCounts, setDocumentCounts] = useState<Record<string, number>>({});
   const { user } = useAuth();
-  const {
-    assessments,
-    isLoadingAssessments: loading,
-    deleteMutation,
-  } = useSiteAssessmentOperations('idle');
   const { loadDraft } = useTargetMetricsDraft();
 
   const filteredAssessments = assessments.filter(assessment => {
@@ -43,19 +58,19 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
   });
 
   const handleCreateAssessment = () => {
-    loadDraft();
+    loadDraft('');
     setIsDialogOpen(true);
   };
 
   const handleEditAssessment = (assessment: SiteAssessment) => {
     setSelectedAssessment(assessment);
-    loadDraft();
-    setIsDialogOpen(true);
+    loadDraft(assessment.target_metric_set_id || '');
+    onEdit(assessment);
   };
 
   const handleDeleteAssessment = async (assessment: SiteAssessment) => {
     try {
-      deleteMutation.mutate([assessment.id]);
+      onDeleteCommit([assessment.id]);
       toast.success('Site assessment deleted successfully.');
     } catch (error) {
       console.error('Error deleting site assessment:', error);
@@ -67,6 +82,39 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
     setIsDialogOpen(false);
     setSelectedAssessment(null);
   };
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedAssessmentIds(filteredAssessments.map(a => a.id));
+    } else {
+      setSelectedAssessmentIds([]);
+    }
+  };
+
+  const handleSelectRow = (assessmentId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedAssessmentIds(prev => [...prev, assessmentId]);
+    } else {
+      setSelectedAssessmentIds(prev => prev.filter(id => id !== assessmentId));
+    }
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const handleAttachmentsClick = (assessment: SiteAssessment) => {
+    // Handle attachments click
+    console.log('Attachments clicked for:', assessment.id);
+  };
+
+  // Clear selections when forceClearSelectionsKey changes
+  useEffect(() => {
+    setSelectedAssessmentIds([]);
+  }, [forceClearSelectionsKey]);
 
   return (
     <Card>
@@ -104,9 +152,18 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
 
         <SiteAssessmentsTableContent
           assessments={filteredAssessments}
-          loading={loading}
+          selectedAssessmentIds={selectedAssessmentIds}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          onSelectAll={handleSelectAll}
+          onSelectRow={handleSelectRow}
+          onViewDetails={onViewDetails}
           onEdit={handleEditAssessment}
           onDelete={handleDeleteAssessment}
+          onAttachmentsClick={handleAttachmentsClick}
+          isDeleting={isDeleting}
+          assessmentToDelete={assessmentToDelete}
+          documentCounts={documentCounts}
         />
       </CardContent>
     </Card>

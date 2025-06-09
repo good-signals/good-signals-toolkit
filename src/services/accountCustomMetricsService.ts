@@ -17,12 +17,36 @@ export interface CustomMetricCategory {
 export interface CustomMetric {
   id: string;
   category_id: string;
-  metric_name: string;
-  metric_description?: string | null;
+  metric_identifier: string;
+  name: string;
+  category: string;
+  description?: string | null;
   min_value?: number | null;
   max_value?: number | null;
+  units?: string | null;
+  higher_is_better: boolean;
+  default_target_value?: number | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface AccountCustomMetric {
+  metric_identifier: string;
+  name: string;
+  category: string;
+  description?: string | null;
+  units?: string | null;
+  higher_is_better: boolean;
+  default_target_value?: number | null;
+}
+
+export interface CreateCustomMetricFormData {
+  name: string;
+  category: string;
+  higher_is_better: boolean;
+  units?: string;
+  description?: string;
+  default_target_value?: number;
 }
 
 // Placeholder functions - these would need proper database tables to work
@@ -32,7 +56,7 @@ export const fetchCustomMetricCategories = async (accountId: string): Promise<Cu
   return [];
 };
 
-export const getAccountCustomMetrics = async (accountId: string): Promise<CustomMetric[]> => {
+export const getAccountCustomMetrics = async (accountId: string): Promise<AccountCustomMetric[]> => {
   console.log('getAccountCustomMetrics called with:', accountId);
   // Return empty array since tables don't exist yet
   return [];
@@ -40,12 +64,23 @@ export const getAccountCustomMetrics = async (accountId: string): Promise<Custom
 
 export const createAccountCustomMetric = async (
   accountId: string,
-  metricData: Partial<CustomMetric>
-): Promise<CustomMetric | null> => {
+  metricData: CreateCustomMetricFormData
+): Promise<AccountCustomMetric | null> => {
   console.log('createAccountCustomMetric called with:', accountId, metricData);
-  // Return null since tables don't exist yet
+  
+  // Create a mock response for now
+  const mockMetric: AccountCustomMetric = {
+    metric_identifier: `custom_${Date.now()}`,
+    name: metricData.name,
+    category: metricData.category,
+    description: metricData.description,
+    units: metricData.units,
+    higher_is_better: metricData.higher_is_better,
+    default_target_value: metricData.default_target_value,
+  };
+  
   toast.info('Custom metrics feature is not yet implemented');
-  return null;
+  return mockMetric;
 };
 
 export const addCustomMetricCategory = async (
@@ -93,7 +128,7 @@ export const addCustomMetric = async (
 
 export const updateCustomMetric = async (
   metricId: string,
-  updates: Partial<Pick<CustomMetric, 'metric_name' | 'metric_description' | 'min_value' | 'max_value'>>
+  updates: Partial<Pick<CustomMetric, 'name' | 'description' | 'min_value' | 'max_value'>>
 ): Promise<CustomMetric | null> => {
   console.log('updateCustomMetric called');
   toast.info('Custom metrics feature is not yet implemented');

@@ -133,16 +133,18 @@ const TargetMetricsBuilderPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['accountCustomMetrics', user?.id] });
       
       // Add the new custom metric to the form with default target value
-      const newCustomMetricFormData = {
-        metric_identifier: newMetric.metric_identifier,
-        label: newMetric.name,
-        category: newMetric.category,
-        target_value: newMetric.default_target_value || 0,
-        higher_is_better: newMetric.higher_is_better,
-        units: newMetric.units || undefined,
-        is_custom: true as const,
-      };
-      appendCustomMetric(newCustomMetricFormData);
+      if (newMetric) {
+        const newCustomMetricFormData = {
+          metric_identifier: newMetric.metric_identifier,
+          label: newMetric.name,
+          category: newMetric.category,
+          target_value: newMetric.default_target_value || 0,
+          higher_is_better: newMetric.higher_is_better,
+          units: newMetric.units || undefined,
+          is_custom: true as const,
+        };
+        appendCustomMetric(newCustomMetricFormData);
+      }
       setCustomMetricFormOpen(false);
     },
     onError: (error) => {
