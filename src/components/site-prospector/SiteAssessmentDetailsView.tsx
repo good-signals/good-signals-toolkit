@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,13 +99,11 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
             </div>
             
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <span className="font-medium">Site Status:</span>
-                <SiteStatusSelector 
-                  value={currentStatus}
-                  onValueChange={handleStatusChange}
-                  showBadge={true}
-                />
+                <Badge variant={getSiteStatusColor(currentStatus)} className="text-sm">
+                  {currentStatus}
+                </Badge>
               </div>
               
               <div className="flex items-center">
@@ -280,6 +279,19 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
       )}
     </div>
   );
+};
+
+// Helper function for site status color (moved outside component for better organization)
+const getSiteStatusColor = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'Prospect': return 'outline';
+    case 'LOI': return 'secondary';
+    case 'Lease': return 'default';
+    case 'Development': return 'secondary';
+    case 'Open': return 'default';
+    case 'Closed': return 'destructive';
+    default: return 'outline';
+  }
 };
 
 export default SiteAssessmentDetailsView;
