@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,7 +74,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
   const formatPercentage = (value: number | null | undefined) => {
     if (value === null || value === undefined) return "N/A";
-    return `${Math.round(value * 100)}%`;
+    return `${Math.round(value)}%`;
   };
 
   return (
@@ -296,4 +294,3 @@ const getSiteStatusColor = (status: string | null | undefined): "default" | "sec
 };
 
 export default SiteAssessmentDetailsView;
-
