@@ -11,7 +11,8 @@ import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
 import { Search, FileText, Plus } from 'lucide-react';
 
-export type SortableKeys = 'assessment_name' | 'address_line1' | 'city' | 'overall_score' | 'created_at';
+// Use the same SortableKeys type as the table content component
+type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage' | 'site_status';
 
 interface SiteAssessmentsTableProps {
   assessments: SiteAssessment[];
@@ -85,15 +86,15 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     }));
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
       setSelectedIds(filteredAndSortedAssessments.map(a => a.id));
     } else {
       setSelectedIds([]);
     }
   };
 
-  const handleSelectOne = (id: string, checked: boolean) => {
+  const handleSelectRow = (id: string, checked: boolean) => {
     if (checked) {
       setSelectedIds(prev => [...prev, id]);
     } else {
@@ -180,21 +181,27 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
         </div>
 
         <div className="rounded-md border">
-          <SiteAssessmentsTableHeader
+          <SiteAssessmentsTableContent
+            assessments={filteredAndSortedAssessments}
+            selectedAssessmentIds={selectedIds}
             sortConfig={sortConfig}
             onSort={handleSort}
             onSelectAll={handleSelectAll}
-            allSelected={selectedIds.length === filteredAndSortedAssessments.length && filteredAndSortedAssessments.length > 0}
-            someSelected={selectedIds.length > 0 && selectedIds.length < filteredAndSortedAssessments.length}
-          />
-          <SiteAssessmentsTableContent
-            assessments={filteredAndSortedAssessments}
-            onSelectOne={handleSelectOne}
+            onSelectRow={handleSelectRow}
             onViewDetails={handleViewDetails}
             onEdit={handleEdit}
             onDelete={async (assessment: SiteAssessment) => {
               onDeleteCommit([assessment.id]);
             }}
+            onAttachmentsClick={(assessment: SiteAssessment) => {
+              // Handle attachments click
+              console.log('Attachments clicked for:', assessment.id);
+            }}
+            isDeleting={isDeleting}
+            assessmentToDelete={null}
+            documentCounts={{}}
+            accountGoodThreshold={null}
+            accountBadThreshold={null}
           />
         </div>
 

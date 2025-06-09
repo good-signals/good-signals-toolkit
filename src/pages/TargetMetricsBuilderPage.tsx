@@ -1,656 +1,304 @@
 
-import React, { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Target as TargetIcon, PlusCircle, Trash2, Save, List, Info, Plus, Shield } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { VISITOR_PROFILE_CATEGORY, MEASUREMENT_TYPES, PredefinedMetricCategory } from '@/types/targetMetrics';
-import { predefinedMetricsConfig as initialPredefinedMetricsConfig, PredefinedMetricConfig } from '@/config/targetMetricsConfig';
-import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
+import { toast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Save, Target, Zap, Users, Building2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
   getTargetMetricSets,
   createTargetMetricSet,
-  updateTargetMetricSetName
-} from '@/services/targetMetricsService';
-import { toast as sonnerToast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+  updateTargetMetricSet,
+} from '@/services/targetMetrics/targetMetricSetService';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useSuperAdmin } from '@/hooks/useSuperAdmin';
-import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
+  TargetMetricsFormSchema,
+  type TargetMetricsFormData,
+  PREDEFINED_METRIC_CATEGORIES,
+  VISITOR_PROFILE_CATEGORY,
+} from '@/types/targetMetrics';
+import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
+import CategorySection from '@/components/site-prospector/metric-input/CategorySection';
 
-const TargetMetricsFormSchema = z.object({
-  metric_set_id: z.string().optional(),
-  metric_set_name: z.string().min(1, "Metric set name is required"),
-  metric_set_description: z.string().optional(),
-  predefined_metrics: z.array(z.object({
-    metric_identifier: z.string(),
-    label: z.string(),
-    category: z.string(),
-    target_value: z.number(),
-    higher_is_better: z.boolean(),
-  })),
-  custom_metrics: z.array(z.object({
-    metric_identifier: z.string(),
-    label: z.string(),
-    category: z.string(),
-    target_value: z.number(),
-    higher_is_better: z.boolean(),
-    units: z.string().optional(),
-    is_custom: z.literal(true),
-  })),
-  visitor_profile_metrics: z.array(z.object({
-    metric_identifier: z.string(),
-    label: z.string(),
-    category: z.string(),
-    target_value: z.number(),
-    measurement_type: z.string().optional(),
-    higher_is_better: z.boolean(),
-  })),
-});
-
-type TargetMetricsFormData = z.infer<typeof TargetMetricsFormSchema>;
-
-const NON_EDITABLE_PREDEFINED_METRICS = [
-  'market_saturation_trade_area_overlap',
-  'market_saturation_heat_map_intersection',
-  'demand_supply_balance'
-];
-
-const TargetMetricsBuilderPage: React.FC = () => {
-  const { isSuperAdmin } = useSuperAdmin();
-  const queryClient = useQueryClient();
+const TargetMetricsBuilderPage = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
-  
-  const { metricSetId: routeMetricSetId } = useParams<{ metricSetId?: string }>();
-  const [currentMetricSetId, setCurrentMetricSetId] = useState<string | undefined>(routeMetricSetId);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [accountId, setAccountId] = useState<string | null>(null);
 
   const form = useForm<TargetMetricsFormData>({
     resolver: zodResolver(TargetMetricsFormSchema),
     defaultValues: {
-      metric_set_id: routeMetricSetId, 
-      metric_set_name: "", 
-      metric_set_description: "",
+      metric_set_name: '',
       predefined_metrics: [],
       custom_metrics: [],
       visitor_profile_metrics: [],
     },
   });
 
-  const { fields: visitorProfileFields, append: appendVisitorProfile, remove: removeVisitorProfile } = useFieldArray({
-    control: form.control,
-    name: "visitor_profile_metrics",
-  });
-
-  const { fields: customMetricsFields, append: appendCustomMetric, remove: removeCustomMetric } = useFieldArray({
-    control: form.control,
-    name: "custom_metrics",
-  });
-
-  // Initialize draft management with corrected signature
-  const { loadDraft, clearDraft, hasDraft } = useTargetMetricsDraft(form, currentMetricSetId);
-
+  // Get account ID for the user
   useEffect(() => {
-    console.log('Route metric set ID changed:', routeMetricSetId);
-    setCurrentMetricSetId(routeMetricSetId);
-  }, [routeMetricSetId]);
-
-  // Mock queries for missing services
-  const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
-    queryKey: ['targetMetricSet', currentMetricSetId],
-    queryFn: async () => {
-      if (!currentMetricSetId) return null;
-      // Mock implementation since service doesn't exist
-      return { id: currentMetricSetId, name: '', description: '' };
-    },
-    enabled: !!currentMetricSetId,
-  });
-
-  const { data: existingMetrics, isLoading: isLoadingMetrics } = useQuery({
-    queryKey: ['targetMetrics', currentMetricSetId],
-    queryFn: () => {
-      if (!currentMetricSetId) return [];
-      // Mock implementation since service doesn't exist
-      return [];
-    },
-    enabled: !!currentMetricSetId,
-  });
-
-  // Create default predefined metrics
-  const createDefaultPredefinedMetrics = () => {
-    return initialPredefinedMetricsConfig.map(config => {
-      let targetValue;
-      if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-        targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => 
-          opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand")
-        )?.value ?? 50;
-      } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
-        targetValue = 50;
-      } else {
-        targetValue = 0;
-      }
-      return {
-        metric_identifier: config.metric_identifier,
-        label: config.label,
-        category: config.category,
-        target_value: targetValue,
-        higher_is_better: config.higher_is_better,
-      };
-    });
-  };
-
-  // Initialize form data
-  useEffect(() => {
-    console.log('Form initialization effect - currentMetricSetId:', currentMetricSetId);
-    console.log('existingMetricSet:', existingMetricSet);
-    console.log('existingMetrics loaded:', !!existingMetrics);
-
-    // Handle existing metric set
-    if (currentMetricSetId && existingMetricSet && existingMetrics !== undefined) {
-      console.log('Initializing form with existing data');
-
-      // Initialize predefined metrics with existing data or defaults
-      const predefinedMetricsData = initialPredefinedMetricsConfig.map(config => {
-        const existing = Array.isArray(existingMetrics) ? existingMetrics.find(s => s.metric_identifier === config.metric_identifier && !s.is_custom) : null;
-        let targetValue;
-
-        if (existing) {
-          targetValue = existing.target_value;
-        } else if (NON_EDITABLE_PREDEFINED_METRICS.includes(config.metric_identifier)) {
-          targetValue = metricDropdownOptions[config.metric_identifier]?.find(opt => 
-            opt.label.includes("No Overlap") || opt.label.includes("Cold Spot") || opt.label.includes("Positive Demand")
-          )?.value ?? 50;
-        } else if (specificDropdownMetrics.includes(config.metric_identifier)) {
-          targetValue = 50;
-        } else {
-          targetValue = 0;
+    const fetchAccountId = async () => {
+      if (user?.id) {
+        try {
+          const userAccountId = await getAccountForUser(user.id);
+          setAccountId(userAccountId);
+        } catch (error) {
+          console.error('Error fetching account ID:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load account information",
+            variant: "destructive",
+          });
         }
+      }
+    };
+    fetchAccountId();
+  }, [user?.id]);
 
-        return {
-          metric_identifier: config.metric_identifier,
-          label: config.label,
-          category: config.category,
-          target_value: targetValue,
-          higher_is_better: existing?.higher_is_better ?? config.higher_is_better,
-        };
-      });
+  // Load existing metric set if editing
+  const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
+    queryKey: ['targetMetricSet', id],
+    queryFn: async () => {
+      if (!id || !user?.id) return null;
+      const metricSets = await getTargetMetricSets(user.id);
+      return metricSets.find(set => set.id === id) || null;
+    },
+    enabled: !!id && !!user?.id,
+  });
 
-      // Handle custom metrics (non-visitor profile)
-      const customMetricsData = Array.isArray(existingMetrics) ? existingMetrics
-        .filter(metric => metric.is_custom && metric.category !== VISITOR_PROFILE_CATEGORY)
-        .map(metric => ({
-          metric_identifier: metric.metric_identifier,
-          label: metric.label,
-          category: metric.category,
-          target_value: metric.target_value,
-          higher_is_better: metric.higher_is_better,
-          units: metric.units || undefined,
-          is_custom: true as const,
-        })) : [];
-
-      // Handle visitor profile metrics
-      const visitorProfileMetricsData = Array.isArray(existingMetrics) ? existingMetrics
-        .filter(s => s.category === VISITOR_PROFILE_CATEGORY)
-        .map(s => ({
-          metric_identifier: s.metric_identifier,
-          label: s.label,
-          category: VISITOR_PROFILE_CATEGORY, 
-          target_value: s.target_value,
-          measurement_type: s.measurement_type,
-          higher_is_better: s.higher_is_better,
-        })) : [];
+  // Populate form when editing
+  useEffect(() => {
+    if (existingMetricSet) {
+      form.setValue('metric_set_name', existingMetricSet.name);
+      form.setValue('metric_set_id', existingMetricSet.id);
       
-      const formData: TargetMetricsFormData = {
-        metric_set_id: existingMetricSet.id,
-        metric_set_name: existingMetricSet.name,
-        metric_set_description: existingMetricSet.description || "",
-        predefined_metrics: predefinedMetricsData,
-        custom_metrics: customMetricsData,
-        visitor_profile_metrics: visitorProfileMetricsData,
-      };
-
-      console.log('Resetting form with existing data:', formData);
-      form.reset(formData);
-    } 
-    // Handle new metric set - always check for draft first
-    else if (!currentMetricSetId) {
-      console.log('Initializing form for new metric set');
+      // Reset arrays first
+      form.setValue('predefined_metrics', []);
+      form.setValue('custom_metrics', []);
+      form.setValue('visitor_profile_metrics', []);
       
-      // Always try to load draft data first
-      const draftData = loadDraft();
-      
-      if (draftData) {
-        console.log('Loading draft data:', draftData);
-        form.reset(draftData);
-      } else {
-        console.log('No draft found, initializing with defaults');
-        const defaultFormData: TargetMetricsFormData = {
-          metric_set_id: undefined,
-          metric_set_name: "",
-          metric_set_description: "",
-          predefined_metrics: createDefaultPredefinedMetrics(),
-          custom_metrics: [],
-          visitor_profile_metrics: [],
-        };
-
-        form.reset(defaultFormData);
+      // Populate metrics if they exist
+      if (existingMetricSet.user_custom_metrics_settings) {
+        existingMetricSet.user_custom_metrics_settings.forEach((setting) => {
+          if (setting.category === VISITOR_PROFILE_CATEGORY) {
+            const currentMetrics = form.getValues('visitor_profile_metrics') || [];
+            form.setValue('visitor_profile_metrics', [
+              ...currentMetrics,
+              {
+                metric_identifier: setting.metric_identifier,
+                label: setting.label,
+                category: VISITOR_PROFILE_CATEGORY,
+                target_value: setting.target_value,
+                measurement_type: (setting.measurement_type as "Index" | "Amount") || "Index",
+                higher_is_better: setting.higher_is_better,
+              },
+            ]);
+          } else {
+            const currentMetrics = form.getValues('predefined_metrics') || [];
+            form.setValue('predefined_metrics', [
+              ...currentMetrics,
+              {
+                metric_identifier: setting.metric_identifier,
+                label: setting.label,
+                category: setting.category,
+                target_value: setting.target_value,
+                higher_is_better: setting.higher_is_better,
+              },
+            ]);
+          }
+        });
       }
     }
-  }, [currentMetricSetId, existingMetricSet, existingMetrics, form, loadDraft]);
+  }, [existingMetricSet, form]);
 
-  const mutation = useMutation({
-    mutationFn: async (formData: TargetMetricsFormData) => {
-      let operatingMetricSetId = formData.metric_set_id || currentMetricSetId;
-
-      if (!formData.metric_set_name || formData.metric_set_name.trim() === "") {
-        throw new Error("Metric set name is required.");
+  // Save/Update mutation
+  const saveMutation = useMutation({
+    mutationFn: async (data: TargetMetricsFormData) => {
+      if (!user?.id || !accountId) {
+        throw new Error('User not authenticated or account not found');
       }
 
-      if (operatingMetricSetId) {
-        await updateTargetMetricSetName(operatingMetricSetId, formData.metric_set_name);
+      if (id) {
+        return await updateTargetMetricSet(id, data, user.id, accountId);
       } else {
-        const newSet = await createTargetMetricSet({
-          name: formData.metric_set_name,
-          description: formData.metric_set_description,
-        });
-        operatingMetricSetId = newSet.id;
-        setCurrentMetricSetId(newSet.id); 
-        form.setValue('metric_set_id', newSet.id); 
-        navigate(`/target-metrics/builder/${newSet.id}`, { replace: true });
+        return await createTargetMetricSet(data, user.id, accountId);
       }
-
-      if (!operatingMetricSetId) {
-        throw new Error("Failed to get or create metric set ID.");
-      }
-      
-      // Mock save since service doesn't exist
-      return { success: true };
     },
-    onSuccess: (data, variables) => { 
-      sonnerToast.success("Target metric set saved successfully!");
-      // Clear draft after successful save
-      clearDraft();
-      const finalMetricSetId = variables.metric_set_id || currentMetricSetId;
-      queryClient.invalidateQueries({ queryKey: ['targetMetrics', finalMetricSetId] });
-      queryClient.invalidateQueries({ queryKey: ['targetMetricSet', finalMetricSetId] });
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: `Target metric set ${id ? 'updated' : 'created'} successfully!`,
+      });
       queryClient.invalidateQueries({ queryKey: ['targetMetricSets'] });
+      navigate('/target-metrics');
     },
-    onError: (error) => {
-      sonnerToast.error(`Failed to save target metrics: ${error.message}`);
+    onError: (error: Error) => {
+      console.error('Error saving target metrics:', error);
+      toast({
+        title: "Error",
+        description: error.message || `Failed to ${id ? 'update' : 'create'} target metric set`,
+        variant: "destructive",
+      });
     },
   });
-
-  if (isLoadingMetricSet || (currentMetricSetId && isLoadingMetrics)) {
-    return <div className="container mx-auto py-12 px-4 text-center">Loading...</div>;
-  }
 
   const onSubmit = (data: TargetMetricsFormData) => {
-    console.log("Target metrics form data submitted:", data);
-    mutation.mutate(data);
+    console.log('Submitting form data:', data);
+    saveMutation.mutate(data);
   };
 
-  // Group predefined metrics by category
-  const groupedPredefinedMetrics: Record<PredefinedMetricCategory, PredefinedMetricConfig[]> = 
-    initialPredefinedMetricsConfig.reduce((acc, metric) => {
-      const category = metric.category as PredefinedMetricCategory;
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(metric);
-      return acc;
-    }, {} as Record<PredefinedMetricCategory, PredefinedMetricConfig[]>);
-
-  // Group custom metrics by category
-  const groupedCustomMetrics = customMetricsFields.reduce((acc, metric, index) => {
-    const category = metric.category as PredefinedMetricCategory;
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push({ ...metric, index });
-    return acc;
-  }, {} as Record<PredefinedMetricCategory, Array<(typeof customMetricsFields[0] & { index: number })>>);
+  if (isLoadingMetricSet) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
 
   return (
-    <TooltipProvider>
-    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center">
-          <TargetIcon size={48} className="text-primary mr-4" />
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Target Metrics Builder</h1>
-            <p className="text-muted-foreground">
-              {currentMetricSetId ? "Edit a target metrics template." : "Create a new target metrics template."}
-              {!currentMetricSetId && hasDraft() && (
-                <span className="block text-sm text-green-600 mt-1 font-medium">
-                  ✓ Draft auto-saved - your changes are preserved
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {!currentMetricSetId && hasDraft() && (
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                clearDraft();
-                window.location.reload();
-              }}
-              className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
-            >
-              Clear Draft
-            </Button>
-          )}
-          <Button asChild variant="outline">
-            <Link to="/target-metrics"><List className="mr-2"/> View All Sets</Link>
-          </Button>
-        </div>
+    <div className="container mx-auto py-10 px-4">
+      <div className="mb-8">
+        <Button variant="ghost" onClick={() => navigate('/target-metrics')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Target Metrics
+        </Button>
+        <h1 className="text-3xl font-bold text-primary mt-4">
+          {id ? 'Edit' : 'Create'} Target Metric Set
+        </h1>
+        <p className="text-muted-foreground">
+          Define the target values for metrics that will be used to evaluate sites.
+        </p>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                Target Metric Set Details
-                <Badge variant="secondary">Super Admin</Badge>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Basic Information
               </CardTitle>
+              <CardDescription>
+                Set a name for your target metric set
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <FormField
                 control={form.control}
                 name="metric_set_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Target Set Name</FormLabel>
+                    <FormLabel>Metric Set Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Retail Store Standards" {...field} />
+                      <Input placeholder="e.g., Retail Site Standards" {...field} />
                     </FormControl>
-                    <FormDescription>Give a descriptive name to this target metric set.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="metric_set_description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Describe when this target set should be used..." {...field} />
-                    </FormControl>
-                    <FormDescription>Provide context about when this target set should be used.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </CardContent>
           </Card>
-          
-          {Object.entries(groupedPredefinedMetrics).map(([category, metricsInCategory]) => {
-            const customMetricsInCategory = groupedCustomMetrics[category as PredefinedMetricCategory] || [];
-            
-            return (
-              <Card key={category}>
+
+          <Tabs defaultValue="predefined" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="predefined" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Predefined Metrics
+              </TabsTrigger>
+              <TabsTrigger value="visitor-profile" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Visitor Profile
+              </TabsTrigger>
+              <TabsTrigger value="custom" className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Custom Metrics
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="predefined" className="space-y-4">
+              <Card>
                 <CardHeader>
-                  <div>
-                    <CardTitle className="text-xl">{category}</CardTitle>
-                    <CardDescription>Set target standard values for {category.toLowerCase()} metrics.</CardDescription>
-                  </div>
+                  <CardTitle>Predefined Metrics</CardTitle>
+                  <CardDescription>
+                    Set target values for standard business metrics
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Predefined Metrics */}
-                  {form.getValues().predefined_metrics.map((metric, index) => {
-                    const config = initialPredefinedMetricsConfig.find(c => c.metric_identifier === metric.metric_identifier);
-                    if (config?.category !== category) return null;
-
-                    const isNonEditable = NON_EDITABLE_PREDEFINED_METRICS.includes(metric.metric_identifier);
-
-                    return (
-                      <FormField
-                        key={`${metric.metric_identifier}-${index}-predefined`}
-                        control={form.control}
-                        name={`predefined_metrics.${index}.target_value`}
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-md">
-                            <div className="sm:w-2/5 mb-2 sm:mb-0">
-                              <FormLabel className="text-base">{metric.label}</FormLabel>
-                              {config?.description && <FormDescription>{config.description}</FormDescription>}
-                              <FormDescription>
-                                {(form.getValues().predefined_metrics[index]?.higher_is_better ?? config?.higher_is_better) ? "(Higher is better)" : "(Lower is better)"}
-                                {isNonEditable && (
-                                  <Tooltip delayDuration={100}>
-                                    <TooltipTrigger asChild>
-                                      <Info className="h-3 w-3 ml-1.5 text-muted-foreground inline-block" />
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs">
-                                      <p>This metric's target and scoring are predefined based on dropdown selection in assessments.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </FormDescription>
-                            </div>
-                            <div className="sm:w-2/5">
-                              {specificDropdownMetrics.includes(metric.metric_identifier) ? (
-                                <Select
-                                  onValueChange={(value) => {
-                                    if (!isNonEditable) field.onChange(parseFloat(value));
-                                  }}
-                                  value={String(field.value)}
-                                  defaultValue={String(field.value)}
-                                  disabled={isNonEditable}
-                                >
-                                  <SelectTrigger className={isNonEditable ? "bg-muted/50 cursor-not-allowed" : ""}>
-                                    <SelectValue placeholder={isNonEditable ? "Predefined Target" : "Select target"} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {metricDropdownOptions[metric.metric_identifier].map(option => (
-                                      <SelectItem key={option.value} value={String(option.value)}>
-                                        {option.label} ({option.value})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    placeholder={isNonEditable ? "Predefined Target" : "Enter target value"} 
-                                    {...field} 
-                                    onChange={e => {
-                                      if (!isNonEditable) field.onChange(parseFloat(e.target.value) || 0);
-                                    }} 
-                                    readOnly={isNonEditable}
-                                    className={isNonEditable ? "bg-muted/50" : ""}
-                                  />
-                                </FormControl>
-                              )}
-                            </div>
-                            <div className="sm:w-1/5 min-h-[20px] mt-1 sm:mt-0"> <FormMessage /></div>
-                          </FormItem>
-                        )}
-                      />
-                    );
-                  })}
-
-                  {/* Custom Metrics */}
-                  {customMetricsInCategory.map((customMetric) => (
-                    <FormField
-                      key={`${customMetric.metric_identifier}-${customMetric.index}-custom`}
-                      control={form.control}
-                      name={`custom_metrics.${customMetric.index}.target_value`}
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-md bg-blue-50/50">
-                          <div className="sm:w-2/5 mb-2 sm:mb-0">
-                            <div className="flex items-center gap-2">
-                              <FormLabel className="text-base">{customMetric.label}</FormLabel>
-                              <Badge variant="secondary" className="text-xs">Custom</Badge>
-                            </div>
-                            {customMetric.units && (
-                              <FormDescription>Units: {customMetric.units}</FormDescription>
-                            )}
-                            <FormDescription>
-                              {customMetric.higher_is_better ? "(Higher is better)" : "(Lower is better)"}
-                            </FormDescription>
-                          </div>
-                          <div className="sm:w-2/5">
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="Enter target value" 
-                                {...field} 
-                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)} 
-                              />
-                            </FormControl>
-                          </div>
-                          <div className="sm:w-1/5 flex items-center justify-end gap-2">
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => removeCustomMetric(customMetric.index)}
-                              className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            <FormMessage />
-                          </div>
-                        </FormItem>
-                      )}
+                <CardContent>
+                  {PREDEFINED_METRIC_CATEGORIES.map((category) => (
+                    <CategorySection
+                      key={category}
+                      category={category}
+                      form={form}
+                      metricType="predefined"
                     />
                   ))}
                 </CardContent>
               </Card>
-            );
-          })}
+            </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">{VISITOR_PROFILE_CATEGORY}</CardTitle>
-              <CardDescription>Define target visitor profile attributes.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {visitorProfileFields.map((item, index) => (
-                <Card key={item.id} className="p-4 relative">
-                   <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => removeVisitorProfile(index)}
-                      className="absolute top-2 right-2 text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
-                      aria-label="Remove visitor profile metric"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                    <FormField
-                      control={form.control}
-                      name={`visitor_profile_metrics.${index}.label`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Attribute Name</FormLabel>
-                          <FormControl><Input placeholder="e.g., Income Level" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`visitor_profile_metrics.${index}.target_value`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Target Value</FormLabel>
-                          <FormControl><Input type="number" placeholder="Enter value" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name={`visitor_profile_metrics.${index}.measurement_type`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Measurement Type</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ?? undefined} defaultValue={field.value ?? undefined}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              {MEASUREMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`visitor_profile_metrics.${index}.higher_is_better`}
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-2 pt-7">
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                          <FormLabel>Higher value is better?</FormLabel>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Controller
-                        name={`visitor_profile_metrics.${index}.metric_identifier`}
-                        control={form.control}
-                        render={({ field }) => <input type="hidden" {...field} />}
-                    />
-                     <Controller
-                        name={`visitor_profile_metrics.${index}.category`}
-                        control={form.control}
-                        defaultValue={VISITOR_PROFILE_CATEGORY}
-                        render={({ field }) => <input type="hidden" {...field} />}
-                    />
+            <TabsContent value="visitor-profile" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Visitor Profile Metrics</CardTitle>
+                  <CardDescription>
+                    Define target demographics and visitor characteristics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CategorySection
+                    category={VISITOR_PROFILE_CATEGORY}
+                    form={form}
+                    metricType="visitor_profile"
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="custom" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Custom Metrics</CardTitle>
+                  <CardDescription>
+                    Add custom metrics specific to your business needs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8 text-muted-foreground">
+                    Custom metrics functionality coming soon...
                   </div>
-                </Card>
-              ))}
-              <Button type="button" variant="outline" onClick={() => appendVisitorProfile({ 
-                  metric_identifier: `new_visitor_metric_${Date.now()}`, 
-                  label: "", 
-                  category: VISITOR_PROFILE_CATEGORY, 
-                  target_value: 0, 
-                  measurement_type: "Index", 
-                  higher_is_better: true 
-                })} className="mt-4">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Visitor Attribute
-              </Button>
-            </CardContent>
-          </Card>
-          
-          <Separator />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="ghost" asChild>
-              <Link to="/target-metrics">Cancel</Link>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => navigate('/target-metrics')}
+            >
+              Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button 
+              type="submit" 
+              disabled={saveMutation.isPending}
+            >
               <Save className="mr-2 h-4 w-4" />
-              {mutation.isPending ? 'Saving...' : (currentMetricSetId || form.getValues().metric_set_id ? 'Update Set' : 'Save New Set')}
+              {saveMutation.isPending ? 'Saving...' : (id ? 'Update' : 'Create') + ' Metric Set'}
             </Button>
           </div>
         </form>
       </Form>
     </div>
-    </TooltipProvider>
   );
 };
 
