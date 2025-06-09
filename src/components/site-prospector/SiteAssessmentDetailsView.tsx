@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
-import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
 import { formatDate } from '@/lib/utils';
 
 interface SiteAssessmentDetailsProps {
@@ -18,12 +17,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   onEditGoToInputMetrics,
   onBackToList,
 }) => {
-  const { loadDraft } = useTargetMetricsDraft(null, null);
-
   const handleEdit = () => {
-    if (assessment.target_metric_set_id) {
-      loadDraft();
-    }
     onEditGoToInputMetrics();
   };
 

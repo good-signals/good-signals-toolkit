@@ -8,7 +8,6 @@ import ExportButton from '@/components/export/ExportButton';
 import SiteAssessmentsTableHeader from './table/SiteAssessmentsTableHeader';
 import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
-import { useTargetMetricsDraft } from '@/hooks/useTargetMetricsDraft';
 import { Search, FileText, Plus } from 'lucide-react';
 
 // Use the same SortableKeys type as the table content component
@@ -42,19 +41,11 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const { loadDraft } = useTargetMetricsDraft(null, null);
-
   const handleEdit = (assessment: SiteAssessment) => {
-    if (assessment.target_metric_set_id) {
-      loadDraft();
-    }
     onEdit(assessment);
   };
 
   const handleViewDetails = (assessment: SiteAssessment) => {
-    if (assessment.target_metric_set_id) {
-      loadDraft();
-    }
     onViewDetails(assessment);
   };
 
