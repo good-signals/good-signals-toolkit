@@ -1,7 +1,12 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
+import { calculateMetricSignalScore } from '@/lib/signalScoreUtils';
+import { getSignalStatus } from '@/lib/assessmentDisplayUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserAccount } from '@/services/userAccountService';
+import { getAccountSignalThresholds } from '@/services/signalThresholdsService';
 
 interface MetricDisplayFieldProps {
   metricField: {
@@ -20,6 +25,46 @@ interface MetricDisplayFieldProps {
 const MetricDisplayField: React.FC<MetricDisplayFieldProps> = ({
   metricField,
 }) => {
+  const { user } = useAuth();
+  const [accountThresholds, setAccountThresholds] = useState<{
+    goodThreshold: number;
+    badThreshold: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const loadAccountThresholds = async () => {
+      if (!user?.id) return;
+
+      try {
+        const userAccount = await getUserAccount(user.id);
+        if (!userAccount) return;
+
+        const thresholds = await getAccountSignalThresholds(userAccount.id);
+        if (thresholds) {
+          setAccountThresholds({
+            goodThreshold: thresholds.good_threshold,
+            badThreshold: thresholds.bad_threshold,
+          });
+        } else {
+          // Use defaults if no custom thresholds
+          setAccountThresholds({
+            goodThreshold: 0.75,
+            badThreshold: 0.50,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading account thresholds:', error);
+        // Use defaults on error
+        setAccountThresholds({
+          goodThreshold: 0.75,
+          badThreshold: 0.50,
+        });
+      }
+    };
+
+    loadAccountThresholds();
+  }, [user?.id]);
+
   const getDisplayValue = () => {
     if (metricField.entered_value === null || metricField.entered_value === undefined) {
       return "No value entered";
@@ -43,30 +88,30 @@ const MetricDisplayField: React.FC<MetricDisplayFieldProps> = ({
   };
 
   const getSignalScore = () => {
-    if (metricField.entered_value === null || metricField.entered_value === undefined || 
-        metricField.target_value === null || metricField.target_value === undefined) {
-      return null;
-    }
-
-    const enteredValue = metricField.entered_value;
-    const targetValue = metricField.target_value;
-    const higherIsBetter = metricField.higher_is_better ?? true;
-
-    let score: number;
-    if (higherIsBetter) {
-      score = enteredValue >= targetValue ? 100 : Math.round((enteredValue / targetValue) * 100);
-    } else {
-      score = enteredValue <= targetValue ? 100 : Math.round((targetValue / enteredValue) * 100);
-    }
-
-    return Math.max(0, Math.min(100, score));
+    return calculateMetricSignalScore({
+      enteredValue: metricField.entered_value,
+      targetValue: metricField.target_value,
+      higherIsBetter: metricField.higher_is_better ?? true,
+    });
   };
 
-  const getSignalScoreColor = (score: number | null) => {
-    if (score === null) return "secondary";
-    if (score >= 80) return "success";
-    if (score >= 60) return "default";
-    return "destructive";
+  const getSignalScoreBadgeVariant = (score: number | null) => {
+    if (score === null || !accountThresholds) return "secondary";
+    
+    const signalStatus = getSignalStatus(
+      score, 
+      accountThresholds.goodThreshold, 
+      accountThresholds.badThreshold
+    );
+    
+    switch (signalStatus.text) {
+      case 'Good':
+        return "success";
+      case 'Bad':
+        return "destructive";
+      default:
+        return "default";
+    }
   };
 
   const signalScore = getSignalScore();
@@ -91,7 +136,7 @@ const MetricDisplayField: React.FC<MetricDisplayFieldProps> = ({
       {/* Signal Score */}
       <div>
         {signalScore !== null ? (
-          <Badge variant={getSignalScoreColor(signalScore)} className="text-sm">
+          <Badge variant={getSignalScoreBadgeVariant(signalScore)} className="text-sm">
             {signalScore}%
           </Badge>
         ) : (
