@@ -23,11 +23,17 @@ export const useHeaderData = () => {
     }
   }, [user, authLoading]);
 
+  // Function to update the account (useful for when logo is updated)
+  const updateUserAccount = (updatedAccount: Account) => {
+    setUserAccount(updatedAccount);
+  };
+
   return {
     user,
     userAccount,
     signOut,
     authLoading,
     isSuperAdmin,
+    updateUserAccount,
   };
 };

@@ -33,9 +33,9 @@ const HeaderUserMenu: React.FC<HeaderUserMenuProps> = ({
     navigate("/");
   };
 
-  // Determine what to show in the avatar: company logo first, then user avatar
+  // Use company logo first, then fallback to user avatar
   const avatarUrl = userAccount?.logo_url || user?.user_metadata?.avatar_url;
-  const displayName = userAccount?.name || user?.user_metadata?.full_name || user?.email;
+  const displayName = user?.user_metadata?.full_name || user?.email;
 
   if (!user) {
     return (
@@ -46,83 +46,94 @@ const HeaderUserMenu: React.FC<HeaderUserMenuProps> = ({
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="relative h-8 w-8 rounded-full hover:bg-gray-800"
-        >
-          <UserAvatar 
-            avatarUrl={avatarUrl} 
-            fullName={displayName}
-            size={8}
-          />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <div className="flex items-center justify-start gap-2 p-2">
-          <div className="flex flex-col space-y-1 leading-none">
-            {user.email && (
-              <p className="text-sm font-medium">{user.email}</p>
-            )}
-            {isSuperAdmin && (
-              <div className="flex items-center gap-1">
-                <Shield className="h-3 w-3 text-orange-600" />
-                <span className="text-xs text-orange-600 font-medium">Super Admin</span>
-              </div>
-            )}
+    <div className="flex items-center space-x-3">
+      {userAccount?.name && (
+        <span className="text-sm font-medium text-white hidden sm:block">
+          {userAccount.name}
+        </span>
+      )}
+      
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className="relative h-8 w-8 rounded-full hover:bg-gray-800"
+          >
+            <UserAvatar 
+              avatarUrl={avatarUrl} 
+              fullName={displayName}
+              size={8}
+            />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="end" forceMount>
+          <div className="flex items-center justify-start gap-2 p-2">
+            <div className="flex flex-col space-y-1 leading-none">
+              {user.email && (
+                <p className="text-sm font-medium">{user.email}</p>
+              )}
+              {userAccount?.name && (
+                <p className="text-xs text-muted-foreground">{userAccount.name}</p>
+              )}
+              {isSuperAdmin && (
+                <div className="flex items-center gap-1">
+                  <Shield className="h-3 w-3 text-orange-600" />
+                  <span className="text-xs text-orange-600 font-medium">Super Admin</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/profile-settings" className="cursor-pointer">
-            <User className="mr-2 h-4 w-4" />
-            Profile Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/account-management" className="cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
-            Account Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/treasure-map-settings" className="cursor-pointer">
-            <Map className="mr-2 h-4 w-4" />
-            Map Configuration
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/target-metric-sets" className="cursor-pointer">
-            <Target className="mr-2 h-4 w-4" />
-            Target Metrics
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/signal-settings" className="cursor-pointer">
-            <BarChart className="mr-2 h-4 w-4" />
-            Signal Settings
-          </Link>
-        </DropdownMenuItem>
-        {isSuperAdmin && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/super-admin" className="cursor-pointer text-orange-600">
-                <Shield className="mr-2 h-4 w-4" />
-                Super Admin Dashboard
-              </Link>
-            </DropdownMenuItem>
-          </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link to="/profile-settings" className="cursor-pointer">
+              <User className="mr-2 h-4 w-4" />
+              Profile Settings
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/account-management" className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              Account Settings
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link to="/treasure-map-settings" className="cursor-pointer">
+              <Map className="mr-2 h-4 w-4" />
+              Map Configuration
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/target-metric-sets" className="cursor-pointer">
+              <Target className="mr-2 h-4 w-4" />
+              Target Metrics
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/signal-settings" className="cursor-pointer">
+              <BarChart className="mr-2 h-4 w-4" />
+              Signal Settings
+            </Link>
+          </DropdownMenuItem>
+          {isSuperAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/super-admin" className="cursor-pointer text-orange-600">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Super Admin Dashboard
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 };
 
