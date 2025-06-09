@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,8 @@ import { useSiteAssessmentDetails } from '@/hooks/useSiteAssessmentDetails';
 import { getUserCustomMetricSettings } from '@/services/targetMetricsService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserAccount } from '@/services/userAccountService';
+import ExportButton from '@/components/export/ExportButton';
+import { ExportData } from '@/services/exportService';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -38,6 +41,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     measurement_type?: string;
   }>>({});
   const [isLoadingTargetMetrics, setIsLoadingTargetMetrics] = useState(true);
+  const [targetMetricSet, setTargetMetricSet] = useState<any>(null);
 
   // Fetch target metrics when component mounts
   React.useEffect(() => {
@@ -86,6 +90,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         console.log('[DEBUG] Final target metrics map:', metricsMap);
         console.log('[DEBUG] Map keys:', Object.keys(metricsMap));
         setTargetMetricsMap(metricsMap);
+        
+        // Set target metric set for export
+        setTargetMetricSet({
+          id: assessment.target_metric_set_id,
+          user_custom_metrics_settings: targetSettings
+        });
       } catch (error) {
         console.error('[DEBUG] Error loading target metrics:', error);
       } finally {
@@ -158,6 +168,44 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
   console.log('[DEBUG] Sorted categories:', sortedCategories);
 
+  // Prepare export data
+  const prepareExportData = (): ExportData => {
+    // Create detailed metric scores map
+    const detailedMetricScores = new Map();
+    
+    if (assessment.assessment_metric_values) {
+      assessment.assessment_metric_values.forEach(metric => {
+        if (metric.category !== 'SiteVisitSectionImages') {
+          const targetData = targetMetricsMap[metric.metric_identifier];
+          detailedMetricScores.set(metric.metric_identifier, {
+            category: metric.category,
+            label: metric.label,
+            enteredValue: metric.entered_value,
+            targetValue: targetData?.target_value,
+            higherIsBetter: targetData?.higher_is_better,
+            measurementType: targetData?.measurement_type,
+            notes: metric.notes,
+            imageUrl: metric.image_url,
+            score: null // You may want to calculate this based on your scoring logic
+          });
+        }
+      });
+    }
+
+    return {
+      assessment: {
+        ...assessment,
+        site_visit_ratings: assessment.site_visit_ratings || [],
+        siteVisitSectionImage
+      },
+      targetMetricSet,
+      accountSettings: null, // You may want to fetch this if needed
+      detailedMetricScores,
+      overallSiteSignalScore: assessment.site_signal_score,
+      completionPercentage: assessment.completion_percentage
+    };
+  };
+
   const getSignalScoreColor = () => {
     const score = assessment.site_signal_score;
     if (score === null || score === undefined) return "text-muted-foreground";
@@ -220,10 +268,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
               <RefreshCcw className="mr-2 h-4 w-4" />
               Recalculate Scores
             </Button>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Export Assessment
-            </Button>
+            <ExportButton exportData={prepareExportData()} />
             <Button onClick={handleEdit} className="bg-foreground text-background hover:bg-foreground/90">
               <Edit className="mr-2 h-4 w-4" />
               Edit Assessment Data
