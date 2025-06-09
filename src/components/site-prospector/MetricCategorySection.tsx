@@ -30,12 +30,20 @@ const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
         <Badge>{categoryDescription}</Badge>
       </CardHeader>
       <CardContent className="grid gap-4">
-        {Object.entries(categoryMetrics).map(([metricKey, metricValue]) => (
+        {Object.entries(categoryMetrics).map(([metricKey, metricValue], index) => (
           <MetricInputField
             key={metricKey}
-            metricIdentifier={metricKey}
-            metricValue={metricValue}
-            onMetricChange={onMetricChange}
+            metricField={{
+              id: metricKey,
+              originalIndex: index,
+              metric_identifier: metricKey,
+              label: metricKey,
+              category: categoryName,
+              entered_value: metricValue,
+            }}
+            control={null as any}
+            errors={{}}
+            disabled={false}
           />
         ))}
         <CategoryImageUpload 

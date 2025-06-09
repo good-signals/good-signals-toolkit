@@ -237,10 +237,12 @@ const TargetMetricsBuilderPage = () => {
                     <CategorySection
                       key={category}
                       category={category}
+                      categoryMetrics={[]}
                       control={form.control}
+                      errors={{}}
                       watch={form.watch}
                       setValue={form.setValue}
-                      metricType="predefined"
+                      disabled={false}
                     />
                   ))}
                 </CardContent>
@@ -258,10 +260,12 @@ const TargetMetricsBuilderPage = () => {
                 <CardContent>
                   <CategorySection
                     category={VISITOR_PROFILE_CATEGORY}
+                    categoryMetrics={[]}
                     control={form.control}
+                    errors={{}}
                     watch={form.watch}
                     setValue={form.setValue}
-                    metricType="visitor_profile"
+                    disabled={false}
                   />
                 </CardContent>
               </Card>

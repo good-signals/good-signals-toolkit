@@ -63,7 +63,7 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
     case 'view-details':
       return (
         <SiteAssessmentDetailsView
-          assessment={{} as any} // This will be populated by the parent component
+          assessment={{} as any}
           onEditGoToInputMetrics={() => setCurrentStep('metric-input')}
           onBackToList={() => setCurrentStep('idle')}
         />
