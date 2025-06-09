@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2, TrendingUp, RefreshCcw, Export } from 'lucide-react';
+import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2, TrendingUp, RefreshCcw, Download } from 'lucide-react';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -105,7 +104,6 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
                   value={currentStatus}
                   onValueChange={handleStatusChange}
                   showBadge={true}
-                  className="ml-2"
                 />
               </div>
               
@@ -123,7 +121,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
               Recalculate Scores
             </Button>
             <Button variant="outline">
-              <Export className="mr-2 h-4 w-4" />
+              <Download className="mr-2 h-4 w-4" />
               Export Assessment
             </Button>
             <Button onClick={handleEdit} className="bg-foreground text-background hover:bg-foreground/90">
