@@ -1,170 +1,239 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { z } from 'zod';
-import { Account } from './accountService';
+import { toast } from 'sonner';
+import { validateImageFile } from '@/utils/fileValidation';
+import { Account } from './account';
 
-// Helper function to get user's account ID (assumes user is admin of first account)
-async function getUserAccountId(userId: string): Promise<string | null> {
-  console.log('Getting account ID for user:', userId);
-  
-  const { data, error } = await supabase
-    .from('account_memberships')
-    .select('account_id')
-    .eq('user_id', userId)
-    .eq('role', 'account_admin')
-    .single();
-
-  if (error) {
-    console.error('Error fetching user account:', error);
-    return null;
-  }
-  
-  console.log('Found account ID:', data?.account_id);
-  return data?.account_id || null;
+export interface CustomMetricCategory {
+  id: string;
+  account_id: string;
+  category_name: string;
+  category_description?: string | null;
+  category_image_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Schema for account custom metric
-export const AccountCustomMetricSchema = z.object({
-  id: z.string().uuid(),
-  account_id: z.string().uuid(),
-  metric_identifier: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().nullable(),
-  category: z.string().min(1),
-  units: z.string().nullable(),
-  default_target_value: z.number().nullable(),
-  higher_is_better: z.boolean(),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
-export type AccountCustomMetric = z.infer<typeof AccountCustomMetricSchema>;
+export interface CustomMetric {
+  id: string;
+  category_id: string;
+  metric_name: string;
+  metric_description?: string | null;
+  min_value?: number | null;
+  max_value?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
-// Schema for creating/updating custom metrics
-export const CreateAccountCustomMetricSchema = z.object({
-  name: z.string().min(1, "Metric name is required"),
-  description: z.string().optional(),
-  category: z.string().min(1, "Category is required"),
-  units: z.string().optional(),
-  default_target_value: z.number().nullable().optional(),
-  higher_is_better: z.boolean(),
-});
-export type CreateAccountCustomMetricData = z.infer<typeof CreateAccountCustomMetricSchema>;
+// Custom Metric Category Services
+export const fetchCustomMetricCategories = async (accountId: string): Promise<CustomMetricCategory[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('custom_metric_categories')
+      .select('*')
+      .eq('account_id', accountId);
 
-export async function getAccountCustomMetrics(userId: string, activeAccount?: Account | null): Promise<AccountCustomMetric[]> {
-  console.log('Getting account custom metrics for user:', userId);
-  
-  const accountId = await getUserAccountId(userId);
-  if (!accountId) {
-    console.log('No account ID found for user, returning empty array');
+    if (error) {
+      console.error('Error fetching custom metric categories:', error);
+      toast.error('Failed to fetch custom metric categories.');
+      return [];
+    }
+
+    return data || [];
+  } catch (error: any) {
+    console.error('Unexpected error fetching custom metric categories:', error);
+    toast.error('An unexpected error occurred while fetching custom metric categories.');
     return [];
   }
+};
 
-  const { data, error } = await supabase
-    .from('account_custom_metrics')
-    .select('*')
-    .eq('account_id', accountId)
-    .order('category', { ascending: true })
-    .order('name', { ascending: true });
+export const addCustomMetricCategory = async (
+  accountId: string,
+  categoryName: string,
+  categoryDescription: string | null = null,
+  categoryImageUrl: string | null = null
+): Promise<CustomMetricCategory | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('custom_metric_categories')
+      .insert([
+        {
+          account_id: accountId,
+          category_name: categoryName,
+          category_description: categoryDescription,
+          category_image_url: categoryImageUrl,
+        },
+      ])
+      .select()
+      .single();
 
-  if (error) {
-    console.error('Error fetching account custom metrics:', error);
-    throw error;
+    if (error) {
+      console.error('Error adding custom metric category:', error);
+      toast.error('Failed to add custom metric category.');
+      return null;
+    }
+
+    toast.success('Custom metric category added successfully!');
+    return data;
+  } catch (error: any) {
+    console.error('Unexpected error adding custom metric category:', error);
+    toast.error('An unexpected error occurred while adding custom metric category.');
+    return null;
   }
-  
-  console.log('Found custom metrics:', data?.length || 0);
-  return z.array(AccountCustomMetricSchema).parse(data || []);
-}
+};
 
-export async function createAccountCustomMetric(
-  userId: string, 
-  metricData: CreateAccountCustomMetricData,
-  activeAccount?: Account | null
-): Promise<AccountCustomMetric> {
-  console.log('Creating account custom metric for user:', userId, 'with data:', metricData);
-  
-  const accountId = await getUserAccountId(userId);
-  if (!accountId) {
-    throw new Error('User must be an account admin to create custom metrics');
+export const updateCustomMetricCategory = async (
+  categoryId: string,
+  updates: Partial<Pick<CustomMetricCategory, 'category_name' | 'category_description' | 'category_image_url'>>
+): Promise<CustomMetricCategory | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('custom_metric_categories')
+      .update(updates)
+      .eq('id', categoryId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating custom metric category:', error);
+      toast.error('Failed to update custom metric category.');
+      return null;
+    }
+
+    toast.success('Custom metric category updated successfully!');
+    return data;
+  } catch (error: any) {
+    console.error('Unexpected error updating custom metric category:', error);
+    toast.error('An unexpected error occurred while updating custom metric category.');
+    return null;
   }
+};
 
-  // Generate a unique metric identifier
-  const metric_identifier = `custom_${metricData.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+export const deleteCustomMetricCategory = async (categoryId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('custom_metric_categories')
+      .delete()
+      .eq('id', categoryId);
 
-  const { data, error } = await supabase
-    .from('account_custom_metrics')
-    .insert({
-      account_id: accountId,
-      metric_identifier,
-      name: metricData.name,
-      description: metricData.description || null,
-      category: metricData.category,
-      units: metricData.units || null,
-      default_target_value: metricData.default_target_value || null,
-      higher_is_better: metricData.higher_is_better,
-    })
-    .select()
-    .single();
+    if (error) {
+      console.error('Error deleting custom metric category:', error);
+      toast.error('Failed to delete custom metric category.');
+      return false;
+    }
 
-  if (error) {
-    console.error('Error creating account custom metric:', error);
-    throw error;
+    toast.success('Custom metric category deleted successfully!');
+    return true;
+  } catch (error: any) {
+    console.error('Unexpected error deleting custom metric category:', error);
+    toast.error('An unexpected error occurred while deleting custom metric category.');
+    return false;
   }
-  
-  console.log('Created custom metric:', data);
-  return AccountCustomMetricSchema.parse(data);
-}
+};
 
-export async function updateAccountCustomMetric(
-  userId: string,
+// Custom Metric Services
+export const fetchCustomMetricsByCategory = async (categoryId: string): Promise<CustomMetric[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('custom_metrics')
+      .select('*')
+      .eq('category_id', categoryId);
+
+    if (error) {
+      console.error('Error fetching custom metrics by category:', error);
+      toast.error('Failed to fetch custom metrics.');
+      return [];
+    }
+
+    return data || [];
+  } catch (error: any) {
+    console.error('Unexpected error fetching custom metrics:', error);
+    toast.error('An unexpected error occurred while fetching custom metrics.');
+    return [];
+  }
+};
+
+export const addCustomMetric = async (
+  categoryId: string,
+  metricName: string,
+  metricDescription: string | null = null,
+  minValue: number | null = null,
+  maxValue: number | null = null
+): Promise<CustomMetric | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('custom_metrics')
+      .insert([
+        {
+          category_id: categoryId,
+          metric_name: metricName,
+          metric_description: metricDescription,
+          min_value: minValue,
+          max_value: maxValue,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding custom metric:', error);
+      toast.error('Failed to add custom metric.');
+      return null;
+    }
+
+    toast.success('Custom metric added successfully!');
+    return data;
+  } catch (error: any) {
+    console.error('Unexpected error adding custom metric:', error);
+    toast.error('An unexpected error occurred while adding custom metric.');
+    return null;
+  }
+};
+
+export const updateCustomMetric = async (
   metricId: string,
-  metricData: Partial<CreateAccountCustomMetricData>,
-  activeAccount?: Account | null
-): Promise<AccountCustomMetric> {
-  console.log('Updating account custom metric:', metricId, 'with data:', metricData);
-  
-  const accountId = await getUserAccountId(userId);
-  if (!accountId) {
-    throw new Error('User must be an account admin to update custom metrics');
+  updates: Partial<Pick<CustomMetric, 'metric_name' | 'metric_description' | 'min_value' | 'max_value'>>
+): Promise<CustomMetric | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('custom_metrics')
+      .update(updates)
+      .eq('id', metricId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating custom metric:', error);
+      toast.error('Failed to update custom metric.');
+      return null;
+    }
+
+    toast.success('Custom metric updated successfully!');
+    return data;
+  } catch (error: any) {
+    console.error('Unexpected error updating custom metric:', error);
+    toast.error('An unexpected error occurred while updating custom metric.');
+    return null;
   }
+};
 
-  const { data, error } = await supabase
-    .from('account_custom_metrics')
-    .update({
-      ...metricData,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', metricId)
-    .eq('account_id', accountId)
-    .select()
-    .single();
+export const deleteCustomMetric = async (metricId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('custom_metrics')
+      .delete()
+      .eq('id', metricId);
 
-  if (error) {
-    console.error('Error updating account custom metric:', error);
-    throw error;
+    if (error) {
+      console.error('Error deleting custom metric:', error);
+      toast.error('Failed to delete custom metric.');
+      return false;
+    }
+
+    toast.success('Custom metric deleted successfully!');
+    return true;
+  } catch (error: any) {
+    console.error('Unexpected error deleting custom metric:', error);
+    toast.error('An unexpected error occurred while deleting custom metric.');
+    return false;
   }
-  
-  console.log('Updated custom metric:', data);
-  return AccountCustomMetricSchema.parse(data);
-}
-
-export async function deleteAccountCustomMetric(userId: string, metricId: string, activeAccount?: Account | null): Promise<void> {
-  console.log('Deleting account custom metric:', metricId);
-  
-  const accountId = await getUserAccountId(userId);
-  if (!accountId) {
-    throw new Error('User must be an account admin to delete custom metrics');
-  }
-
-  const { error } = await supabase
-    .from('account_custom_metrics')
-    .delete()
-    .eq('id', metricId)
-    .eq('account_id', accountId);
-
-  if (error) {
-    console.error('Error deleting account custom metric:', error);
-    throw error;
-  }
-  
-  console.log('Deleted custom metric:', metricId);
-}
+};

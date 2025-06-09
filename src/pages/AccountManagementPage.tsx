@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Account, fetchUserAccountsWithAdminRole } from '@/services/accountService';
+import { Account, fetchUserAccountsWithAdminRole } from '@/services/account';
 import AccountDetailsForm from '@/components/account/AccountDetailsForm';
 import CompanyLogoUpload from '@/components/account/CompanyLogoUpload';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';

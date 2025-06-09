@@ -1,22 +1,13 @@
-
-import React, { useState, useEffect } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import React, { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // For address
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Account, updateAccountDetailsService } from '@/services/accountService';
-
-const accountFormSchema = z.object({
-  name: z.string().min(2, { message: "Account name must be at least 2 characters." }).max(100),
-  category: z.string().max(100).optional().nullable(),
-  subcategory: z.string().max(100).optional().nullable(),
-  address: z.string().max(255).optional().nullable(),
-});
-
-type AccountFormValues = z.infer<typeof accountFormSchema>;
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { Account, updateAccountDetailsService } from '@/services/account';
+import { companyCategories } from '@/data/companyCategories';
 
 interface AccountDetailsFormProps {
   account: Account;
@@ -24,107 +15,90 @@ interface AccountDetailsFormProps {
 }
 
 const AccountDetailsForm: React.FC<AccountDetailsFormProps> = ({ account, onAccountUpdate }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [name, setName] = useState(account.name || '');
+  const [category, setCategory] = useState(account.category || '');
+  const [subcategory, setSubcategory] = useState(account.subcategory || '');
+  const [address, setAddress] = useState(account.address || '');
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const form = useForm<AccountFormValues>({
-    resolver: zodResolver(accountFormSchema),
-    defaultValues: {
-      name: account.name || '',
-      category: account.category || '',
-      subcategory: account.subcategory || '',
-      address: account.address || '',
-    },
-  });
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-  useEffect(() => {
-    form.reset({
-      name: account.name || '',
-      category: account.category || '',
-      subcategory: account.subcategory || '',
-      address: account.address || '',
-    });
-  }, [account, form]);
+    setIsUpdating(true);
+    try {
+      const updates = {
+        name,
+        category,
+        subcategory,
+        address,
+      };
 
-  const onSubmit: SubmitHandler<AccountFormValues> = async (data) => {
-    setIsSubmitting(true);
-    const updatedAccount = await updateAccountDetailsService(account.id, {
-      name: data.name,
-      category: data.category,
-      subcategory: data.subcategory,
-      address: data.address,
-    });
-    
-    if (updatedAccount) {
-      onAccountUpdate(updatedAccount);
-      // Toast handled by service
+      const updatedAccount = await updateAccountDetailsService(account.id, updates);
+
+      if (updatedAccount) {
+        onAccountUpdate(updatedAccount);
+        toast.success("Account details updated successfully!");
+      } else {
+        toast.error("Failed to update account details.");
+      }
+    } catch (error) {
+      console.error("Error updating account details:", error);
+      toast.error("An unexpected error occurred.");
+    } finally {
+      setIsUpdating(false);
     }
-    setIsSubmitting(false);
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Account Name</FormLabel>
-              <FormControl>
-                <Input placeholder="Your company name" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="name">Company Name</Label>
+        <Input
+          id="name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your Company Name"
         />
-        
-        <FormField
-          control={form.control}
-          name="category"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Category</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Technology, Healthcare" {...field} value={field.value ?? ''} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+      </div>
+      <div>
+        <Label htmlFor="category">Category</Label>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a category" />
+          </SelectTrigger>
+          <SelectContent>
+            {companyCategories.map((cat) => (
+              <SelectItem key={cat.value} value={cat.value}>
+                {cat.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="subcategory">Subcategory</Label>
+        <Input
+          id="subcategory"
+          type="text"
+          value={subcategory || ''}
+          onChange={(e) => setSubcategory(e.target.value)}
+          placeholder="Subcategory"
         />
-
-        <FormField
-          control={form.control}
-          name="subcategory"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Subcategory</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., SaaS, Medical Devices" {...field} value={field.value ?? ''} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+      </div>
+      <div>
+        <Label htmlFor="address">Address</Label>
+        <Textarea
+          id="address"
+          value={address || ''}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Company Address"
         />
-
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Company address" {...field} value={field.value ?? ''} className="min-h-[80px]" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
-          {isSubmitting ? 'Saving...' : 'Save Account Changes'}
-        </Button>
-      </form>
-    </Form>
+      </div>
+      <Button type="submit" disabled={isUpdating}>
+        {isUpdating ? "Updating..." : "Update Details"}
+      </Button>
+    </form>
   );
 };
 

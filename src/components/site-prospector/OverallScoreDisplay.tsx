@@ -1,87 +1,51 @@
-
 import React from 'react';
-import { TrendingUp, CheckCircle, Loader2 } from 'lucide-react';
-import { Progress } from "@/components/ui/progress";
-import { Account } from '@/services/accountService';
-import { SignalStatus } from '@/lib/assessmentDisplayUtils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Account } from '@/services/account';
 
 interface OverallScoreDisplayProps {
-  overallSiteSignalScore: number | null;
-  completionPercentage: number;
-  signalStatus: SignalStatus;
-  isLoadingAccounts: boolean;
-  accountSettings: Account | null;
-  isCalculating?: boolean;
-  storedScores?: {
-    overallScore: number | null;
-    completion: number | null;
-  };
+  overallScore: number | null;
+  scoreChange: number | null;
 }
 
-const OverallScoreDisplay: React.FC<OverallScoreDisplayProps> = ({
-  overallSiteSignalScore,
-  completionPercentage,
-  signalStatus,
-  isLoadingAccounts,
-  accountSettings,
-  isCalculating = false,
-  storedScores,
-}) => {
-  // Use stored scores if we're still calculating and don't have calculated values yet
-  const displayScore = isCalculating && overallSiteSignalScore === null && storedScores?.overallScore !== null
-    ? storedScores.overallScore
-    : overallSiteSignalScore;
+const OverallScoreDisplay: React.FC<OverallScoreDisplayProps> = ({ overallScore, scoreChange }) => {
+  const percentage = overallScore !== null ? Math.max(0, Math.min(overallScore, 100)) : 0;
 
-  const displayCompletion = isCalculating && completionPercentage === 0 && storedScores?.completion !== null
-    ? storedScores.completion
-    : completionPercentage;
+  let trendingIcon = null;
+  let trendingText = '';
 
-  const isScoreLoading = isCalculating && overallSiteSignalScore === null;
-  const isCompletionLoading = isCalculating && completionPercentage === 0;
+  if (scoreChange !== null) {
+    if (scoreChange > 0) {
+      trendingIcon = <TrendingUp className="h-4 w-4 text-green-500 ml-1" />;
+      trendingText = `Increased by ${scoreChange.toFixed(1)} points`;
+    } else if (scoreChange < 0) {
+      trendingIcon = <TrendingDown className="h-4 w-4 text-red-500 ml-1" />;
+      trendingText = `Decreased by ${Math.abs(scoreChange).toFixed(1)} points`;
+    } else {
+      trendingIcon = <Minus className="h-4 w-4 text-gray-500 ml-1" />;
+      trendingText = 'No change';
+    }
+  }
 
   return (
-    <>
-      <div>
-        <h3 className="text-lg font-semibold text-foreground/90 mb-2">Overall Site Signal Score</h3>
-        <div className="flex items-center space-x-2">
-          {isScoreLoading ? (
-            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-          ) : (
-            <TrendingUp className={`h-10 w-10 ${signalStatus.iconColor}`} />
+    <Card>
+      <CardHeader>
+        <CardTitle>Overall Site Signal Score</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div className="text-2xl font-bold">{overallScore !== null ? overallScore.toFixed(0) : 'N/A'}</div>
+          {trendingIcon && (
+            <div className="text-sm text-muted-foreground flex items-center">
+              {trendingText}
+              {trendingIcon}
+            </div>
           )}
-          <p className={`text-4xl font-bold ${isScoreLoading ? 'text-muted-foreground' : signalStatus.color}`}>
-            {isScoreLoading ? (
-              'Calculating...'
-            ) : typeof displayScore === 'number' ? (
-              `${displayScore.toFixed(0)}% - ${signalStatus.text}`
-            ) : (
-              signalStatus.text
-            )}
-          </p>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          A measure of overall site suitability based on your targets.
-          ({isLoadingAccounts ? 'Loading thresholds...' : 'Using default thresholds.'})
-        </p>
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold text-foreground/90 mb-2">Assessment Completion</h3>
-        <div className="flex items-center space-x-2">
-          {isCompletionLoading ? (
-            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-          ) : (
-            <CheckCircle className={`h-10 w-10 ${displayCompletion >= 100 ? 'text-green-500' : 'text-yellow-500'}`} />
-          )}
-          <p className={`text-4xl font-bold ${isCompletionLoading ? 'text-muted-foreground' : displayCompletion >= 100 ? 'text-green-600' : 'text-yellow-600'}`}>
-            {isCompletionLoading ? 'Calculating...' : `${displayCompletion.toFixed(0)}%`}
-          </p>
-        </div>
-        <Progress value={displayCompletion} className="w-full mt-2 h-3" />
-        <p className="text-sm text-muted-foreground mt-1">
-          Percentage of metrics with entered values.
-        </p>
-      </div>
-    </>
+        <Progress value={percentage} className="mt-2" />
+      </CardContent>
+    </Card>
   );
 };
 
