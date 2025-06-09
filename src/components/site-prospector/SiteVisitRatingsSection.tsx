@@ -19,7 +19,7 @@ const SiteVisitRatingsSection: React.FC<SiteVisitRatingsSectionProps> = ({
   if (!siteVisitRatings || siteVisitRatings.length === 0) return null;
 
   return (
-    <Card className="shadow-lg">
+    <Card>
       <CardHeader>
         <CardTitle className="text-2xl font-semibold flex items-center">
           <ListChecks className="h-6 w-6 mr-2 text-primary" />
@@ -57,21 +57,23 @@ const SiteVisitRatingsSection: React.FC<SiteVisitRatingsSectionProps> = ({
         {siteVisitSectionImage && (
           <div className="mt-6">
             <h4 className="text-lg font-medium mb-3">Site Visit Images</h4>
-            <Carousel className="w-full max-w-4xl mx-auto">
-              <CarouselContent>
-                <CarouselItem>
-                  <div className="p-1">
-                    <img 
-                      src={siteVisitSectionImage} 
-                      alt="Site Visit section image" 
-                      className="rounded-md max-h-80 w-full object-contain border bg-muted/30" 
-                    />
-                  </div>
-                </CarouselItem>
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
+            <div className="px-12">
+              <Carousel className="w-full max-w-4xl mx-auto">
+                <CarouselContent>
+                  <CarouselItem>
+                    <div className="p-1">
+                      <img 
+                        src={siteVisitSectionImage} 
+                        alt="Site Visit section image" 
+                        className="rounded-md max-h-80 w-full object-contain border bg-muted/30" 
+                      />
+                    </div>
+                  </CarouselItem>
+                </CarouselContent>
+                <CarouselPrevious />
+                <CarouselNext />
+              </Carousel>
+            </div>
           </div>
         )}
       </CardContent>
