@@ -43,13 +43,24 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   React.useEffect(() => {
     const loadTargetMetrics = async () => {
       if (!assessment.target_metric_set_id || !user?.id) {
+        console.log('[DEBUG] Skipping target metrics load:', {
+          hasTargetMetricSetId: !!assessment.target_metric_set_id,
+          hasUserId: !!user?.id,
+          targetMetricSetId: assessment.target_metric_set_id,
+          userId: user?.id
+        });
         setIsLoadingTargetMetrics(false);
         return;
       }
 
       try {
-        console.log('Loading target metrics for set:', assessment.target_metric_set_id);
+        console.log('[DEBUG] Starting target metrics load for set:', assessment.target_metric_set_id);
         const targetSettings = await getUserCustomMetricSettings(assessment.target_metric_set_id);
+        
+        console.log('[DEBUG] Raw target settings fetched:', {
+          settingsCount: targetSettings.length,
+          settings: targetSettings
+        });
         
         // Create a lookup map for target values
         const metricsMap: Record<string, {
@@ -64,12 +75,19 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
             higher_is_better: setting.higher_is_better,
             measurement_type: setting.measurement_type || undefined,
           };
+          console.log('[DEBUG] Added to metrics map:', {
+            identifier: setting.metric_identifier,
+            targetValue: setting.target_value,
+            higherIsBetter: setting.higher_is_better,
+            measurementType: setting.measurement_type
+          });
         });
         
-        console.log('Loaded target metrics map:', metricsMap);
+        console.log('[DEBUG] Final target metrics map:', metricsMap);
+        console.log('[DEBUG] Map keys:', Object.keys(metricsMap));
         setTargetMetricsMap(metricsMap);
       } catch (error) {
-        console.error('Error loading target metrics:', error);
+        console.error('[DEBUG] Error loading target metrics:', error);
       } finally {
         setIsLoadingTargetMetrics(false);
       }
@@ -100,8 +118,20 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   const metricsByCategory: Record<string, typeof assessment.assessment_metric_values> = {};
   let siteVisitSectionImage: string | null = null;
   
+  console.log('[DEBUG] Assessment metric values:', {
+    count: assessment.assessment_metric_values?.length || 0,
+    values: assessment.assessment_metric_values
+  });
+  
   if (assessment.assessment_metric_values && assessment.assessment_metric_values.length > 0) {
     assessment.assessment_metric_values.forEach((metric) => {
+      console.log('[DEBUG] Processing metric:', {
+        identifier: metric.metric_identifier,
+        label: metric.label,
+        category: metric.category,
+        enteredValue: metric.entered_value
+      });
+
       // Extract the Site Visit section image but don't display it as a metric category
       if (metric.category === 'SiteVisitSectionImages') {
         if (metric.image_url) {
@@ -117,8 +147,16 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     });
   }
 
+  console.log('[DEBUG] Metrics organized by category:', {
+    categoryCount: Object.keys(metricsByCategory).length,
+    categories: Object.keys(metricsByCategory),
+    metricsByCategory
+  });
+
   // Sort categories according to the predefined order
   const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
+
+  console.log('[DEBUG] Sorted categories:', sortedCategories);
 
   const getSignalScoreColor = () => {
     const score = assessment.site_signal_score;
@@ -302,25 +340,40 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
             <div className="space-y-6">
               {sortedCategories.map((category) => {
                 const metrics = metricsByCategory[category];
+                console.log('[DEBUG] Rendering category:', category, 'with metrics:', metrics);
+                
+                const processedMetrics = metrics.map(metric => {
+                  const targetData = targetMetricsMap[metric.metric_identifier];
+                  
+                  console.log('[DEBUG] Processing metric for display:', {
+                    metricIdentifier: metric.metric_identifier,
+                    label: metric.label,
+                    enteredValue: metric.entered_value,
+                    foundTargetData: !!targetData,
+                    targetData: targetData
+                  });
+                  
+                  return {
+                    id: metric.id || `${metric.category}-${metric.label}`,
+                    metric_identifier: metric.metric_identifier || metric.label,
+                    label: metric.label,
+                    category: metric.category,
+                    entered_value: metric.entered_value,
+                    notes: metric.notes,
+                    target_value: targetData?.target_value,
+                    higher_is_better: targetData?.higher_is_better,
+                    measurement_type: targetData?.measurement_type,
+                  };
+                });
+                
+                console.log('[DEBUG] Processed metrics for category', category, ':', processedMetrics);
+                
                 return (
                   <MetricDisplaySection
                     key={category}
                     categoryName={category}
                     categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
-                    categoryMetrics={metrics.map(metric => {
-                      const targetData = targetMetricsMap[metric.metric_identifier];
-                      return {
-                        id: metric.id || `${metric.category}-${metric.label}`,
-                        metric_identifier: metric.metric_identifier || metric.label,
-                        label: metric.label,
-                        category: metric.category,
-                        entered_value: metric.entered_value,
-                        notes: metric.notes,
-                        target_value: targetData?.target_value,
-                        higher_is_better: targetData?.higher_is_better,
-                        measurement_type: targetData?.measurement_type,
-                      };
-                    })}
+                    categoryMetrics={processedMetrics}
                   />
                 );
               })}
