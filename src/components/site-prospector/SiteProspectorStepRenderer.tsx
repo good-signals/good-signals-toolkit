@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import NewAssessmentForm from './NewAssessmentForm';
 import SelectTargetMetricSetStep from './SelectTargetMetricSetStep';
 import InputMetricValuesStep from './InputMetricValuesStep';
@@ -62,6 +62,14 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
 
   const validationError = validateStepRequirements(currentStep);
   
+  // Handle automatic redirect on validation error
+  useEffect(() => {
+    if (validationError) {
+      const timer = setTimeout(() => setCurrentStep('idle'), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [validationError, setCurrentStep]);
+  
   if (validationError) {
     console.error('[SiteProspectorStepRenderer] Validation error:', validationError);
     
@@ -73,7 +81,6 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
             {validationError}. Returning to start.
           </AlertDescription>
         </Alert>
-        {setTimeout(() => setCurrentStep('idle'), 2000)}
       </div>
     );
   }
