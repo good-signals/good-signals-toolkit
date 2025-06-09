@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2 } from 'lucide-react';
@@ -9,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import SiteStatusSelector from './SiteStatusSelector';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { updateSiteStatus } from '@/services/siteAssessment/statusUpdates';
+import { toast } from 'sonner';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -21,8 +22,25 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   onEditGoToInputMetrics,
   onBackToList,
 }) => {
+  const [currentStatus, setCurrentStatus] = useState(assessment.site_status || 'Prospect');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
   const handleEdit = () => {
     onEditGoToInputMetrics();
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    setIsUpdatingStatus(true);
+    try {
+      await updateSiteStatus(assessment.id, newStatus);
+      setCurrentStatus(newStatus);
+      toast.success('Site status updated successfully');
+    } catch (error) {
+      console.error('Error updating site status:', error);
+      toast.error('Failed to update site status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   // Organize metric values by category if they exist
@@ -86,10 +104,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
           </CardHeader>
           <CardContent>
             <SiteStatusSelector 
-              assessmentId={assessment.id} 
-              initialStatus={assessment.site_status || 'Prospect'} 
-              readOnly={false}
+              value={currentStatus}
+              onValueChange={handleStatusChange}
+              showBadge={true}
             />
+            {isUpdatingStatus && (
+              <p className="text-xs text-muted-foreground mt-1">Updating...</p>
+            )}
           </CardContent>
         </Card>
 
