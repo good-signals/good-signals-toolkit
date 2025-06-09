@@ -44,7 +44,6 @@ const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
           control={null}
           watch={() => null}
           setValue={() => {}}
-          getValues={() => ({})}
         />
       </CardContent>
     </Card>

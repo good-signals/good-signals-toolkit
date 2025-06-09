@@ -41,18 +41,18 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const { loadDraft } = useTargetMetricsDraft();
+  const { loadDraft } = useTargetMetricsDraft(null);
 
   const handleEdit = (assessment: SiteAssessment) => {
     if (assessment.target_metric_set_id) {
-      loadDraft();
+      loadDraft(assessment.target_metric_set_id);
     }
     onEdit(assessment);
   };
 
   const handleViewDetails = (assessment: SiteAssessment) => {
     if (assessment.target_metric_set_id) {
-      loadDraft();
+      loadDraft(assessment.target_metric_set_id);
     }
     onViewDetails(assessment);
   };
@@ -133,7 +133,9 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     accountSettings: null,
     detailedMetricScores: [],
     siteVisitRatings: [],
-    additionalImages: []
+    additionalImages: [],
+    overallSiteSignalScore: 0,
+    completionPercentage: 0
   };
 
   return (
@@ -187,7 +189,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
           />
           <SiteAssessmentsTableContent
             assessments={filteredAndSortedAssessments}
-            isLoading={isLoading}
             selectedIds={selectedIds}
             onSelectOne={handleSelectOne}
             onViewDetails={handleViewDetails}
