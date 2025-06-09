@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,34 +25,14 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [assessments, setAssessments] = useState<SiteAssessment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedAssessment, setSelectedAssessment] = useState<SiteAssessment | null>(null);
   const { user } = useAuth();
   const {
-    fetchSiteAssessments,
-    deleteSiteAssessment,
-  } = useSiteAssessmentOperations();
-  const { initializeDraft } = useTargetMetricsDraft();
-
-  useEffect(() => {
-    if (user && accountId) {
-      loadAssessments();
-    }
-  }, [user, accountId]);
-
-  const loadAssessments = async () => {
-    setLoading(true);
-    try {
-      const fetchedAssessments = await fetchSiteAssessments(accountId);
-      setAssessments(fetchedAssessments);
-    } catch (error) {
-      console.error('Error fetching site assessments:', error);
-      toast.error('Failed to load site assessments.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    assessments,
+    isLoadingAssessments: loading,
+    deleteMutation,
+  } = useSiteAssessmentOperations('idle');
+  const { loadDraft } = useTargetMetricsDraft();
 
   const filteredAssessments = assessments.filter(assessment => {
     const searchMatch = assessment.assessment_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -62,20 +43,19 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
   });
 
   const handleCreateAssessment = () => {
-    initializeDraft();
+    loadDraft();
     setIsDialogOpen(true);
   };
 
   const handleEditAssessment = (assessment: SiteAssessment) => {
     setSelectedAssessment(assessment);
-    initializeDraft(assessment.target_metric_set_id);
+    loadDraft();
     setIsDialogOpen(true);
   };
 
-  const handleDeleteAssessment = async (assessmentId: string) => {
+  const handleDeleteAssessment = async (assessment: SiteAssessment) => {
     try {
-      await deleteSiteAssessment(assessmentId);
-      setAssessments(prevAssessments => prevAssessments.filter(assessment => assessment.id !== assessmentId));
+      deleteMutation.mutate([assessment.id]);
       toast.success('Site assessment deleted successfully.');
     } catch (error) {
       console.error('Error deleting site assessment:', error);
@@ -86,7 +66,6 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setSelectedAssessment(null);
-    loadAssessments();
   };
 
   return (
@@ -115,7 +94,7 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({ accountId }
             </SelectContent>
           </Select>
           <div className="flex justify-end md:col-span-1">
-            <ExportButton data={assessments} filename="site-assessments" />
+            <ExportButton exportData={assessments} filename="site-assessments" />
             <Button onClick={handleCreateAssessment}>
               <Plus className="mr-2 h-4 w-4" />
               Create Assessment

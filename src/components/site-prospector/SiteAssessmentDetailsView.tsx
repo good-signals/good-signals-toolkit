@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,27 +21,16 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({ accou
   const navigate = useNavigate();
   const [siteAssessment, setSiteAssessment] = useState<SiteAssessment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { fetchSiteAssessmentById } = useSiteAssessmentOperations();
-  const { targetMetricsDraft } = useTargetMetricsDraft();
+  const { assessments } = useSiteAssessmentOperations('idle');
+  const { loadDraft } = useTargetMetricsDraft();
 
   useEffect(() => {
-    const loadSiteAssessment = async () => {
-      if (assessmentId) {
-        setIsLoading(true);
-        try {
-          const assessment = await fetchSiteAssessmentById(assessmentId);
-          setSiteAssessment(assessment);
-        } catch (error) {
-          console.error("Failed to load site assessment:", error);
-          // Optionally, display an error message to the user
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadSiteAssessment();
-  }, [assessmentId, fetchSiteAssessmentById]);
+    if (assessmentId && assessments.length > 0) {
+      const assessment = assessments.find(a => a.id === assessmentId);
+      setSiteAssessment(assessment || null);
+      setIsLoading(false);
+    }
+  }, [assessmentId, assessments]);
 
   if (isLoading) {
     return <div>Loading site assessment details...</div>;
@@ -58,6 +48,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({ accou
     siteAssessment.postal_code,
     siteAssessment.country
   ].filter(Boolean).join(', ');
+
+  const targetMetricsDraft = loadDraft();
 
   return (
     <div className="container mx-auto py-8">
@@ -94,7 +86,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({ accou
             <div>
               <p className="text-sm font-medium">Target Metric Set:</p>
                {targetMetricsDraft ? (
-                  <p className="text-muted-foreground">{targetMetricsDraft.name || 'N/A'}</p>
+                  <p className="text-muted-foreground">{targetMetricsDraft.metric_set_name || 'N/A'}</p>
                 ) : (
                   <p className="text-muted-foreground">N/A</p>
                 )}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,12 +7,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, MapPin, Download, FileText } from 'lucide-react';
 import { Account } from '@/services/account';
 
-interface SiteTreasureMapPageParams {
-  siteId: string;
-}
-
 const SiteTreasureMapPage: React.FC = () => {
-  const { siteId } = useParams<SiteTreasureMapPageParams>();
+  const { siteId } = useParams<{ siteId: string }>();
   const navigate = useNavigate();
   const { user, authLoading } = useAuth();
   const [account, setAccount] = useState<Account | null>(null);

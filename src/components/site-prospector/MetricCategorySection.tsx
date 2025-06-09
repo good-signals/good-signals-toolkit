@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,16 +33,15 @@ const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
         {Object.entries(categoryMetrics).map(([metricKey, metricValue]) => (
           <MetricInputField
             key={metricKey}
-            metricKey={metricKey}
+            metricName={metricKey}
             metricValue={metricValue}
             onMetricChange={onMetricChange}
           />
         ))}
-        <CategoryImageUpload onImageUpload={onImageUpload} account={account} />
+        <CategoryImageUpload account={account} />
       </CardContent>
     </Card>
   );
 };
 
 export default MetricCategorySection;
-

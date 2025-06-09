@@ -122,3 +122,8 @@ export const companyCategoriesData: CompanyCategory[] = [
   },
 ];
 
+// Export for backward compatibility
+export const companyCategories = companyCategoriesData.map(category => ({
+  value: category.name.toLowerCase().replace(/\s+/g, '_'),
+  label: category.name
+}));

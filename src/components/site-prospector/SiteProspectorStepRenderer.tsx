@@ -68,12 +68,7 @@ const SiteProspectorStepRenderer: React.FC<StepRendererProps> = ({
     if (currentStep === 'assessmentDetails' && activeAssessmentId && selectedMetricSetId) {
       return (
         <SiteAssessmentDetailsView
-          assessmentId={activeAssessmentId}
-          selectedMetricSetId={selectedMetricSetId}
-          onEditGoToInputMetrics={() => {
-              setCurrentStep('inputMetrics');
-          }}
-          onBackToList={onCancelAssessmentProcess}
+          account={null}
         />
       );
     }

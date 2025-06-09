@@ -111,7 +111,7 @@ const SiteProspectorPage = () => {
       </div>
       
       <SiteAssessmentsTable
-        assessmentsData={assessments}
+        assessments={assessments}
         isLoading={isLoadingAssessments}
         errorLoading={assessmentsError}
         onViewDetails={handleViewAssessment}
