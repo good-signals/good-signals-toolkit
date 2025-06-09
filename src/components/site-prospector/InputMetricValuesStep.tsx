@@ -17,6 +17,7 @@ import SiteStatusSelector from './SiteStatusSelector';
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CategorySection from './metric-input/CategorySection';
 import SiteVisitSection from './metric-input/SiteVisitSection';
+import { safeStorage } from '@/utils/safeStorage';
 
 // Import shared config
 import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
@@ -87,6 +88,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isFormReady, setIsFormReady] = useState(false);
 
   // Add query for current assessment details to get site status
   const { data: currentAssessment } = useQuery({
@@ -117,10 +119,12 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     enabled: !!assessmentId,
   });
   
-  const { control, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = useForm<MetricValuesFormData>({
+  const form = useForm<MetricValuesFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: { metrics: [], siteVisitRatings: [], siteStatus: 'Prospect' },
   });
+
+  const { control, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = form;
 
   const { fields: metricFields, replace: replaceMetrics } = useFieldArray({
     control,
@@ -150,46 +154,30 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     },
   });
 
-  // Safe session storage functions
-  const safeGetSessionStorage = (key: string): string | null => {
+  // Load saved form data from session storage
+  const loadSavedFormData = () => {
     try {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        return sessionStorage.getItem(key);
+      const savedDataJson = safeStorage.sessionGetItem(getFormDataSessionKey(assessmentId));
+      if (savedDataJson) {
+        const savedData = safeStorage.safeParse(savedDataJson, {} as Partial<MetricValuesFormData>);
+        console.log('Loaded saved form data from session storage:', savedData);
+        return savedData;
       }
     } catch (error) {
-      console.warn('Failed to access sessionStorage:', error);
+      console.warn('Failed to load saved form data from session storage:', error);
     }
     return null;
   };
 
-  const safeSetSessionStorage = (key: string, value: string): void => {
-    try {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        sessionStorage.setItem(key, value);
-      }
-    } catch (error) {
-      console.warn('Failed to set sessionStorage:', error);
-    }
-  };
-
-  const safeRemoveSessionStorage = (key: string): void => {
-    try {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        sessionStorage.removeItem(key);
-      }
-    } catch (error) {
-      console.warn('Failed to remove from sessionStorage:', error);
-    }
-  };
-
-  // Save form data to session storage whenever form data changes - with debouncing
+  // Save form data to session storage with proper safety checks
   useEffect(() => {
-    // Only set up watcher if watch function is available
-    if (!watch) {
-      console.warn('[InputMetricValuesStep] Watch function not available yet');
+    if (!isFormReady || !watch) {
+      console.log('[InputMetricValuesStep] Form not ready for watching yet');
       return;
     }
 
+    console.log('[InputMetricValuesStep] Setting up form watcher');
+    
     const subscription = watch((value) => {
       const timeoutId = setTimeout(() => {
         try {
@@ -202,7 +190,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             siteStatus: value.siteStatus || 'Prospect',
           };
           
-          safeSetSessionStorage(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
+          safeStorage.sessionSetItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
           console.log('Form data saved to session storage:', serializableData);
         } catch (error) {
           console.warn('Failed to save form data to session storage:', error);
@@ -212,29 +200,17 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       return () => clearTimeout(timeoutId);
     });
     
-    return () => subscription?.unsubscribe();
-  }, [watch, assessmentId]);
+    return () => {
+      console.log('[InputMetricValuesStep] Cleaning up form watcher');
+      subscription?.unsubscribe();
+    };
+  }, [isFormReady, watch, assessmentId]);
 
   // Clear session storage on completion
   const clearSessionStorageOnCompletion = () => {
-    safeRemoveSessionStorage(getFormDataSessionKey(assessmentId));
-    safeRemoveSessionStorage(getImageDataSessionKey(assessmentId));
+    safeStorage.sessionRemoveItem(getFormDataSessionKey(assessmentId));
+    safeStorage.sessionRemoveItem(getImageDataSessionKey(assessmentId));
     console.log('Session storage cleared after assessment completion');
-  };
-
-  // Load saved form data from session storage
-  const loadSavedFormData = () => {
-    try {
-      const savedDataJson = safeGetSessionStorage(getFormDataSessionKey(assessmentId));
-      if (savedDataJson) {
-        const savedData = JSON.parse(savedDataJson) as Partial<MetricValuesFormData>;
-        console.log('Loaded saved form data from session storage:', savedData);
-        return savedData;
-      }
-    } catch (error) {
-      console.warn('Failed to load saved form data from session storage:', error);
-    }
-    return null;
   };
 
   // Initialize form data
@@ -339,6 +315,10 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
     const siteStatus = savedFormData?.siteStatus ?? currentAssessment?.site_status ?? 'Prospect';
     setValue('siteStatus', siteStatus);
+
+    // Mark form as ready after all initialization is complete
+    setIsFormReady(true);
+    console.log('[InputMetricValuesStep] Form initialization complete');
 
   }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, setValue, currentAssessment?.site_status]);
 
@@ -563,7 +543,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     metricSetLoaded: !!metricSet,
     customMetricsCount: metricSet?.user_custom_metrics_settings?.length || 0,
     categoriesCount: sortedCategories.length,
-    siteVisitRatingsCount: siteVisitRatingFields.length
+    siteVisitRatingsCount: siteVisitRatingFields.length,
+    isFormReady
   });
 
   // Display message if no custom metrics but site visit ratings exist
@@ -636,7 +617,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     );
   }
 
-  if (isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings) {
+  if (isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings || !isFormReady) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading data...</p></div>;
   }
 

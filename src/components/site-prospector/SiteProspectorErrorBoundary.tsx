@@ -3,6 +3,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { safeStorage } from '@/utils/safeStorage';
 
 interface Props {
   children: ReactNode;
@@ -35,12 +36,19 @@ class SiteProspectorErrorBoundary extends Component<Props, State> {
 
   private handleClearStorage = () => {
     try {
-      // Clear Site Prospector specific storage
-      const keys = Object.keys(sessionStorage).filter(key => 
-        key.startsWith('siteProspector_') || 
-        key.startsWith('inputMetricValues_')
-      );
-      keys.forEach(key => sessionStorage.removeItem(key));
+      // Clear Site Prospector specific storage using safe storage utility
+      const keys = ['siteProspector_currentStep', 'siteProspector_activeAssessmentId', 'siteProspector_selectedMetricSetId'];
+      keys.forEach(key => safeStorage.sessionRemoveItem(key));
+      
+      // Also clear any form data storage
+      if (safeStorage.isStorageAvailable('sessionStorage')) {
+        const allKeys = Object.keys(sessionStorage).filter(key => 
+          key.startsWith('siteProspector_') || 
+          key.startsWith('inputMetricValues_')
+        );
+        allKeys.forEach(key => safeStorage.sessionRemoveItem(key));
+      }
+      
       console.log('Cleared Site Prospector storage');
       this.handleReset();
       window.location.reload();
