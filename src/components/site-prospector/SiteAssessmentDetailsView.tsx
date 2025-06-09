@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,10 +7,13 @@ import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import SiteStatusSelector from './SiteStatusSelector';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { updateSiteStatus } from '@/services/siteAssessment/statusUpdates';
 import { toast } from 'sonner';
+import AddressMapDisplay from './AddressMapDisplay';
+import EditableExecutiveSummary from './EditableExecutiveSummary';
+import MetricCategorySection from './MetricCategorySection';
+import OverallScoreDisplay from './OverallScoreDisplay';
+import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -69,6 +73,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-5xl">
+      {/* Header Section */}
       <div className="mb-8">
         <Button variant="ghost" onClick={onBackToList} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -97,6 +102,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         </div>
       </div>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
@@ -147,120 +153,96 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         </Card>
       </div>
 
+      {/* Executive Summary Section */}
       {assessment.executive_summary && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Executive Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-line">{assessment.executive_summary}</p>
-            {assessment.last_summary_generated_at && (
-              <p className="text-sm text-muted-foreground mt-4">
-                Last updated: {formatDate(assessment.last_summary_generated_at)}
-              </p>
-            )}
+        <div className="mb-8">
+          <EditableExecutiveSummary
+            assessmentId={assessment.id}
+            executiveSummary={assessment.executive_summary}
+            lastSummaryGeneratedAt={assessment.last_summary_generated_at}
+            onRegenerateClick={() => {
+              console.log('Regenerate summary clicked');
+              // This would need to be implemented based on your regeneration logic
+            }}
+            isRegenerating={false}
+          />
+        </div>
+      )}
+
+      {/* Address Map Display */}
+      {assessment.latitude && assessment.longitude && (
+        <div className="mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <MapPin className="h-6 w-6 mr-2 text-primary" />
+                Site Location
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AddressMapDisplay 
+                latitude={assessment.latitude} 
+                longitude={assessment.longitude} 
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Overall Score Display */}
+      <div className="mb-8">
+        <OverallScoreDisplay 
+          overallScore={assessment.site_signal_score ? assessment.site_signal_score * 100 : null}
+          scoreChange={null}
+        />
+      </div>
+
+      {/* Metrics by Category */}
+      {Object.keys(metricsByCategory).length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-6">Assessment Metrics</h2>
+          <div className="space-y-6">
+            {Object.entries(metricsByCategory).map(([category, metrics]) => (
+              <MetricCategorySection
+                key={category}
+                categoryName={category}
+                categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
+                categoryMetrics={metrics.reduce((acc, metric) => {
+                  acc[metric.label] = metric.entered_value;
+                  return acc;
+                }, {} as { [key: string]: any })}
+                onMetricChange={() => {}} // Read-only in details view
+                onImageUpload={() => {}} // Read-only in details view
+                account={null}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Site Visit Ratings */}
+      {assessment.site_visit_ratings && assessment.site_visit_ratings.length > 0 && (
+        <div className="mb-8">
+          <SiteVisitRatingsSection
+            siteVisitRatings={assessment.site_visit_ratings}
+            siteVisitSectionImage={null}
+          />
+        </div>
+      )}
+
+      {/* Empty States */}
+      {Object.keys(metricsByCategory).length === 0 && (!assessment.site_visit_ratings || assessment.site_visit_ratings.length === 0) && (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No assessment data available</p>
+            <Button variant="outline" onClick={handleEdit} className="mt-4">
+              <Edit className="mr-2 h-4 w-4" />
+              Add Assessment Data
+            </Button>
           </CardContent>
         </Card>
       )}
-
-      <Tabs defaultValue="metrics" className="w-full">
-        <TabsList>
-          <TabsTrigger value="metrics">Metrics</TabsTrigger>
-          <TabsTrigger value="siteVisit">Site Visit</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="metrics">
-          {Object.keys(metricsByCategory).length > 0 ? (
-            <div className="grid gap-6">
-              {Object.entries(metricsByCategory).map(([category, metrics]) => (
-                <Card key={category}>
-                  <CardHeader>
-                    <CardTitle>{category}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {metrics.map((metric) => (
-                        <div key={metric.id} className="border-b pb-4 last:border-0 last:pb-0">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-medium">{metric.label}</h4>
-                              <p className="text-muted-foreground">Value: {metric.entered_value}</p>
-                              {metric.notes && (
-                                <p className="text-muted-foreground mt-1">{metric.notes}</p>
-                              )}
-                            </div>
-                            {metric.image_url && (
-                              <div className="ml-4">
-                                <img 
-                                  src={metric.image_url} 
-                                  alt={metric.label} 
-                                  className="h-24 w-24 object-cover rounded-md" 
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">No metrics data available</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="siteVisit">
-          <Card>
-            <CardHeader>
-              <CardTitle>Site Visit Ratings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assessment.site_visit_ratings && assessment.site_visit_ratings.length > 0 ? (
-                <div className="grid gap-4">
-                  {assessment.site_visit_ratings.map((rating) => (
-                    <div key={rating.id} className="border-b pb-4 last:border-0 last:pb-0">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{rating.criterion_key}</h4>
-                            <Badge>{rating.rating_grade}</Badge>
-                          </div>
-                          {rating.rating_description && (
-                            <p className="text-muted-foreground">{rating.rating_description}</p>
-                          )}
-                          {rating.notes && (
-                            <p className="text-muted-foreground mt-1">{rating.notes}</p>
-                          )}
-                        </div>
-                        {rating.image_url && (
-                          <div className="ml-4">
-                            <img 
-                              src={rating.image_url} 
-                              alt={rating.criterion_key} 
-                              className="h-24 w-24 object-cover rounded-md" 
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground">No site visit ratings available</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };
