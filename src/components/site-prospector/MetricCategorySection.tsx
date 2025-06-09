@@ -33,7 +33,7 @@ const MetricCategorySection: React.FC<MetricCategorySectionProps> = ({
         {Object.entries(categoryMetrics).map(([metricKey, metricValue]) => (
           <MetricInputField
             key={metricKey}
-            metricKey={metricKey}
+            metricIdentifier={metricKey}
             metricValue={metricValue}
             onMetricChange={onMetricChange}
           />

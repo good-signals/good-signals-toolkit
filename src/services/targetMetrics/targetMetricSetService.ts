@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { TargetMetricSet, CreateTargetMetricSetData } from '@/types/targetMetrics';
+import { TargetMetricSet, CreateTargetMetricSetData, TargetMetricsFormData } from '@/types/targetMetrics';
 
 export const getTargetMetricSetById = async (id: string, userId: string): Promise<TargetMetricSet | null> => {
   const { data, error } = await supabase
@@ -32,6 +32,23 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
   return null;
 };
 
+export const getTargetMetricSets = async (userId: string): Promise<TargetMetricSet[]> => {
+  const { data, error } = await supabase
+    .from('target_metric_sets')
+    .select(`
+      *,
+      user_custom_metrics_settings (*)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching target metric sets:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
 export const deleteTargetMetricSet = async (id: string, userId: string) => {
   const { error } = await supabase
     .from('target_metric_sets')
@@ -44,11 +61,11 @@ export const deleteTargetMetricSet = async (id: string, userId: string) => {
   }
 };
 
-export const createTargetMetricSet = async (data: CreateTargetMetricSetData, userId: string, accountId: string) => {
+export const createTargetMetricSet = async (data: TargetMetricsFormData, userId: string, accountId: string) => {
   const { data: result, error } = await supabase
     .from('target_metric_sets')
     .insert({
-      name: data.name,
+      name: data.metric_set_name,
       account_id: accountId,
     })
     .select()
@@ -56,6 +73,25 @@ export const createTargetMetricSet = async (data: CreateTargetMetricSetData, use
 
   if (error) {
     console.error('Error creating target metric set:', error);
+    throw error;
+  }
+
+  return result;
+};
+
+export const updateTargetMetricSet = async (id: string, data: TargetMetricsFormData, userId: string, accountId: string) => {
+  const { data: result, error } = await supabase
+    .from('target_metric_sets')
+    .update({
+      name: data.metric_set_name,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating target metric set:', error);
     throw error;
   }
 
