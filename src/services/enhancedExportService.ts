@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import jsPDF from 'jspdf';
@@ -138,6 +137,31 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       });
     };
 
+    const generateMapImage = async (latitude: number, longitude: number): Promise<string | null> => {
+      try {
+        console.log('Generating map image for coordinates:', { latitude, longitude });
+        
+        const { data, error } = await supabase.functions.invoke('generate-map-image', {
+          body: {
+            latitude,
+            longitude,
+            zoom: 15,
+            size: '600x300'
+          }
+        });
+
+        if (error) {
+          console.error('Error generating map image:', error);
+          return null;
+        }
+
+        return data?.imageUrl || null;
+      } catch (error) {
+        console.error('Failed to generate map image:', error);
+        return null;
+      }
+    };
+
     const addLogo = async () => {
       try {
         const logoUrl = '/lovable-uploads/73c12031-858d-406a-a679-3b7259c7649d.png';
@@ -224,7 +248,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
     pdf.text('Site Assessment Report', margin, yPosition);
-    yPosition += 0.5;
+    yPosition += 0.6;
     
     // Assessment name
     pdf.setFontSize(18);
@@ -253,7 +277,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       pdf.text(line, margin + 1.0, addressY);
       addressY += 0.2;
     }
-    yPosition = addressY + 0.3;
+    yPosition = addressY + 0.4;
     
     // Site Status
     pdf.setFont('helvetica', 'bold');
@@ -262,7 +286,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'normal');
     safeSetTextColor(colors.mediumText);
     pdf.text(exportData.assessment.site_status || 'Prospect', margin + 1.0, yPosition);
-    yPosition += 0.3;
+    yPosition += 0.4;
     
     // Target Metric Set
     pdf.setFont('helvetica', 'bold');
@@ -271,45 +295,86 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'normal');
     safeSetTextColor(colors.mediumText);
     pdf.text(exportData.targetMetricSet?.id || 'Not specified', margin + 1.5, yPosition);
-    yPosition += 0.5;
+    yPosition += 0.6;
     
-    // Overall Site Signal Score
+    // Two-column layout for scores
+    const leftColumnX = margin;
+    const rightColumnX = margin + (contentWidth / 2) + 0.5;
+    const scoreStartY = yPosition;
+    
+    // Overall Site Signal Score (Left column)
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
-    pdf.text('Overall Site Signal Score', margin, yPosition);
-    yPosition += 0.3;
+    pdf.text('Overall Site Signal Score', leftColumnX, yPosition);
+    yPosition += 0.4;
     
     pdf.setFontSize(36);
     const scoreText = exportData.overallSiteSignalScore !== null 
       ? `${exportData.overallSiteSignalScore.toFixed(0)}%` 
       : 'N/A';
-    pdf.text(scoreText, margin, yPosition);
-    yPosition += 0.8;
+    pdf.text(scoreText, leftColumnX, yPosition);
     
-    // Assessment Completion
+    // Assessment Completion (Right column)
+    let rightYPosition = scoreStartY;
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
-    pdf.text('Assessment Completion', margin, yPosition);
-    yPosition += 0.3;
+    pdf.text('Assessment Completion', rightColumnX, rightYPosition);
+    rightYPosition += 0.4;
     
-    pdf.setFontSize(24);
+    pdf.setFontSize(36);
     const completionText = exportData.completionPercentage !== null 
       ? `${exportData.completionPercentage.toFixed(1)}%` 
       : '0%';
-    pdf.text(completionText, margin, yPosition);
-    yPosition += 0.8;
+    pdf.text(completionText, rightColumnX, rightYPosition);
     
-    // Site Location note
+    // Move yPosition to below both columns
+    yPosition += 1.2;
+    
+    // Site Location Map
     if (exportData.assessment.latitude && exportData.assessment.longitude) {
-      pdf.setFontSize(12);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      safeSetTextColor(colors.primary);
+      pdf.text('Site Location', margin, yPosition);
+      yPosition += 0.4;
+      
+      // Add coordinates text
+      pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
       safeSetTextColor(colors.mediumText);
-      pdf.text(`Location: ${exportData.assessment.latitude}, ${exportData.assessment.longitude}`, margin, yPosition);
+      pdf.text(`Coordinates: ${exportData.assessment.latitude}, ${exportData.assessment.longitude}`, margin, yPosition);
+      yPosition += 0.3;
+      
+      // Try to add map image
+      try {
+        const mapImageUrl = await generateMapImage(
+          exportData.assessment.latitude, 
+          exportData.assessment.longitude
+        );
+        
+        if (mapImageUrl && options.includeImages !== false) {
+          yPosition = await addImageToPage(mapImageUrl, yPosition, 2.0);
+        } else {
+          // If map fails, add a placeholder text
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'italic');
+          safeSetTextColor(colors.gray);
+          pdf.text('Map image unavailable', margin, yPosition);
+          yPosition += 0.3;
+        }
+      } catch (error) {
+        console.warn('Failed to add map to first page:', error);
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'italic');
+        safeSetTextColor(colors.gray);
+        pdf.text('Map image unavailable', margin, yPosition);
+        yPosition += 0.3;
+      }
     }
 
-    // PAGE 2: Executive Summary
+    // PAGE 2: Executive Summary (or map if it didn't fit on page 1)
     if (exportData.assessment.executive_summary) {
       pdf.addPage();
       await addLogo();
