@@ -376,8 +376,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     if (exportData.assessment.executive_summary) {
       pdf.addPage();
       await addLogo();
-      addPageHeader('Executive Summary');
-      yPosition = margin + 1.0;
+      yPosition = margin; // Align with logo top
       
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
@@ -394,8 +393,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
         if (yPosition > pageHeight - margin - 0.5) {
           pdf.addPage();
           await addLogo();
-          addPageHeader('Executive Summary (continued)');
-          yPosition = margin + 1.0;
+          yPosition = margin; // Align with logo top
         }
         pdf.text(line, margin, yPosition);
         yPosition += 0.2;
@@ -419,8 +417,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       
       pdf.addPage();
       await addLogo();
-      addPageHeader(`${categoryName} Metrics`);
-      yPosition = margin + 1.0;
+      yPosition = margin; // Align with logo top
       
       // Category title
       pdf.setFontSize(20);
@@ -436,8 +433,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
           if (yPosition > pageHeight - margin - 2.0) {
             pdf.addPage();
             await addLogo();
-            addPageHeader(`${categoryName} Metrics (continued)`);
-            yPosition = margin + 1.0;
+            yPosition = margin; // Align with logo top
           }
         }
       }
@@ -468,8 +464,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
           if (yPosition > pageHeight - margin - 0.5) {
             pdf.addPage();
             await addLogo();
-            addPageHeader(`${categoryName} Metrics (continued)`);
-            yPosition = margin + 1.0;
+            yPosition = margin; // Align with logo top
           }
           
           const metricName = pdf.splitTextToSize(metricData.label || 'Unknown', 2.0);
@@ -491,8 +486,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     if (exportData.assessment.site_visit_ratings && exportData.assessment.site_visit_ratings.length > 0) {
       pdf.addPage();
       await addLogo();
-      addPageHeader('Site Visit Ratings');
-      yPosition = margin + 1.0;
+      yPosition = margin; // Align with logo top
       
       // Title
       pdf.setFontSize(20);
@@ -522,8 +516,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
         if (yPosition > pageHeight - margin - 0.5) {
           pdf.addPage();
           await addLogo();
-          addPageHeader('Site Visit Ratings (continued)');
-          yPosition = margin + 1.0;
+          yPosition = margin; // Align with logo top
         }
         
         const criterionText = pdf.splitTextToSize(rating.criterion_key || 'Unknown', 1.8);
