@@ -9,6 +9,7 @@ export interface EnhancedExportData {
   };
   targetMetricSet: {
     id?: string;
+    name?: string;
     user_custom_metrics_settings?: any[];
   } | null;
   detailedMetricScores: Map<string, any>;
@@ -291,13 +292,14 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.text(exportData.assessment.site_status || 'Prospect', margin + 1.0, yPosition);
     yPosition += 0.3;
     
-    // Target Metric Set - equal spacing
+    // Target Metric Set - equal spacing with actual name
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.darkText);
     pdf.text('Target Metric Set:', margin, yPosition);
     pdf.setFont('helvetica', 'normal');
     safeSetTextColor(colors.mediumText);
-    pdf.text(exportData.targetMetricSet?.id || 'Not specified', margin + 1.5, yPosition);
+    const targetMetricSetName = exportData.targetMetricSet?.name || 'Not specified';
+    pdf.text(targetMetricSetName, margin + 1.5, yPosition);
     yPosition += 0.6;
     
     // Two-column layout for scores
