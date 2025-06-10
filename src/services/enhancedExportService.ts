@@ -242,15 +242,15 @@ export const exportEnhancedSiteAssessmentToPDF = async (
 
     // PAGE 1: Title, address, site status, target metric set, overall site signal score, assessment completion and site location
     await addLogo();
-    addPageHeader('Site Assessment Report');
-    let yPosition = margin + 1.0;
+    // Removed duplicate page header as requested
+    let yPosition = margin;
     
-    // Main title
+    // Main title - aligned with logo top
     pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
     pdf.text('Site Assessment Report', margin, yPosition);
-    yPosition += 0.6;
+    yPosition += 0.8;
     
     // Assessment name
     pdf.setFontSize(18);
@@ -258,11 +258,12 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     safeSetTextColor(colors.darkText);
     const assessmentName = exportData.assessment.assessment_name || 'Unnamed Assessment';
     pdf.text(assessmentName, margin, yPosition);
-    yPosition += 0.8;
+    yPosition += 0.6;
     
     // Address
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
+    safeSetTextColor(colors.darkText);
     pdf.text('Address:', margin, yPosition);
     pdf.setFont('helvetica', 'normal');
     safeSetTextColor(colors.mediumText);
@@ -279,18 +280,18 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       pdf.text(line, margin + 1.0, addressY);
       addressY += 0.2;
     }
-    yPosition = addressY + 0.4;
+    yPosition = addressY + 0.3;
     
-    // Site Status
+    // Site Status - equal spacing
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.darkText);
     pdf.text('Site Status:', margin, yPosition);
     pdf.setFont('helvetica', 'normal');
     safeSetTextColor(colors.mediumText);
     pdf.text(exportData.assessment.site_status || 'Prospect', margin + 1.0, yPosition);
-    yPosition += 0.4;
+    yPosition += 0.3;
     
-    // Target Metric Set
+    // Target Metric Set - equal spacing
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.darkText);
     pdf.text('Target Metric Set:', margin, yPosition);
@@ -309,7 +310,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
     pdf.text('Overall Site Signal Score', leftColumnX, yPosition);
-    yPosition += 0.4;
+    yPosition += 0.4; // Added space between label and number
     
     pdf.setFontSize(36);
     const scoreText = exportData.overallSiteSignalScore !== null 
@@ -323,7 +324,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
     pdf.text('Assessment Completion', rightColumnX, rightYPosition);
-    rightYPosition += 0.4;
+    rightYPosition += 0.4; // Added space between label and number
     
     pdf.setFontSize(36);
     const completionText = exportData.completionPercentage !== null 
@@ -342,14 +343,9 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       pdf.text('Site Location', margin, yPosition);
       yPosition += 0.4;
       
-      // Add coordinates text
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      safeSetTextColor(colors.mediumText);
-      pdf.text(`Coordinates: ${exportData.assessment.latitude}, ${exportData.assessment.longitude}`, margin, yPosition);
-      yPosition += 0.3;
+      // Removed coordinates text as requested
       
-      // Try to add map image
+      // Try to add map image - made it larger
       try {
         const mapImageUrl = await generateMapImage(
           exportData.assessment.latitude, 
@@ -357,7 +353,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
         );
         
         if (mapImageUrl && options.includeImages !== false) {
-          yPosition = await addImageToPage(mapImageUrl, yPosition, 2.0);
+          yPosition = await addImageToPage(mapImageUrl, yPosition, 3.5); // Increased from 2.0 to 3.5
         } else {
           // If map fails, add a placeholder text
           pdf.setFontSize(10);
