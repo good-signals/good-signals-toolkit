@@ -34,6 +34,45 @@ const CATEGORY_PAGE_ORDER = [
   'Financial Performance'
 ];
 
+// Helper function to fetch target metric set name if not provided
+const ensureTargetMetricSetName = async (targetMetricSet: any): Promise<any> => {
+  if (!targetMetricSet) return null;
+  
+  // If name is already present, return as-is
+  if (targetMetricSet.name) {
+    console.log('Target metric set name already available:', targetMetricSet.name);
+    return targetMetricSet;
+  }
+  
+  // If we have an ID but no name, fetch the name from the database
+  if (targetMetricSet.id) {
+    console.log('Fetching target metric set name for ID:', targetMetricSet.id);
+    try {
+      const { data, error } = await supabase
+        .from('target_metric_sets')
+        .select('name')
+        .eq('id', targetMetricSet.id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching target metric set name:', error);
+        return targetMetricSet;
+      }
+      
+      console.log('Retrieved target metric set name:', data?.name);
+      return {
+        ...targetMetricSet,
+        name: data?.name || 'Unknown Metric Set'
+      };
+    } catch (error) {
+      console.error('Failed to fetch target metric set name:', error);
+      return targetMetricSet;
+    }
+  }
+  
+  return targetMetricSet;
+};
+
 export const exportEnhancedSiteAssessmentToPDF = async (
   exportData: EnhancedExportData, 
   options: EnhancedExportOptions = {}
@@ -42,6 +81,11 @@ export const exportEnhancedSiteAssessmentToPDF = async (
   
   try {
     console.log('Starting enhanced PDF export for assessment:', exportData.assessment?.id);
+    console.log('Target metric set data received:', exportData.targetMetricSet);
+    
+    // Ensure we have the target metric set name
+    const enhancedTargetMetricSet = await ensureTargetMetricSetName(exportData.targetMetricSet);
+    console.log('Enhanced target metric set:', enhancedTargetMetricSet);
     
     // Validate required data
     if (!exportData.assessment) {
@@ -243,7 +287,6 @@ export const exportEnhancedSiteAssessmentToPDF = async (
 
     // PAGE 1: Title, address, site status, target metric set, overall site signal score, assessment completion and site location
     await addLogo();
-    // Removed duplicate page header as requested
     let yPosition = margin;
     
     // Main title - aligned with logo top
@@ -298,7 +341,8 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.text('Target Metric Set:', margin, yPosition);
     pdf.setFont('helvetica', 'normal');
     safeSetTextColor(colors.mediumText);
-    const targetMetricSetName = exportData.targetMetricSet?.name || 'Not specified';
+    const targetMetricSetName = enhancedTargetMetricSet?.name || 'Not specified';
+    console.log('Using target metric set name in PDF:', targetMetricSetName);
     pdf.text(targetMetricSetName, margin + 1.5, yPosition);
     yPosition += 0.6;
     
@@ -344,8 +388,6 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       safeSetTextColor(colors.primary);
       pdf.text('Site Location', margin, yPosition);
       yPosition += 0.4;
-      
-      // Removed coordinates text as requested
       
       // Try to add map image - made it larger
       try {
