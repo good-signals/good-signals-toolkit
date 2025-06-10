@@ -64,9 +64,9 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     const margin = 0.75;
     const contentWidth = pageWidth - (margin * 2);
 
-    // Enhanced color scheme
+    // Enhanced color scheme - changed primary blue to black
     const colors = {
-      primary: { r: 59, g: 130, b: 246 },
+      primary: { r: 0, g: 0, b: 0 }, // Changed from blue to black
       primaryLight: { r: 147, g: 197, b: 253 },
       success: { r: 34, g: 197, b: 94 },
       warning: { r: 234, g: 179, b: 8 },
@@ -164,7 +164,8 @@ export const exportEnhancedSiteAssessmentToPDF = async (
 
     const addLogo = async () => {
       try {
-        const logoUrl = '/lovable-uploads/73c12031-858d-406a-a679-3b7259c7649d.png';
+        // Updated logo URL and made it half the size
+        const logoUrl = '/lovable-uploads/23f531e5-c2b3-4541-923d-0fb6f1ead625.png';
         const img = await loadImageWithTimeout(logoUrl, 2000);
         
         if (!img) return;
@@ -174,7 +175,8 @@ export const exportEnhancedSiteAssessmentToPDF = async (
         
         if (!ctx) return;
         
-        const logoHeight = 0.5;
+        // Reduced logo height to half (from 0.5 to 0.25)
+        const logoHeight = 0.25;
         const aspectRatio = img.width / img.height;
         const logoWidth = logoHeight * aspectRatio;
         
