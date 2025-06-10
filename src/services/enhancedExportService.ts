@@ -356,7 +356,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
     pdf.text('Overall Site Signal Score', leftColumnX, yPosition);
-    yPosition += 0.4; // Added space between label and number
+    yPosition += 0.5; // Increased from 0.4 to 0.5 for more space
     
     pdf.setFontSize(36);
     const scoreText = exportData.overallSiteSignalScore !== null 
@@ -370,7 +370,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     pdf.setFont('helvetica', 'bold');
     safeSetTextColor(colors.primary);
     pdf.text('Assessment Completion', rightColumnX, rightYPosition);
-    rightYPosition += 0.4; // Added space between label and number
+    rightYPosition += 0.5; // Increased from 0.4 to 0.5 for consistency
     
     pdf.setFontSize(36);
     const completionText = exportData.completionPercentage !== null 
