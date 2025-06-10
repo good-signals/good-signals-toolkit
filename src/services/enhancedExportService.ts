@@ -249,10 +249,10 @@ export const exportEnhancedSiteAssessmentToPDF = async (
     ].filter(Boolean).join(', ') || 'Address not specified';
     const addressLines = pdf.splitTextToSize(address, contentWidth - 1.5);
     let addressY = yPosition;
-    addressLines.forEach((line: string) => {
+    for (const line of addressLines) {
       pdf.text(line, margin + 1.0, addressY);
       addressY += 0.2;
-    });
+    }
     yPosition = addressY + 0.3;
     
     // Site Status
@@ -327,7 +327,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       safeSetTextColor(colors.darkText);
       
       const summaryLines = pdf.splitTextToSize(exportData.assessment.executive_summary, contentWidth);
-      summaryLines.forEach((line: string) => {
+      for (const line of summaryLines) {
         if (yPosition > pageHeight - margin - 0.5) {
           pdf.addPage();
           await addLogo();
@@ -336,7 +336,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
         }
         pdf.text(line, margin, yPosition);
         yPosition += 0.2;
-      });
+      }
     }
 
     // PAGES 3-9: Category-specific pages with metrics and images
@@ -455,7 +455,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
       pdf.setFont('helvetica', 'normal');
       safeSetTextColor(colors.darkText);
       
-      exportData.assessment.site_visit_ratings.forEach((rating: any) => {
+      for (const rating of exportData.assessment.site_visit_ratings) {
         if (yPosition > pageHeight - margin - 0.5) {
           pdf.addPage();
           await addLogo();
@@ -471,7 +471,7 @@ export const exportEnhancedSiteAssessmentToPDF = async (
         pdf.text(descText[0] || 'No description', margin + 3.0, yPosition);
         
         yPosition += 0.2;
-      });
+      }
     }
 
     // Add footers to all pages
