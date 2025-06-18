@@ -87,9 +87,16 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
     onOpenChange(false);
   };
 
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      form.reset();
+    }
+    onOpenChange(open);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={handleDialogChange}>
+      <DialogContent className="sm:max-w-[425px]" onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Custom Metric' : 'Add Custom Metric'}

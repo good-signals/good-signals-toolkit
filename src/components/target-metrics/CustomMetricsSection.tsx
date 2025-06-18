@@ -63,17 +63,23 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({ control }) 
     }
   };
 
-  const openEditForm = (index: number) => {
+  const openEditForm = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
     setEditingIndex(index);
     setIsFormOpen(true);
   };
 
-  const openAddForm = () => {
+  const openAddForm = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setEditingIndex(null);
     setIsFormOpen(true);
   };
 
-  const handleRemoveMetric = (index: number) => {
+  const handleRemoveMetric = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('Removing custom metric at index:', index);
     remove(index);
   };
@@ -111,7 +117,7 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({ control }) 
               <p className="text-sm mb-4">
                 Create custom metrics to track business-specific KPIs
               </p>
-              <Button onClick={openAddForm}>
+              <Button type="button" onClick={openAddForm}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Custom Metric
               </Button>
@@ -146,7 +152,7 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({ control }) 
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => openEditForm(index)}
+                        onClick={(e) => openEditForm(e, index)}
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
@@ -154,7 +160,7 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({ control }) 
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => handleRemoveMetric(index)}
+                        onClick={(e) => handleRemoveMetric(e, index)}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
