@@ -2,7 +2,99 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TargetMetricSet, CreateTargetMetricSetData, TargetMetricsFormData } from '@/types/targetMetrics';
 import { getAccountForUser } from './accountHelpers';
-import { saveUserCustomMetricSettings } from '../targetMetricsService';
+
+const saveUserCustomMetricSettings = async (userId: string, metricSetId: string, formData: TargetMetricsFormData) => {
+  console.log('[saveUserCustomMetricSettings] Saving metrics for user:', userId, 'metric set:', metricSetId);
+  
+  // First delete existing settings for this metric set
+  const { error: deleteError } = await supabase
+    .from('user_custom_metrics_settings')
+    .delete()
+    .eq('user_id', userId)
+    .eq('metric_set_id', metricSetId);
+
+  if (deleteError) {
+    console.error('[saveUserCustomMetricSettings] Error deleting existing settings:', deleteError);
+    throw deleteError;
+  }
+
+  // Get account for user
+  const accountId = await getAccountForUser(userId);
+  if (!accountId) {
+    throw new Error('No account found for user');
+  }
+
+  // Prepare all metrics to insert
+  const metricsToInsert = [];
+
+  // Add predefined metrics
+  if (formData.predefined_metrics && formData.predefined_metrics.length > 0) {
+    formData.predefined_metrics.forEach(metric => {
+      metricsToInsert.push({
+        user_id: userId,
+        account_id: accountId,
+        metric_set_id: metricSetId,
+        metric_identifier: metric.metric_identifier,
+        label: metric.label,
+        category: metric.category,
+        target_value: metric.target_value,
+        higher_is_better: metric.higher_is_better,
+        measurement_type: null
+      });
+    });
+  }
+
+  // Add custom metrics
+  if (formData.custom_metrics && formData.custom_metrics.length > 0) {
+    formData.custom_metrics.forEach(metric => {
+      metricsToInsert.push({
+        user_id: userId,
+        account_id: accountId,
+        metric_set_id: metricSetId,
+        metric_identifier: metric.metric_identifier,
+        label: metric.label,
+        category: metric.category,
+        target_value: metric.target_value,
+        higher_is_better: metric.higher_is_better,
+        measurement_type: null
+      });
+    });
+  }
+
+  // Add visitor profile metrics
+  if (formData.visitor_profile_metrics && formData.visitor_profile_metrics.length > 0) {
+    console.log('[saveUserCustomMetricSettings] Saving visitor profile metrics:', formData.visitor_profile_metrics.length);
+    formData.visitor_profile_metrics.forEach(metric => {
+      metricsToInsert.push({
+        user_id: userId,
+        account_id: accountId,
+        metric_set_id: metricSetId,
+        metric_identifier: metric.metric_identifier,
+        label: metric.label,
+        category: metric.category,
+        target_value: metric.target_value,
+        higher_is_better: metric.higher_is_better,
+        measurement_type: metric.measurement_type
+      });
+    });
+  }
+
+  // Insert all metrics
+  if (metricsToInsert.length > 0) {
+    console.log('[saveUserCustomMetricSettings] Inserting metrics:', metricsToInsert.length);
+    const { error } = await supabase
+      .from('user_custom_metrics_settings')
+      .insert(metricsToInsert);
+
+    if (error) {
+      console.error('[saveUserCustomMetricSettings] Error saving user custom metric settings:', error);
+      throw error;
+    }
+  }
+
+  console.log('[saveUserCustomMetricSettings] Successfully saved all metrics');
+  return { success: true };
+};
 
 export const getTargetMetricSetById = async (id: string, userId: string): Promise<TargetMetricSet | null> => {
   console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);

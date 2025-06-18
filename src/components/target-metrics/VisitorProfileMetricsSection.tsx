@@ -32,6 +32,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       higher_is_better: data.higher_is_better,
     };
     append(newMetric);
+    setIsFormOpen(false);
   };
 
   const handleEditMetric = (index: number, data: any) => {
@@ -44,6 +45,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
     };
     update(index, updatedMetric);
     setEditingIndex(null);
+    setIsFormOpen(false);
   };
 
   const handleDeleteMetric = (index: number) => {
@@ -60,6 +62,13 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
     setEditingIndex(null);
   };
 
+  const handleAddClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingIndex(null);
+    setIsFormOpen(true);
+  };
+
   const editingMetric = editingIndex !== null ? fields[editingIndex] : null;
 
   return (
@@ -73,7 +82,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       <CardContent className="space-y-4">
         <div className="flex justify-between items-center">
           <h4 className="text-sm font-medium">Your Visitor Profile Metrics</h4>
-          <Button onClick={() => setIsFormOpen(true)} size="sm">
+          <Button type="button" onClick={handleAddClick} size="sm">
             <Plus className="h-4 w-4 mr-2" />
             Add Metric
           </Button>
@@ -100,16 +109,26 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
                 </div>
                 <div className="flex gap-2">
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => startEditingMetric(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      startEditingMetric(index);
+                    }}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDeleteMetric(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteMetric(index);
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

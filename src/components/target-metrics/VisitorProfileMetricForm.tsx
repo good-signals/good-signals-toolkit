@@ -45,13 +45,37 @@ const VisitorProfileMetricForm: React.FC<VisitorProfileMetricFormProps> = ({
     },
   });
 
-  const handleSubmit = (data: VisitorProfileMetricFormData) => {
-    onSubmit(data);
-    form.reset();
-    onOpenChange(false);
+  React.useEffect(() => {
+    if (open && initialData) {
+      form.reset({
+        label: initialData.label || '',
+        target_value: initialData.target_value || 0,
+        measurement_type: initialData.measurement_type || 'Index',
+        higher_is_better: initialData.higher_is_better ?? true,
+      });
+    } else if (open && !initialData) {
+      form.reset({
+        label: '',
+        target_value: 0,
+        measurement_type: 'Index',
+        higher_is_better: true,
+      });
+    }
+  }, [open, initialData, form]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    form.handleSubmit((data) => {
+      console.log('Visitor profile metric form submitted:', data);
+      onSubmit(data);
+    })(e);
   };
 
-  const handleCancel = () => {
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     form.reset();
     onOpenChange(false);
   };
@@ -69,7 +93,7 @@ const VisitorProfileMetricForm: React.FC<VisitorProfileMetricFormProps> = ({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
               control={form.control}
               name="label"
@@ -109,7 +133,7 @@ const VisitorProfileMetricForm: React.FC<VisitorProfileMetricFormProps> = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Measurement Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select measurement type" />
