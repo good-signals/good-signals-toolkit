@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -103,7 +102,7 @@ const TargetMetricsBuilderPage = () => {
                 label: setting.label,
                 category: VISITOR_PROFILE_CATEGORY,
                 target_value: setting.target_value,
-                measurement_type: (setting.measurement_type as "Index" | "Amount") || "Index",
+                measurement_type: (setting.measurement_type as "Index" | "Amount" | "Percentage") || "Index",
                 higher_is_better: setting.higher_is_better,
               },
             ]);

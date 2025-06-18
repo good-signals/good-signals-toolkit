@@ -142,6 +142,7 @@ const VisitorProfileMetricForm: React.FC<VisitorProfileMetricFormProps> = ({
                     <SelectContent>
                       <SelectItem value="Index">Index</SelectItem>
                       <SelectItem value="Amount">Amount</SelectItem>
+                      <SelectItem value="Percentage">Percentage (%)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

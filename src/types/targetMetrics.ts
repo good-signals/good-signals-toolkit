@@ -18,7 +18,7 @@ export type PredefinedMetricCategory = typeof PREDEFINED_METRIC_CATEGORIES[numbe
 export type VisitorProfileCategory = typeof VISITOR_PROFILE_CATEGORY;
 export type MetricCategory = typeof ALL_METRIC_CATEGORIES[number];
 
-export const MEASUREMENT_TYPES = ["Index", "Amount"] as const;
+export const MEASUREMENT_TYPES = ["Index", "Amount", "Percentage"] as const;
 export type MeasurementType = typeof MEASUREMENT_TYPES[number];
 
 // Schema for account custom metrics
