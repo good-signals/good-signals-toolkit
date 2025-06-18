@@ -10,14 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Save, Target, Zap, Users, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  getTargetMetricSets,
+  getTargetMetricSetById,
   createTargetMetricSet,
   updateTargetMetricSet,
 } from '@/services/targetMetrics/targetMetricSetService';
+import { triggerAssessmentRecalculation } from '@/services/targetMetrics/metricRecalculationService';
 import {
   TargetMetricsFormSchema,
   type TargetMetricsFormData,
@@ -28,7 +28,7 @@ import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import CategorySection from '@/components/site-prospector/metric-input/CategorySection';
 
 const TargetMetricsBuilderPage = () => {
-  const { id } = useParams();
+  const { metricSetId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -65,19 +65,21 @@ const TargetMetricsBuilderPage = () => {
   }, [user?.id]);
 
   // Load existing metric set if editing
-  const { data: existingMetricSet, isLoading: isLoadingMetricSet } = useQuery({
-    queryKey: ['targetMetricSet', id],
+  const { data: existingMetricSet, isLoading: isLoadingMetricSet, error: metricSetError } = useQuery({
+    queryKey: ['targetMetricSet', metricSetId, user?.id],
     queryFn: async () => {
-      if (!id || !user?.id) return null;
-      const metricSets = await getTargetMetricSets(user.id);
-      return metricSets.find(set => set.id === id) || null;
+      if (!metricSetId || !user?.id) return null;
+      console.log('[TargetMetricsBuilderPage] Fetching metric set:', metricSetId);
+      return await getTargetMetricSetById(metricSetId, user.id);
     },
-    enabled: !!id && !!user?.id,
+    enabled: !!metricSetId && !!user?.id,
   });
 
   // Populate form when editing
   useEffect(() => {
     if (existingMetricSet) {
+      console.log('[TargetMetricsBuilderPage] Populating form with existing metric set:', existingMetricSet);
+      
       form.setValue('metric_set_name', existingMetricSet.name);
       form.setValue('metric_set_id', existingMetricSet.id);
       
@@ -87,7 +89,9 @@ const TargetMetricsBuilderPage = () => {
       form.setValue('visitor_profile_metrics', []);
       
       // Populate metrics if they exist
-      if (existingMetricSet.user_custom_metrics_settings) {
+      if (existingMetricSet.user_custom_metrics_settings && existingMetricSet.user_custom_metrics_settings.length > 0) {
+        console.log('[TargetMetricsBuilderPage] Processing metric settings:', existingMetricSet.user_custom_metrics_settings.length);
+        
         existingMetricSet.user_custom_metrics_settings.forEach((setting) => {
           if (setting.category === VISITOR_PROFILE_CATEGORY) {
             const currentMetrics = form.getValues('visitor_profile_metrics') || [];
@@ -116,50 +120,117 @@ const TargetMetricsBuilderPage = () => {
             ]);
           }
         });
+      } else {
+        console.warn('[TargetMetricsBuilderPage] No user_custom_metrics_settings found for metric set. This may indicate a data integrity issue.');
       }
     }
   }, [existingMetricSet, form]);
 
-  // Save/Update mutation
+  // Save/Update mutation with assessment recalculation
   const saveMutation = useMutation({
     mutationFn: async (data: TargetMetricsFormData) => {
       if (!user?.id || !accountId) {
         throw new Error('User not authenticated or account not found');
       }
 
-      if (id) {
-        return await updateTargetMetricSet(id, data, user.id, accountId);
+      let result;
+      if (metricSetId) {
+        console.log('[TargetMetricsBuilderPage] Updating metric set:', metricSetId);
+        result = await updateTargetMetricSet(metricSetId, data, user.id, accountId);
       } else {
-        return await createTargetMetricSet(data, user.id, accountId);
+        console.log('[TargetMetricsBuilderPage] Creating new metric set');
+        result = await createTargetMetricSet(data, user.id, accountId);
       }
+
+      // Trigger assessment recalculation if updating an existing set
+      if (metricSetId && user?.id) {
+        console.log('[TargetMetricsBuilderPage] Triggering assessment recalculation for metric set:', metricSetId);
+        try {
+          const recalcResult = await triggerAssessmentRecalculation(metricSetId, user.id);
+          if (recalcResult.success) {
+            toast({
+              title: "Assessments Updated",
+              description: recalcResult.message,
+            });
+          } else {
+            toast({
+              title: "Assessment Recalculation Warning",
+              description: recalcResult.message,
+              variant: "destructive",
+            });
+          }
+        } catch (recalcError) {
+          console.error('[TargetMetricsBuilderPage] Error during assessment recalculation:', recalcError);
+          toast({
+            title: "Assessment Recalculation Failed",
+            description: "Target metrics were saved, but assessment scores could not be recalculated.",
+            variant: "destructive",
+          });
+        }
+      }
+
+      return result;
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: `Target metric set ${id ? 'updated' : 'created'} successfully!`,
+        description: `Target metric set ${metricSetId ? 'updated' : 'created'} successfully!`,
       });
       queryClient.invalidateQueries({ queryKey: ['targetMetricSets'] });
-      navigate('/target-metrics');
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
+      queryClient.invalidateQueries({ queryKey: ['assessmentDetails'] });
+      navigate('/target-metric-sets');
     },
     onError: (error: Error) => {
       console.error('Error saving target metrics:', error);
       toast({
         title: "Error",
-        description: error.message || `Failed to ${id ? 'update' : 'create'} target metric set`,
+        description: error.message || `Failed to ${metricSetId ? 'update' : 'create'} target metric set`,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: TargetMetricsFormData) => {
-    console.log('Submitting form data:', data);
+    console.log('[TargetMetricsBuilderPage] Submitting form data:', data);
     saveMutation.mutate(data);
   };
 
   if (isLoadingMetricSet) {
     return (
       <div className="container mx-auto py-10 px-4">
-        <div className="text-center">Loading...</div>
+        <div className="text-center">Loading metric set...</div>
+      </div>
+    );
+  }
+
+  if (metricSetError) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <div className="text-center text-destructive">
+          <p className="text-lg mb-4">Error loading metric set</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {metricSetError.message || 'The metric set could not be found or you may not have permission to access it.'}
+          </p>
+          <Button onClick={() => navigate('/target-metric-sets')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Target Metric Sets
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (metricSetId && !existingMetricSet) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <div className="text-center">
+          <p className="text-lg mb-4">Metric set not found</p>
+          <Button onClick={() => navigate('/target-metric-sets')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Target Metric Sets
+          </Button>
+        </div>
       </div>
     );
   }
@@ -167,15 +238,16 @@ const TargetMetricsBuilderPage = () => {
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="mb-8">
-        <Button variant="ghost" onClick={() => navigate('/target-metrics')}>
+        <Button variant="ghost" onClick={() => navigate('/target-metric-sets')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Target Metrics
+          Back to Target Metric Sets
         </Button>
         <h1 className="text-3xl font-bold text-primary mt-4">
-          {id ? 'Edit' : 'Create'} Target Metric Set
+          {metricSetId ? 'Edit' : 'Create'} Target Metric Set
         </h1>
         <p className="text-muted-foreground">
           Define the target values for metrics that will be used to evaluate sites.
+          {metricSetId && ' Changes will automatically recalculate scores for all related site assessments.'}
         </p>
       </div>
 
@@ -237,7 +309,7 @@ const TargetMetricsBuilderPage = () => {
                     <CategorySection
                       key={category}
                       category={category}
-                      categoryMetrics={[]}
+                      categoryMetrics={existingMetricSet?.user_custom_metrics_settings?.filter(setting => setting.category === category) || []}
                       control={form.control}
                       errors={{}}
                       watch={form.watch}
@@ -260,7 +332,7 @@ const TargetMetricsBuilderPage = () => {
                 <CardContent>
                   <CategorySection
                     category={VISITOR_PROFILE_CATEGORY}
-                    categoryMetrics={[]}
+                    categoryMetrics={existingMetricSet?.user_custom_metrics_settings?.filter(setting => setting.category === VISITOR_PROFILE_CATEGORY) || []}
                     control={form.control}
                     errors={{}}
                     watch={form.watch}
@@ -292,7 +364,7 @@ const TargetMetricsBuilderPage = () => {
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => navigate('/target-metrics')}
+              onClick={() => navigate('/target-metric-sets')}
             >
               Cancel
             </Button>
@@ -301,7 +373,7 @@ const TargetMetricsBuilderPage = () => {
               disabled={saveMutation.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
-              {saveMutation.isPending ? 'Saving...' : (id ? 'Update' : 'Create') + ' Metric Set'}
+              {saveMutation.isPending ? 'Saving...' : (metricSetId ? 'Update' : 'Create') + ' Metric Set'}
             </Button>
           </div>
         </form>

@@ -3,11 +3,11 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetricsService';
+import { getTargetMetricSets, deleteTargetMetricSet } from '@/services/targetMetrics/targetMetricSetService';
 import { getUserAccount } from '@/services/userAccountService';
 import { TargetMetricSet } from '@/types/targetMetrics';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Edit3, Trash2, ListChecks } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,6 +55,7 @@ const TargetMetricSetsListPage: React.FC = () => {
       sonnerToast.success("Metric set deleted successfully.");
       queryClient.invalidateQueries({ queryKey: ['targetMetricSets', accountId] });
       queryClient.invalidateQueries({ queryKey: ['hasUserSetAnyMetrics', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
     },
     onError: (err: Error) => {
       sonnerToast.error(`Failed to delete metric set: ${err.message}`);
@@ -145,7 +146,7 @@ const TargetMetricSetsListPage: React.FC = () => {
                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                             <AlertDialogDescription>
                               This action cannot be undone. This will permanently delete the metric set
-                              "{set.name}" and all its associated metrics.
+                              "{set.name}" and all its associated metrics. All related site assessments will need to be updated.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
