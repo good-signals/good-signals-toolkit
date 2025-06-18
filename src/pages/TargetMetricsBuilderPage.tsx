@@ -26,6 +26,7 @@ import {
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import TargetMetricsCategorySection from '@/components/target-metrics/TargetMetricsCategorySection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
+import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
 
 const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -106,7 +107,23 @@ const TargetMetricsBuilderPage = () => {
                 higher_is_better: setting.higher_is_better,
               },
             ]);
+          } else if (setting.metric_identifier.startsWith('custom_')) {
+            // This is a custom metric
+            const currentMetrics = form.getValues('custom_metrics') || [];
+            form.setValue('custom_metrics', [
+              ...currentMetrics,
+              {
+                metric_identifier: setting.metric_identifier,
+                label: setting.label,
+                category: setting.category,
+                target_value: setting.target_value,
+                higher_is_better: setting.higher_is_better,
+                units: setting.measurement_type, // Using measurement_type to store units for custom metrics
+                is_custom: true,
+              },
+            ]);
           } else {
+            // This is a predefined metric
             const currentMetrics = form.getValues('predefined_metrics') || [];
             form.setValue('predefined_metrics', [
               ...currentMetrics,
@@ -334,19 +351,9 @@ const TargetMetricsBuilderPage = () => {
             </TabsContent>
 
             <TabsContent value="custom" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Custom Metrics</CardTitle>
-                  <CardDescription>
-                    Add custom metrics specific to your business needs
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-muted-foreground">
-                    Custom metrics functionality coming soon...
-                  </div>
-                </CardContent>
-              </Card>
+              <CustomMetricsSection
+                control={form.control}
+              />
             </TabsContent>
           </Tabs>
 

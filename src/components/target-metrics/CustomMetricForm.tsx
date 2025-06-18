@@ -2,71 +2,105 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateCustomMetricFormSchema, CreateCustomMetricFormData, PREDEFINED_METRIC_CATEGORIES } from '@/types/targetMetrics';
+import { z } from 'zod';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Switch } from '@/components/ui/switch';
+
+const CustomMetricFormSchema = z.object({
+  name: z.string().min(1, "Metric name is required"),
+  description: z.string().optional(),
+  category: z.string().min(1, "Category is required"),
+  units: z.string().optional(),
+  target_value: z.coerce.number().min(0, "Target value must be positive"),
+  higher_is_better: z.boolean(),
+});
+
+type CustomMetricFormData = z.infer<typeof CustomMetricFormSchema>;
 
 interface CustomMetricFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: CreateCustomMetricFormData) => void;
-  defaultCategory?: string;
-  isLoading?: boolean;
+  onSubmit: (data: CustomMetricFormData) => void;
+  initialData?: Partial<CustomMetricFormData>;
+  isEditing?: boolean;
 }
 
-const CustomMetricForm: React.FC<CustomMetricFormProps> = ({ 
-  open, 
-  onOpenChange, 
-  onSubmit, 
-  defaultCategory,
-  isLoading = false 
+const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
+  open,
+  onOpenChange,
+  onSubmit,
+  initialData,
+  isEditing = false,
 }) => {
-  const form = useForm<CreateCustomMetricFormData>({
-    resolver: zodResolver(CreateCustomMetricFormSchema),
+  const form = useForm<CustomMetricFormData>({
+    resolver: zodResolver(CustomMetricFormSchema),
     defaultValues: {
-      name: "",
-      description: "",
-      category: defaultCategory || "",
-      units: "",
-      default_target_value: undefined,
-      higher_is_better: true,
+      name: initialData?.name || '',
+      description: initialData?.description || '',
+      category: initialData?.category || '',
+      units: initialData?.units || '',
+      target_value: initialData?.target_value || 0,
+      higher_is_better: initialData?.higher_is_better ?? true,
     },
   });
 
-  const handleSubmit = (data: CreateCustomMetricFormData) => {
-    onSubmit(data);
-    form.reset();
+  React.useEffect(() => {
+    if (open && initialData) {
+      form.reset({
+        name: initialData.name || '',
+        description: initialData.description || '',
+        category: initialData.category || '',
+        units: initialData.units || '',
+        target_value: initialData.target_value || 0,
+        higher_is_better: initialData.higher_is_better ?? true,
+      });
+    } else if (open && !initialData) {
+      form.reset({
+        name: '',
+        description: '',
+        category: '',
+        units: '',
+        target_value: 0,
+        higher_is_better: true,
+      });
+    }
+  }, [open, initialData, form]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    form.handleSubmit((data) => {
+      console.log('Custom metric form submitted:', data);
+      onSubmit(data);
+    })(e);
   };
 
-  const handleCancel = () => {
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     form.reset();
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Custom Metric</DialogTitle>
+          <DialogTitle>
+            {isEditing ? 'Edit Custom Metric' : 'Add Custom Metric'}
+          </DialogTitle>
           <DialogDescription>
-            Create a new custom metric that can be used in your target metric sets.
+            Create a custom metric specific to your business needs.
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -83,16 +117,12 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
 
             <FormField
               control={form.control}
-              name="description"
+              name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>Category</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Brief description of what this metric measures"
-                      className="resize-none"
-                      {...field} 
-                    />
+                    <Input placeholder="e.g., Customer Experience" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -101,24 +131,16 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
 
             <FormField
               control={form.control}
-              name="category"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {PREDEFINED_METRIC_CATEGORIES.map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Describe what this metric measures..."
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -131,11 +153,8 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
                 <FormItem>
                   <FormLabel>Units (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., %, $, count" {...field} />
+                    <Input placeholder="e.g., score, %, dollars" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    What unit of measurement does this metric use?
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -143,21 +162,18 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
 
             <FormField
               control={form.control}
-              name="default_target_value"
+              name="target_value"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Default Target Value (Optional)</FormLabel>
+                  <FormLabel>Target Value</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="e.g., 85" 
-                      {...field} 
-                      onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)} 
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter target value"
+                      {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    A suggested default target value for this metric.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -167,27 +183,29 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
               control={form.control}
               name="higher_is_better"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-2">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Higher values are better</FormLabel>
-                    <FormDescription>
-                      Check this if higher values for this metric represent better performance.
-                    </FormDescription>
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Higher is Better</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Check if higher values indicate better performance
+                    </div>
                   </div>
-                  <FormMessage />
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />
 
-            <DialogFooter className="gap-2">
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Creating...' : 'Create Metric'}
+              <Button type="submit">
+                {isEditing ? 'Update Metric' : 'Add Metric'}
               </Button>
             </DialogFooter>
           </form>

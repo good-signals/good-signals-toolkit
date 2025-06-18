@@ -61,8 +61,11 @@ export const useTargetMetricsDraft = (
     if (!form || metricSetId) return; // Don't auto-save if form is null or for existing metric sets
 
     const subscription = form.watch((data) => {
-      // Only save if there's meaningful content
-      if (data.metric_set_name && data.metric_set_name.trim() !== '') {
+      // Only save if there's meaningful content (including custom metrics)
+      if (data.metric_set_name && data.metric_set_name.trim() !== '' || 
+          (data.custom_metrics && data.custom_metrics.length > 0) ||
+          (data.visitor_profile_metrics && data.visitor_profile_metrics.length > 0) ||
+          (data.predefined_metrics && data.predefined_metrics.length > 0)) {
         saveDraft(data as TargetMetricsFormData);
       }
     });

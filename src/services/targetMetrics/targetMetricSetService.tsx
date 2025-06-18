@@ -46,6 +46,7 @@ const saveUserCustomMetricSettings = async (userId: string, metricSetId: string,
 
   // Add custom metrics
   if (formData.custom_metrics && formData.custom_metrics.length > 0) {
+    console.log('[saveUserCustomMetricSettings] Saving custom metrics:', formData.custom_metrics.length);
     formData.custom_metrics.forEach(metric => {
       metricsToInsert.push({
         user_id: userId,
@@ -56,7 +57,7 @@ const saveUserCustomMetricSettings = async (userId: string, metricSetId: string,
         category: metric.category,
         target_value: metric.target_value,
         higher_is_better: metric.higher_is_better,
-        measurement_type: null
+        measurement_type: metric.units || null // Store units in measurement_type for custom metrics
       });
     });
   }
