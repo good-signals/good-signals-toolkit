@@ -26,6 +26,7 @@ import {
 } from '@/types/targetMetrics';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import TargetMetricsCategorySection from '@/components/target-metrics/TargetMetricsCategorySection';
+import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 
 const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -328,27 +329,9 @@ const TargetMetricsBuilderPage = () => {
             </TabsContent>
 
             <TabsContent value="visitor-profile" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Visitor Profile Metrics</CardTitle>
-                  <CardDescription>
-                    Define target demographics and visitor characteristics
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <TargetMetricsCategorySection
-                    category={VISITOR_PROFILE_CATEGORY}
-                    categoryMetrics={existingMetricSet?.user_custom_metrics_settings?.filter(
-                      setting => setting.category === VISITOR_PROFILE_CATEGORY
-                    ) || []}
-                    control={form.control}
-                    errors={{}}
-                    watch={form.watch}
-                    setValue={form.setValue}
-                    disabled={false}
-                  />
-                </CardContent>
-              </Card>
+              <VisitorProfileMetricsSection
+                control={form.control}
+              />
             </TabsContent>
 
             <TabsContent value="custom" className="space-y-4">
