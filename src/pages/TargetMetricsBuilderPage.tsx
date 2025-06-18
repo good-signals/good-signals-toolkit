@@ -25,7 +25,7 @@ import {
   VISITOR_PROFILE_CATEGORY,
 } from '@/types/targetMetrics';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
-import CategorySection from '@/components/site-prospector/metric-input/CategorySection';
+import TargetMetricsCategorySection from '@/components/target-metrics/TargetMetricsCategorySection';
 
 const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -305,18 +305,24 @@ const TargetMetricsBuilderPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {PREDEFINED_METRIC_CATEGORIES.map((category) => (
-                    <CategorySection
-                      key={category}
-                      category={category}
-                      categoryMetrics={existingMetricSet?.user_custom_metrics_settings?.filter(setting => setting.category === category) || []}
-                      control={form.control}
-                      errors={{}}
-                      watch={form.watch}
-                      setValue={form.setValue}
-                      disabled={false}
-                    />
-                  ))}
+                  {PREDEFINED_METRIC_CATEGORIES.map((category) => {
+                    const categoryMetrics = existingMetricSet?.user_custom_metrics_settings?.filter(
+                      setting => setting.category === category
+                    ) || [];
+                    
+                    return (
+                      <TargetMetricsCategorySection
+                        key={category}
+                        category={category}
+                        categoryMetrics={categoryMetrics}
+                        control={form.control}
+                        errors={{}}
+                        watch={form.watch}
+                        setValue={form.setValue}
+                        disabled={false}
+                      />
+                    );
+                  })}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -330,9 +336,11 @@ const TargetMetricsBuilderPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <CategorySection
+                  <TargetMetricsCategorySection
                     category={VISITOR_PROFILE_CATEGORY}
-                    categoryMetrics={existingMetricSet?.user_custom_metrics_settings?.filter(setting => setting.category === VISITOR_PROFILE_CATEGORY) || []}
+                    categoryMetrics={existingMetricSet?.user_custom_metrics_settings?.filter(
+                      setting => setting.category === VISITOR_PROFILE_CATEGORY
+                    ) || []}
                     control={form.control}
                     errors={{}}
                     watch={form.watch}
