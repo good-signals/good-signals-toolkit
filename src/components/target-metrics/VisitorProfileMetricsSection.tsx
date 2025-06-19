@@ -1,55 +1,210 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFieldArray, Control } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { TargetMetricsFormData, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import VisitorProfileMetricForm from './VisitorProfileMetricForm';
+import { saveIndividualMetric, updateIndividualMetric, deleteIndividualMetric, getMetricsForSet } from '@/services/targetMetrics/individualMetricService';
+import { useUser } from '@/hooks/useUser';
+import { useToast } from '@/hooks/use-toast';
 
 interface VisitorProfileMetricsSectionProps {
   control: Control<TargetMetricsFormData>;
+  metricSetId?: string;
 }
 
 const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> = ({
   control,
+  metricSetId,
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useUser();
+  const { toast } = useToast();
 
-  const { fields, append, update, remove } = useFieldArray({
+  const { fields, append, update, remove, replace } = useFieldArray({
     control,
     name: "visitor_profile_metrics",
   });
 
-  const handleAddMetric = (data: any) => {
-    const newMetric = {
-      metric_identifier: `visitor_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      label: data.label,
-      category: VISITOR_PROFILE_CATEGORY,
-      target_value: data.target_value,
-      measurement_type: data.measurement_type,
-      higher_is_better: data.higher_is_better,
-    };
-    append(newMetric);
-    setIsFormOpen(false);
+  // Load metrics from database when component mounts or metricSetId changes
+  useEffect(() => {
+    if (metricSetId && user?.id) {
+      loadMetricsFromDatabase();
+    }
+  }, [metricSetId, user?.id]);
+
+  const loadMetricsFromDatabase = async () => {
+    if (!metricSetId || !user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      const metrics = await getMetricsForSet(user.id, metricSetId);
+      const visitorProfileMetrics = metrics
+        .filter(metric => metric.category === VISITOR_PROFILE_CATEGORY)
+        .map(metric => ({
+          metric_identifier: metric.metric_identifier,
+          label: metric.label,
+          category: metric.category,
+          target_value: metric.target_value,
+          measurement_type: metric.measurement_type,
+          higher_is_better: metric.higher_is_better,
+          id: metric.id // Store the database ID for updates/deletes
+        }));
+      
+      replace(visitorProfileMetrics);
+    } catch (error) {
+      console.error('Error loading visitor profile metrics:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load visitor profile metrics",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditMetric = (index: number, data: any) => {
-    const updatedMetric = {
-      ...fields[index],
-      label: data.label,
-      target_value: data.target_value,
-      measurement_type: data.measurement_type,
-      higher_is_better: data.higher_is_better,
-    };
-    update(index, updatedMetric);
-    setEditingIndex(null);
-    setIsFormOpen(false);
+  const handleAddMetric = async (data: any) => {
+    if (!metricSetId || !user?.id) {
+      // If no metricSetId, just add to form (draft mode)
+      const newMetric = {
+        metric_identifier: `visitor_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        label: data.label,
+        category: VISITOR_PROFILE_CATEGORY,
+        target_value: data.target_value,
+        measurement_type: data.measurement_type,
+        higher_is_better: data.higher_is_better,
+      };
+      append(newMetric);
+      setIsFormOpen(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const metricData = {
+        metric_identifier: `visitor_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        label: data.label,
+        category: VISITOR_PROFILE_CATEGORY,
+        target_value: data.target_value,
+        measurement_type: data.measurement_type,
+        higher_is_better: data.higher_is_better,
+      };
+
+      const savedMetric = await saveIndividualMetric(user.id, metricSetId, metricData);
+      
+      // Add to form with database ID
+      append({
+        ...metricData,
+        id: savedMetric.id
+      });
+
+      toast({
+        title: "Success",
+        description: "Visitor profile metric added successfully"
+      });
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error adding visitor profile metric:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add visitor profile metric",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteMetric = (index: number) => {
-    remove(index);
+  const handleEditMetric = async (index: number, data: any) => {
+    const existingMetric = fields[index];
+    
+    if (!metricSetId || !user?.id || !existingMetric.id) {
+      // If no metricSetId or database ID, just update form (draft mode)
+      const updatedMetric = {
+        ...existingMetric,
+        label: data.label,
+        target_value: data.target_value,
+        measurement_type: data.measurement_type,
+        higher_is_better: data.higher_is_better,
+      };
+      update(index, updatedMetric);
+      setEditingIndex(null);
+      setIsFormOpen(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await updateIndividualMetric(user.id, existingMetric.id, {
+        label: data.label,
+        target_value: data.target_value,
+        measurement_type: data.measurement_type,
+        higher_is_better: data.higher_is_better,
+      });
+
+      // Update form
+      const updatedMetric = {
+        ...existingMetric,
+        label: data.label,
+        target_value: data.target_value,
+        measurement_type: data.measurement_type,
+        higher_is_better: data.higher_is_better,
+      };
+      update(index, updatedMetric);
+
+      toast({
+        title: "Success",
+        description: "Visitor profile metric updated successfully"
+      });
+      setEditingIndex(null);
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error updating visitor profile metric:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update visitor profile metric",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteMetric = async (index: number) => {
+    const existingMetric = fields[index];
+    
+    if (!metricSetId || !user?.id || !existingMetric.id) {
+      // If no metricSetId or database ID, just remove from form (draft mode)
+      remove(index);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await deleteIndividualMetric(user.id, existingMetric.id);
+      
+      // Remove from form
+      remove(index);
+
+      toast({
+        title: "Success",
+        description: "Visitor profile metric deleted successfully"
+      });
+    } catch (error) {
+      console.error('Error deleting visitor profile metric:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete visitor profile metric",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const startEditingMetric = (index: number) => {
@@ -82,7 +237,12 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       <CardContent className="space-y-4">
         <div className="flex justify-between items-center">
           <h4 className="text-sm font-medium">Your Visitor Profile Metrics</h4>
-          <Button type="button" onClick={handleAddClick} size="sm">
+          <Button 
+            type="button" 
+            onClick={handleAddClick} 
+            size="sm"
+            disabled={isLoading}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Metric
           </Button>
@@ -117,6 +277,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
                       e.stopPropagation();
                       startEditingMetric(index);
                     }}
+                    disabled={isLoading}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -129,6 +290,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
                       e.stopPropagation();
                       handleDeleteMetric(index);
                     }}
+                    disabled={isLoading}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

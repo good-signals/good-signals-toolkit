@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Save, Target, Zap, Users, Building2 } from 'lucide-react';
+import { ArrowLeft, Save, Target, Zap, Users, Building2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getTargetMetricSetById,
@@ -27,8 +27,9 @@ import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import TargetMetricsCategorySection from '@/components/target-metrics/TargetMetricsCategorySection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
+import { MainLayout } from '@/components/ui/main-layout';
 
-const TargetMetricsBuilderPage = () => {
+export const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -253,129 +254,81 @@ const TargetMetricsBuilderPage = () => {
   }
 
   return (
-    <div className="container mx-auto py-10 px-4">
-      <div className="mb-8">
-        <Button variant="ghost" onClick={() => navigate('/target-metric-sets')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Target Metric Sets
-        </Button>
-        <h1 className="text-3xl font-bold text-primary mt-4">
-          {metricSetId ? 'Edit' : 'Create'} Target Metric Set
-        </h1>
-        <p className="text-muted-foreground">
-          Define the target values for metrics that will be used to evaluate sites.
-          {metricSetId && ' Changes will automatically recalculate scores for all related site assessments.'}
-        </p>
-      </div>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <MainLayout>
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Basic Information
+                <Target className="h-6 w-6" />
+                {metricSetId ? 'Edit Target Metrics Set' : 'Create Target Metrics Set'}
               </CardTitle>
               <CardDescription>
-                Set a name for your target metric set
+                {metricSetId 
+                  ? 'Update your target metrics configuration'
+                  : 'Define your target metrics and KPIs for site assessment'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FormField
-                control={form.control}
-                name="metric_set_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Metric Set Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Retail Site Standards" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                  <FormField
+                    control={form.control}
+                    name="metric_set_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Metric Set Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter a name for this metric set"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <TargetMetricsCategorySection control={form.control} />
+                  
+                  <VisitorProfileMetricsSection 
+                    control={form.control} 
+                    metricSetId={metricSetId}
+                  />
+                  
+                  <CustomMetricsSection 
+                    control={form.control}
+                    metricSetId={metricSetId}
+                  />
+
+                  <div className="flex gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/target-metric-sets')}
+                      disabled={saveMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={saveMutation.isPending}>
+                      {saveMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {metricSetId ? 'Updating...' : 'Creating...'}
+                        </>
+                      ) : (
+                        metricSetId ? 'Update Metric Set' : 'Create Metric Set'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
             </CardContent>
           </Card>
-
-          <Tabs defaultValue="predefined" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="predefined" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Predefined Metrics
-              </TabsTrigger>
-              <TabsTrigger value="visitor-profile" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Visitor Profile
-              </TabsTrigger>
-              <TabsTrigger value="custom" className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                Custom Metrics
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="predefined" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Predefined Metrics</CardTitle>
-                  <CardDescription>
-                    Set target values for standard business metrics
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {PREDEFINED_METRIC_CATEGORIES.map((category) => {
-                    const categoryMetrics = existingMetricSet?.user_custom_metrics_settings?.filter(
-                      setting => setting.category === category
-                    ) || [];
-                    
-                    return (
-                      <TargetMetricsCategorySection
-                        key={category}
-                        category={category}
-                        categoryMetrics={categoryMetrics}
-                        control={form.control}
-                        errors={{}}
-                        watch={form.watch}
-                        setValue={form.setValue}
-                        disabled={false}
-                      />
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="visitor-profile" className="space-y-4">
-              <VisitorProfileMetricsSection
-                control={form.control}
-              />
-            </TabsContent>
-
-            <TabsContent value="custom" className="space-y-4">
-              <CustomMetricsSection
-                control={form.control}
-              />
-            </TabsContent>
-          </Tabs>
-
-          <div className="flex justify-end space-x-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => navigate('/target-metric-sets')}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={saveMutation.isPending}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {saveMutation.isPending ? 'Saving...' : (metricSetId ? 'Update' : 'Create') + ' Metric Set'}
-            </Button>
-          </div>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </div>
+    </MainLayout>
   );
 };
 
