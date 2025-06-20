@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,7 +28,6 @@ import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import TargetMetricsCategorySection from '@/components/target-metrics/TargetMetricsCategorySection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
-import { MainLayout } from '@/components/ui/main-layout';
 
 export const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -106,6 +106,7 @@ export const TargetMetricsBuilderPage = () => {
                 target_value: setting.target_value,
                 measurement_type: (setting.measurement_type as "Index" | "Amount" | "Percentage") || "Index",
                 higher_is_better: setting.higher_is_better,
+                id: setting.id,
               },
             ]);
           } else if (setting.metric_identifier.startsWith('custom_')) {
@@ -120,7 +121,8 @@ export const TargetMetricsBuilderPage = () => {
                 target_value: setting.target_value,
                 higher_is_better: setting.higher_is_better,
                 units: setting.measurement_type, // Using measurement_type to store units for custom metrics
-                is_custom: true,
+                is_custom: true as const,
+                id: setting.id,
               },
             ]);
           } else {
@@ -134,6 +136,7 @@ export const TargetMetricsBuilderPage = () => {
                 category: setting.category,
                 target_value: setting.target_value,
                 higher_is_better: setting.higher_is_better,
+                id: setting.id,
               },
             ]);
           }
@@ -151,13 +154,21 @@ export const TargetMetricsBuilderPage = () => {
         throw new Error('User not authenticated or account not found');
       }
 
+      // For existing metric sets, we only need to save the metric set name and predefined metrics
+      // since visitor profile and custom metrics are saved individually
+      const formDataToSave = {
+        ...data,
+        visitor_profile_metrics: metricSetId ? [] : data.visitor_profile_metrics,
+        custom_metrics: metricSetId ? [] : data.custom_metrics,
+      };
+
       let result;
       if (metricSetId) {
         console.log('[TargetMetricsBuilderPage] Updating metric set:', metricSetId);
-        result = await updateTargetMetricSet(metricSetId, data, user.id, accountId);
+        result = await updateTargetMetricSet(metricSetId, formDataToSave, user.id, accountId);
       } else {
         console.log('[TargetMetricsBuilderPage] Creating new metric set');
-        result = await createTargetMetricSet(data, user.id, accountId);
+        result = await createTargetMetricSet(formDataToSave, user.id, accountId);
       }
 
       // Trigger assessment recalculation if updating an existing set
@@ -254,81 +265,79 @@ export const TargetMetricsBuilderPage = () => {
   }
 
   return (
-    <MainLayout>
-      <div className="container mx-auto py-8 px-4">
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-6 w-6" />
-                {metricSetId ? 'Edit Target Metrics Set' : 'Create Target Metrics Set'}
-              </CardTitle>
-              <CardDescription>
-                {metricSetId 
-                  ? 'Update your target metrics configuration'
-                  : 'Define your target metrics and KPIs for site assessment'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                  <FormField
-                    control={form.control}
-                    name="metric_set_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Metric Set Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter a name for this metric set"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-6 w-6" />
+              {metricSetId ? 'Edit Target Metrics Set' : 'Create Target Metrics Set'}
+            </CardTitle>
+            <CardDescription>
+              {metricSetId 
+                ? 'Update your target metrics configuration'
+                : 'Define your target metrics and KPIs for site assessment'
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <FormField
+                  control={form.control}
+                  name="metric_set_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Metric Set Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter a name for this metric set"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <TargetMetricsCategorySection control={form.control} />
+                
+                <VisitorProfileMetricsSection 
+                  control={form.control} 
+                  metricSetId={metricSetId}
+                />
+                
+                <CustomMetricsSection 
+                  control={form.control}
+                  metricSetId={metricSetId}
+                />
+
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/target-metric-sets')}
+                    disabled={saveMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={saveMutation.isPending}>
+                    {saveMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {metricSetId ? 'Updating...' : 'Creating...'}
+                      </>
+                    ) : (
+                      metricSetId ? 'Update Metric Set' : 'Create Metric Set'
                     )}
-                  />
-
-                  <TargetMetricsCategorySection control={form.control} />
-                  
-                  <VisitorProfileMetricsSection 
-                    control={form.control} 
-                    metricSetId={metricSetId}
-                  />
-                  
-                  <CustomMetricsSection 
-                    control={form.control}
-                    metricSetId={metricSetId}
-                  />
-
-                  <div className="flex gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate('/target-metric-sets')}
-                      disabled={saveMutation.isPending}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={saveMutation.isPending}>
-                      {saveMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {metricSetId ? 'Updating...' : 'Creating...'}
-                        </>
-                      ) : (
-                        metricSetId ? 'Update Metric Set' : 'Create Metric Set'
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 

@@ -89,6 +89,7 @@ const PredefinedMetricFormSchema = z.object({
   category: z.string(),
   target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
   higher_is_better: z.boolean(),
+  id: z.string().optional(), // Add optional id for database records
 });
 
 const CustomMetricFormSchema = z.object({
@@ -99,6 +100,7 @@ const CustomMetricFormSchema = z.object({
   higher_is_better: z.boolean(),
   units: z.string().optional(),
   is_custom: z.literal(true),
+  id: z.string().optional(), // Add optional id for database records
 });
 
 const VisitorProfileMetricFormSchema = z.object({
@@ -108,6 +110,7 @@ const VisitorProfileMetricFormSchema = z.object({
   target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
   measurement_type: z.enum(MEASUREMENT_TYPES, { required_error: "Measurement type is required."}),
   higher_is_better: z.boolean(),
+  id: z.string().optional(), // Add optional id for database records
 });
 export type VisitorProfileMetricFormData = z.infer<typeof VisitorProfileMetricFormSchema>;
 

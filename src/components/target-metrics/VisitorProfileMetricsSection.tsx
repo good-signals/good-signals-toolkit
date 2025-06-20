@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useFieldArray, Control } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -48,9 +47,9 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
         .map(metric => ({
           metric_identifier: metric.metric_identifier,
           label: metric.label,
-          category: metric.category,
+          category: VISITOR_PROFILE_CATEGORY as const,
           target_value: metric.target_value,
-          measurement_type: metric.measurement_type,
+          measurement_type: (metric.measurement_type as "Index" | "Amount" | "Percentage") || "Index",
           higher_is_better: metric.higher_is_better,
           id: metric.id // Store the database ID for updates/deletes
         }));
@@ -74,9 +73,9 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       const newMetric = {
         metric_identifier: `visitor_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         label: data.label,
-        category: VISITOR_PROFILE_CATEGORY,
+        category: VISITOR_PROFILE_CATEGORY as const,
         target_value: data.target_value,
-        measurement_type: data.measurement_type,
+        measurement_type: data.measurement_type as "Index" | "Amount" | "Percentage",
         higher_is_better: data.higher_is_better,
       };
       append(newMetric);
@@ -100,6 +99,8 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       // Add to form with database ID
       append({
         ...metricData,
+        category: VISITOR_PROFILE_CATEGORY as const,
+        measurement_type: data.measurement_type as "Index" | "Amount" | "Percentage",
         id: savedMetric.id
       });
 
@@ -129,7 +130,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
         ...existingMetric,
         label: data.label,
         target_value: data.target_value,
-        measurement_type: data.measurement_type,
+        measurement_type: data.measurement_type as "Index" | "Amount" | "Percentage",
         higher_is_better: data.higher_is_better,
       };
       update(index, updatedMetric);
@@ -152,7 +153,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
         ...existingMetric,
         label: data.label,
         target_value: data.target_value,
-        measurement_type: data.measurement_type,
+        measurement_type: data.measurement_type as "Index" | "Amount" | "Percentage",
         higher_is_better: data.higher_is_better,
       };
       update(index, updatedMetric);
