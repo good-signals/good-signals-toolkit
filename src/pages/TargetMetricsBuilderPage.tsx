@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Save, Target, Zap, Users, Building2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Target, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getTargetMetricSetById,
@@ -21,11 +20,9 @@ import { triggerAssessmentRecalculation } from '@/services/targetMetrics/metricR
 import {
   TargetMetricsFormSchema,
   type TargetMetricsFormData,
-  PREDEFINED_METRIC_CATEGORIES,
   VISITOR_PROFILE_CATEGORY,
 } from '@/types/targetMetrics';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
-import TargetMetricsCategorySection from '@/components/target-metrics/TargetMetricsCategorySection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
 
@@ -299,8 +296,6 @@ export const TargetMetricsBuilderPage = () => {
                     </FormItem>
                   )}
                 />
-
-                <TargetMetricsCategorySection control={form.control} />
                 
                 <VisitorProfileMetricsSection 
                   control={form.control} 
