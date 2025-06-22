@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,6 +22,7 @@ import {
   VISITOR_PROFILE_CATEGORY,
 } from '@/types/targetMetrics';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
+import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
 
@@ -296,6 +296,8 @@ export const TargetMetricsBuilderPage = () => {
                     </FormItem>
                   )}
                 />
+                
+                <PredefinedMetricsSection control={form.control} />
                 
                 <VisitorProfileMetricsSection 
                   control={form.control} 
