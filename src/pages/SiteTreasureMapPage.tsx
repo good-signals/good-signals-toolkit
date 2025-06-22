@@ -52,19 +52,28 @@ const SiteTreasureMapPage: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-4xl">
-      <div className="mb-8">
-        <Button variant="ghost" onClick={handleBackClick}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="text-3xl font-bold text-primary">Site Treasure Map</h1>
-        <p className="text-muted-foreground">
-          View and manage your organization's treasure map
-        </p>
-        {hasMapConfigured && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Map Type: {settings.map_type === 'arcgis' ? 'ArcGIS' : 'Google My Maps'}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <Button variant="ghost" onClick={handleBackClick}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-3xl font-bold text-primary">Site Treasure Map</h1>
+          <p className="text-muted-foreground">
+            View and manage your organization's treasure map
           </p>
+          {hasMapConfigured && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Map Type: {settings.map_type === 'arcgis' ? 'ArcGIS' : 'Google My Maps'}
+            </p>
+          )}
+        </div>
+        
+        {hasMapConfigured && (
+          <Button variant="outline" onClick={handleMapSettings}>
+            <Settings className="mr-2 h-4 w-4" />
+            Map Settings
+          </Button>
         )}
       </div>
 
@@ -92,13 +101,6 @@ const SiteTreasureMapPage: React.FC = () => {
       ) : (
         // Map is configured - show the map viewer
         <div className="space-y-6">
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={handleMapSettings}>
-              <Settings className="mr-2 h-4 w-4" />
-              Map Settings
-            </Button>
-          </div>
-
           <MapPreview previewUrl={previewUrl} />
 
           {siteId && (
