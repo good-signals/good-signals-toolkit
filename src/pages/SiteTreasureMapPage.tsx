@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +24,7 @@ const SiteTreasureMapPage: React.FC = () => {
   }, [settings, isLoading]);
 
   const handleBackClick = () => {
-    navigate(-1);
+    navigate('/toolkit-hub');
   };
 
   const handleConfigureMap = () => {
