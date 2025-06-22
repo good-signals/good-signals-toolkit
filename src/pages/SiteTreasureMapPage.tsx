@@ -59,11 +59,13 @@ const SiteTreasureMapPage: React.FC = () => {
         </Button>
         <h1 className="text-3xl font-bold text-primary">Site Treasure Map</h1>
         <p className="text-muted-foreground">
-          {siteId 
-            ? `Explore key metrics and insights for site: ${siteId}`
-            : 'View and manage your organization\'s treasure map'
-          }
+          View and manage your organization's treasure map
         </p>
+        {hasMapConfigured && (
+          <p className="text-sm text-muted-foreground mt-2">
+            Map Type: {settings.map_type === 'arcgis' ? 'ArcGIS' : 'Google My Maps'}
+          </p>
+        )}
       </div>
 
       {!hasMapConfigured ? (
@@ -90,13 +92,7 @@ const SiteTreasureMapPage: React.FC = () => {
       ) : (
         // Map is configured - show the map viewer
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold">Your Treasure Map</h2>
-              <p className="text-sm text-muted-foreground">
-                Map Type: {settings.map_type === 'arcgis' ? 'ArcGIS' : 'Google My Maps'}
-              </p>
-            </div>
+          <div className="flex justify-end">
             <Button variant="outline" onClick={handleMapSettings}>
               <Settings className="mr-2 h-4 w-4" />
               Map Settings
