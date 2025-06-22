@@ -1,36 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProfileDetailsForm from '@/components/settings/ProfileDetailsForm';
-import CompanyLogoDisplay from '@/components/settings/CompanyLogoDisplay';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Briefcase } from 'lucide-react';
-import { fetchUserAccountsWithAdminRole, Account } from '@/services/account';
 
 const ProfileSettingsPage: React.FC = () => {
   const { user, authLoading } = useAuth();
-  const [displayAccount, setDisplayAccount] = useState<Account | null>(null);
-  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
-
-  useEffect(() => {
-    if (user && !authLoading) {
-      setIsLoadingAccount(true);
-      fetchUserAccountsWithAdminRole(user.id)
-        .then(accounts => {
-          if (accounts && accounts.length > 0) {
-            setDisplayAccount(accounts[0]);
-          }
-        })
-        .catch(error => {
-          console.error("Failed to fetch user accounts for profile display:", error);
-        })
-        .finally(() => {
-          setIsLoadingAccount(false);
-        });
-    }
-  }, [user, authLoading]);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-3xl">
@@ -43,14 +21,10 @@ const ProfileSettingsPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your name and email address. Your company logo (if set) is displayed below.</CardDescription>
+            <CardDescription>Update your name and email address.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <ProfileDetailsForm />
-            <CompanyLogoDisplay 
-              displayAccount={displayAccount}
-              isLoadingAccount={isLoadingAccount}
-            />
           </CardContent>
         </Card>
         
