@@ -1,8 +1,6 @@
 
 import React from 'react';
 import { Slider } from '@/components/ui/slider';
-import { Separator } from '@/components/ui/separator';
-import { Info } from 'lucide-react';
 
 interface ThresholdSliderProps {
   goodThreshold: number;
@@ -17,14 +15,6 @@ export const ThresholdSlider: React.FC<ThresholdSliderProps> = ({
 }) => {
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Info className="h-5 w-5" />
-        <h3 className="text-lg font-semibold">Signal Score Thresholds</h3>
-      </div>
-      <p className="text-sm text-muted-foreground mb-6">
-        Set the percentage thresholds that determine how signal scores are categorized.
-      </p>
-
       {/* Threshold Slider */}
       <div className="space-y-4">
         <div className="flex justify-between text-sm text-muted-foreground">
