@@ -3,9 +3,6 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProfileDetailsForm from '@/components/settings/ProfileDetailsForm';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { Briefcase } from 'lucide-react';
 
 const ProfileSettingsPage: React.FC = () => {
   const { user, authLoading } = useAuth();
@@ -25,24 +22,6 @@ const ProfileSettingsPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <ProfileDetailsForm />
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Management</CardTitle>
-            <CardDescription>Manage your company settings, logo, and team members.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Access settings related to your company account, including company details and logo.
-            </p>
-             <Link to="/account-management">
-              <Button variant="outline">
-                <Briefcase className="mr-2 h-4 w-4" />
-                Go to Account Management
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
