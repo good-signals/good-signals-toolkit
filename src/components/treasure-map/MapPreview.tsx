@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 export interface MapPreviewProps {
   previewUrl: string;
@@ -11,13 +11,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({ previewUrl }) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Map Preview</CardTitle>
-        <CardDescription>
-          Preview your uploaded map before saving.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         {previewUrl ? (
           <div className="aspect-video">
             <iframe
