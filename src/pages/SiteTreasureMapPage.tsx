@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +33,7 @@ const SiteTreasureMapPage: React.FC = () => {
   };
 
   const handleMapSettings = () => {
-    navigate('/treasure-map-settings');
+    navigate('/treasure-map-upload');
   };
 
   if (authLoading || isLoading) {

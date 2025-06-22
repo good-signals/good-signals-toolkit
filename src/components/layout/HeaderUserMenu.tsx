@@ -98,7 +98,7 @@ const HeaderUserMenu: React.FC<HeaderUserMenuProps> = ({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link to="/treasure-map-settings" className="cursor-pointer">
+            <Link to="/treasure-map-upload" className="cursor-pointer">
               <Map className="mr-2 h-4 w-4" />
               Map Configuration
             </Link>
