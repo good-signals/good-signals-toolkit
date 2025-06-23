@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import SiteAssessmentsTableHeader from './table/SiteAssessmentsTableHeader';
 import SiteAssessmentsTableContent from './table/SiteAssessmentsTableContent';
+import DocumentAttachmentDialog from './DocumentAttachmentDialog';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { Search, FileText, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserAccount } from '@/services/userAccountService';
 import { getAccountSignalThresholds } from '@/services/signalThresholdsService';
+import { useDocumentCounts } from '@/hooks/useDocumentCounts';
 
 // Use the same SortableKeys type as the table content component
 type SortableKeys = 'assessment_name' | 'address_line1' | 'created_at' | 'site_signal_score' | 'completion_percentage' | 'site_status';
@@ -47,6 +49,14 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
     goodThreshold: number;
     badThreshold: number;
   } | null>(null);
+
+  // Document attachment dialog state
+  const [documentDialogOpen, setDocumentDialogOpen] = useState(false);
+  const [selectedAssessmentForDocuments, setSelectedAssessmentForDocuments] = useState<SiteAssessment | null>(null);
+
+  // Document counts hook
+  const assessmentIds = useMemo(() => assessments.map(a => a.id), [assessments]);
+  const { documentCounts, refreshDocumentCount } = useDocumentCounts(assessmentIds);
 
   React.useEffect(() => {
     const loadAccountThresholds = async () => {
@@ -88,6 +98,20 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
 
   const handleViewDetails = (assessment: SiteAssessment) => {
     onViewDetails(assessment);
+  };
+
+  const handleAttachmentsClick = (assessment: SiteAssessment) => {
+    setSelectedAssessmentForDocuments(assessment);
+    setDocumentDialogOpen(true);
+  };
+
+  const handleCloseDocumentDialog = () => {
+    setDocumentDialogOpen(false);
+    setSelectedAssessmentForDocuments(null);
+    // Refresh document counts when dialog closes
+    if (selectedAssessmentForDocuments) {
+      refreshDocumentCount(selectedAssessmentForDocuments.id);
+    }
   };
 
   React.useEffect(() => {
@@ -161,84 +185,89 @@ const SiteAssessmentsTable: React.FC<SiteAssessmentsTableProps> = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Site Pipeline
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {assessments.length} assessment{assessments.length !== 1 ? 's' : ''} total
-            </p>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Site Pipeline
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {assessments.length} assessment{assessments.length !== 1 ? 's' : ''} total
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {selectedIds.length > 0 && (
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteSelected}
+                  disabled={isDeleting}
+                  size="sm"
+                >
+                  Delete Selected ({selectedIds.length})
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {selectedIds.length > 0 && (
-              <Button 
-                variant="destructive" 
-                onClick={handleDeleteSelected}
-                disabled={isDeleting}
-                size="sm"
-              >
-                Delete Selected ({selectedIds.length})
-              </Button>
-            )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2 mb-4">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search assessments..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center space-x-2 mb-4">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search assessments..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-sm"
-          />
-        </div>
 
-        <div className="rounded-md border">
-          <SiteAssessmentsTableContent
-            assessments={filteredAndSortedAssessments}
-            selectedAssessmentIds={selectedIds}
-            sortConfig={sortConfig}
-            onSort={handleSort}
-            onSelectAll={handleSelectAll}
-            onSelectRow={handleSelectRow}
-            onViewDetails={handleViewDetails}
-            onEdit={handleEdit}
-            onDelete={async (assessment: SiteAssessment) => {
-              onDeleteCommit([assessment.id]);
-            }}
-            onAttachmentsClick={(assessment: SiteAssessment) => {
-              // Handle attachments click
-              console.log('Attachments clicked for:', assessment.id);
-            }}
-            isDeleting={isDeleting}
-            assessmentToDelete={null}
-            documentCounts={{}}
-            accountGoodThreshold={accountThresholds?.goodThreshold}
-            accountBadThreshold={accountThresholds?.badThreshold}
-          />
-        </div>
-
-        {filteredAndSortedAssessments.length === 0 && !isLoading && (
-          <div className="text-center py-8">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground mb-2">
-              {searchTerm ? 'No assessments match your search' : 'No assessments yet'}
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {searchTerm 
-                ? 'Try adjusting your search terms' 
-                : 'Get started by creating your first site assessment'
-              }
-            </p>
+          <div className="rounded-md border">
+            <SiteAssessmentsTableContent
+              assessments={filteredAndSortedAssessments}
+              selectedAssessmentIds={selectedIds}
+              sortConfig={sortConfig}
+              onSort={handleSort}
+              onSelectAll={handleSelectAll}
+              onSelectRow={handleSelectRow}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEdit}
+              onDelete={async (assessment: SiteAssessment) => {
+                onDeleteCommit([assessment.id]);
+              }}
+              onAttachmentsClick={handleAttachmentsClick}
+              isDeleting={isDeleting}
+              assessmentToDelete={null}
+              documentCounts={documentCounts}
+              accountGoodThreshold={accountThresholds?.goodThreshold}
+              accountBadThreshold={accountThresholds?.badThreshold}
+            />
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {filteredAndSortedAssessments.length === 0 && !isLoading && (
+            <div className="text-center py-8">
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                {searchTerm ? 'No assessments match your search' : 'No assessments yet'}
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {searchTerm 
+                  ? 'Try adjusting your search terms' 
+                  : 'Get started by creating your first site assessment'
+                }
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <DocumentAttachmentDialog
+        assessment={selectedAssessmentForDocuments}
+        isOpen={documentDialogOpen}
+        onClose={handleCloseDocumentDialog}
+      />
+    </>
   );
 };
 
