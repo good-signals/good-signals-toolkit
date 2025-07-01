@@ -33,10 +33,6 @@ const HeaderUserMenu: React.FC<HeaderUserMenuProps> = ({
     navigate("/");
   };
 
-  // Use company logo first, then fallback to user avatar
-  const avatarUrl = userAccount?.logo_url || user?.user_metadata?.avatar_url;
-  const displayName = user?.user_metadata?.full_name || user?.email;
-
   if (!user) {
     return (
       <Button asChild className="bg-white text-black hover:bg-gray-100">
@@ -44,6 +40,10 @@ const HeaderUserMenu: React.FC<HeaderUserMenuProps> = ({
       </Button>
     );
   }
+
+  // Use company logo first, then fallback to user avatar
+  const avatarUrl = userAccount?.logo_url || user?.user_metadata?.avatar_url;
+  const displayName = user?.user_metadata?.full_name || user?.email;
 
   return (
     <div className="flex items-center space-x-3">
