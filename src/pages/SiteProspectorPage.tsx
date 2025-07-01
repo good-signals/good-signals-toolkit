@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { BarChart3, PlusCircle } from 'lucide-react';
+import { BarChart3, PlusCircle, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import SiteAssessmentsTable from '@/components/site-prospector/SiteAssessmentsTable';
 import SiteProspectorStepRenderer from '@/components/site-prospector/SiteProspectorStepRenderer';
@@ -132,6 +133,17 @@ const SiteProspectorPage = () => {
   return (
     <SiteProspectorErrorBoundary>
       <div className="container mx-auto py-10 px-4">
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <Button variant="ghost" asChild>
+              <Link to="/toolkit-hub" className="flex items-center gap-2">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Link>
+            </Button>
+          </div>
+        </div>
+
         <div className="flex flex-col items-center text-center mb-8">
           <BarChart3 size={48} className="text-primary mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-primary mb-2">Site Prospector</h1>
