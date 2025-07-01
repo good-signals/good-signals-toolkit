@@ -7,14 +7,15 @@ import { Button } from '@/components/ui/button';
 const TerritoryHeader: React.FC = () => {
   return (
     <div className="text-center mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <Button asChild variant="ghost" className="text-foreground hover:bg-muted">
-          <Link to="/toolkit-hub" className="flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Back to Toolkit Hub
-          </Link>
-        </Button>
-        <div className="flex-1" />
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <Button variant="ghost" asChild>
+            <Link to="/toolkit-hub" className="flex items-center gap-2">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+        </div>
       </div>
       
       <Search size={48} className="text-primary mx-auto mb-4" />
