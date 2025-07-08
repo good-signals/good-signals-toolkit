@@ -3,27 +3,27 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'; // Assuming Card components exist
 import { Button } from '@/components/ui/button';
-import { MapPin, Search, BarChart3, Compass } from 'lucide-react';
+import { Map, Target, Signal, Compass } from 'lucide-react';
 
 const tools = [
   {
     title: 'Territory Targeter',
     description: 'AI-powered scoring to rank and compare U.S. markets based on prompt-driven criteria.',
-    icon: <Search size={32} className="text-gold" />,
+    icon: <Target size={32} className="text-gold" />,
     link: '/toolkit/territory-targeter',
     cta: 'Target Markets',
   },
   {
     title: 'Site Treasure Map',
     description: 'Map viewer embedding Google My Map or ArcGIS views for market clusters or overlays.',
-    icon: <MapPin size={32} className="text-gold" />,
+    icon: <Map size={32} className="text-gold" />,
     link: '/toolkit/site-treasure-map',
     cta: 'View Map',
   },
   {
     title: 'Site Prospector',
     description: 'Guided assessment tool to evaluate a specific site using brand-specific criteria.',
-    icon: <BarChart3 size={32} className="text-gold" />,
+    icon: <Signal size={32} className="text-gold" />,
     link: '/toolkit/site-prospector',
     cta: 'Prospect Sites',
   },
