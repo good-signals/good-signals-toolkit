@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Target, Map, Lightbulb } from 'lucide-react';
+import { Target, Map, Signal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const LandingPage = () => {
@@ -58,21 +58,21 @@ const LandingPage = () => {
           <h2 className="text-3xl md:text-4xl font-semibold text-center mb-12 text-primary">Our Toolkit</h2>
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
-              <Map size={48} className="text-primary mx-auto mb-4" />
+              <Target size={48} className="text-primary mx-auto mb-4" />
               <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Territory Targeter</h3>
               <p className="text-card-foreground/80">
                 Analyze and rank markets to identify prime territories for expansion.
               </p>
             </div>
             <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
-              <Lightbulb size={48} className="text-primary mx-auto mb-4" />
+              <Map size={48} className="text-primary mx-auto mb-4" />
               <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Site Treasure Map</h3>
               <p className="text-card-foreground/80">
                 Visualize key site data and opportunities on an interactive map.
               </p>
             </div>
             <div className="p-6 bg-card rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300">
-              <Target size={48} className="text-primary mx-auto mb-4" />
+              <Signal size={48} className="text-primary mx-auto mb-4" />
               <h3 className="text-2xl font-semibold mb-2 text-card-foreground">Site Prospector</h3>
               <p className="text-card-foreground/80">
                 Discover optimal locations based on demographics, competition, and custom criteria.
