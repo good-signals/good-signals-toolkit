@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BarChart3, PlusCircle, ArrowLeft } from 'lucide-react';
+import { Signal, PlusCircle, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import SiteAssessmentsTable from '@/components/site-prospector/SiteAssessmentsTable';
@@ -87,7 +87,7 @@ const SiteProspectorPage = () => {
       <div className="container mx-auto py-10 px-4">
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
-            <BarChart3 size={48} className="text-primary mx-auto mb-4 animate-pulse" />
+            <Signal size={48} className="text-primary mx-auto mb-4 animate-pulse" />
             <p className="text-lg">Loading...</p>
           </div>
         </div>
@@ -101,7 +101,7 @@ const SiteProspectorPage = () => {
       <div className="container mx-auto py-10 px-4">
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
-            <BarChart3 size={48} className="text-destructive mx-auto mb-4" />
+            <Signal size={48} className="text-destructive mx-auto mb-4" />
             <p className="text-lg text-destructive">Authentication required</p>
             <p className="text-sm text-muted-foreground">Please sign in to access the Site Prospector</p>
           </div>
@@ -145,7 +145,7 @@ const SiteProspectorPage = () => {
         </div>
 
         <div className="flex flex-col items-center text-center mb-8">
-          <BarChart3 size={48} className="text-primary mx-auto mb-4" />
+          <Signal size={48} className="text-primary mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-primary mb-2">Site Prospector</h1>
           <p className="text-lg text-foreground/80 max-w-2xl">
             Evaluate specific sites, track assessments, and compare potential locations using your custom metrics.

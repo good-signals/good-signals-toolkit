@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, Settings, Upload } from 'lucide-react';
+import { ArrowLeft, Map, Settings, Upload } from 'lucide-react';
 import { useTreasureMapSettings } from '@/hooks/useTreasureMapSettings';
 import MapPreview from '@/components/treasure-map/MapPreview';
 import { extractPreviewUrl } from '@/utils/mapUrlExtractor';
@@ -82,7 +82,7 @@ const SiteTreasureMapPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-6 w-6" />
+              <Map className="h-6 w-6" />
               No Treasure Map Configured
             </CardTitle>
           </CardHeader>
