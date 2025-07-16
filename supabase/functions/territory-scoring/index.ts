@@ -229,14 +229,14 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     // Adjust model and parameters based on analysis mode
     const modelConfig = analysisMode === 'fast' 
       ? {
-          model: 'pplx-7b-online', // Current fast model
+          model: 'sonar', // Lightweight, cost-effective search model
           temperature: 0.2,
-          max_tokens: 6000 // Increased token limit to reduce truncation
+          max_tokens: 6000
         }
       : {
-          model: 'pplx-70b-online', // Current detailed model
+          model: 'sonar-pro', // Advanced search model for detailed analysis
           temperature: 0.1,
-          max_tokens: 10000 // Increased token limit to reduce truncation
+          max_tokens: 8000 // sonar-pro has 8k max output limit
         };
     
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
