@@ -229,12 +229,12 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     // Adjust model and parameters based on analysis mode
     const modelConfig = analysisMode === 'fast' 
       ? {
-          model: 'llama-3.1-sonar-small-128k-online', // Faster, smaller model
+          model: 'llama-3-sonar-small-32k-online', // Faster, smaller model
           temperature: 0.2,
           max_tokens: 6000 // Increased token limit to reduce truncation
         }
       : {
-          model: 'llama-3.1-sonar-large-128k-online', // More capable model
+          model: 'llama-3-sonar-large-32k-online', // More capable model
           temperature: 0.1,
           max_tokens: 10000 // Increased token limit to reduce truncation
         };
