@@ -268,8 +268,8 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Perplexity API error:', errorText);
-      throw new Error(`Perplexity API error: ${response.status} ${response.statusText}`);
+      console.error('Perplexity API error:', response.status, response.statusText, errorText);
+      throw new Error(`Perplexity API returned ${response.status}: ${response.statusText}. Details: ${errorText}`);
     }
 
     const data = await response.json();
@@ -298,8 +298,8 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
       console.error('Raw AI content (first 1000 chars):', aiContent.substring(0, 1000));
       console.error('Raw AI content (last 1000 chars):', aiContent.substring(Math.max(0, aiContent.length - 1000)));
       
-      // Return a more helpful error message
-      throw new Error(`Failed to parse AI response: ${parseError.message}. The AI response may have been truncated or malformed. Please try again or use Fast Analysis mode for better reliability.`);
+      // Return a more helpful error message with full response for debugging
+      throw new Error(`Failed to parse AI response: ${parseError.message}. Full response: ${aiContent}`);
     }
 
     console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
@@ -317,8 +317,12 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     // Return detailed error information for debugging
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
-      details: error.stack || 'No stack trace available'
+      error: `Analysis failed: ${error.message}`,
+      details: {
+        errorType: error.constructor.name,
+        stack: error.stack || 'No stack trace available',
+        timestamp: new Date().toISOString()
+      }
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
