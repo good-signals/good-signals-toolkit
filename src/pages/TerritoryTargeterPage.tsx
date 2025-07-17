@@ -20,7 +20,7 @@ import { toast } from '@/hooks/use-toast';
 const TerritoryTargeterPage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [analysisMode, setAnalysisMode] = useState<'manual' | 'ai'>('ai');
-  const [scoringMode, setScoringMode] = useState<'fast' | 'detailed'>('detailed');
+  const [scoringMode, setScoringMode] = useState<'fast' | 'detailed'>('fast');
 
   const { user } = useAuth();
   const { cbsaData, isInitialized, handleStatusChange } = useCBSAStatus();
