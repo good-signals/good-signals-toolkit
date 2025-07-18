@@ -52,8 +52,7 @@ export const useAnalysisProcessing = () => {
               isChunked: chunks.length > 1,
               chunkIndex: i,
               totalChunks: chunks.length
-            },
-            signal: analysisRequestRef.current?.signal
+            }
           });
 
           if (error) {
