@@ -5,43 +5,45 @@ import { Loader2, Clock, Zap } from 'lucide-react';
 
 interface ProgressCounterProps {
   isActive: boolean;
-  duration?: number; // Duration in seconds
-  startTime?: number | null; // Unix timestamp when analysis started
+  duration?: number;
+  startTime?: number | null;
   analysisMode?: 'fast' | 'detailed';
   onComplete?: () => void;
 }
 
 const ProgressCounter: React.FC<ProgressCounterProps> = ({ 
   isActive, 
-  duration = 75,
+  duration = 60,
   startTime,
-  analysisMode = 'detailed',
+  analysisMode = 'fast',
   onComplete 
 }) => {
   const [progress, setProgress] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const [isResumed, setIsResumed] = useState(false);
 
   useEffect(() => {
     console.log('ProgressCounter: isActive changed to', isActive, 'startTime:', startTime);
     
     if (!isActive) {
-      setProgress(0);
-      setTimeElapsed(0);
-      setIsResumed(false);
+      // Complete the progress smoothly
+      if (progress > 0 && progress < 100) {
+        setProgress(100);
+        setTimeout(() => {
+          setProgress(0);
+          setTimeElapsed(0);
+        }, 1000);
+      } else {
+        setProgress(0);
+        setTimeElapsed(0);
+      }
       return;
     }
 
-    // Calculate initial elapsed time if we have a start time (resumed analysis)
+    // Calculate initial elapsed time if resuming
     let initialElapsed = 0;
     if (startTime) {
       initialElapsed = Math.floor((Date.now() - startTime) / 1000);
       setTimeElapsed(initialElapsed);
-      console.log('ProgressCounter: Resuming with initial elapsed time:', initialElapsed);
-      
-      if (initialElapsed > 0) {
-        setIsResumed(true);
-      }
       
       // Calculate initial progress
       const initialProgress = Math.min((initialElapsed / duration) * 100, 95);
@@ -52,35 +54,17 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     const interval = setInterval(() => {
       setTimeElapsed(prev => {
         const newTime = prev + 1;
-        const newProgress = Math.min((newTime / duration) * 100, 95); // Cap at 95% until actual completion
+        // Cap progress at 95% until actual completion to avoid user confusion
+        const newProgress = Math.min((newTime / duration) * 100, 95);
         setProgress(newProgress);
         
-        if (newTime >= duration && onComplete) {
-          onComplete();
-        }
-        
+        // Don't auto-complete to avoid conflicts with analysis logic
         return newTime;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, duration, startTime, onComplete]);
-
-  // Complete the progress when isActive becomes false (scoring finished)
-  useEffect(() => {
-    if (!isActive && progress > 0) {
-      console.log('ProgressCounter: Analysis completed, setting progress to 100%');
-      setProgress(100);
-      // Reset after a short delay to show completion
-      const resetTimeout = setTimeout(() => {
-        setProgress(0);
-        setTimeElapsed(0);
-        setIsResumed(false);
-      }, 1000);
-      
-      return () => clearTimeout(resetTimeout);
-    }
-  }, [isActive, progress]);
+  }, [isActive, duration, startTime]);
 
   if (!isActive && progress === 0) return null;
 
@@ -91,7 +75,7 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
   };
 
   const getEstimatedRemaining = () => {
-    if (timeElapsed >= duration) return '0s';
+    if (timeElapsed >= duration) return 'Finishing up...';
     const remaining = duration - timeElapsed;
     return formatTime(remaining);
   };
@@ -102,7 +86,6 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
   const getStatusText = () => {
     if (isCompleted) return 'Analysis complete!';
     if (isOvertime) return 'Analysis taking longer than expected...';
-    if (isResumed) return `Analysis resumed - AI analyzing markets (${analysisMode} mode)...`;
     return `AI analyzing markets (${analysisMode} mode)...`;
   };
 
@@ -113,13 +96,10 @@ const ProgressCounter: React.FC<ProgressCounterProps> = ({
     if (isOvertime) {
       return 'Complex analyses can take longer than estimated. Your analysis is still running and will complete soon.';
     }
-    if (isResumed) {
-      return `Your ${analysisMode} analysis continued running in the background. Estimated remaining: ${getEstimatedRemaining()}.`;
-    }
     
     const timeInfo = analysisMode === 'fast' 
-      ? 'This typically takes 30-60 seconds'
-      : 'This typically takes 60-90 seconds';
+      ? 'This typically takes 1-3 minutes'
+      : 'This typically takes 3-8 minutes';
     
     return `Perplexity AI is researching and scoring each market based on your criteria. ${timeInfo}. Estimated remaining: ${getEstimatedRemaining()}.`;
   };

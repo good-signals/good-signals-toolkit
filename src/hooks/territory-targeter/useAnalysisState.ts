@@ -17,12 +17,12 @@ interface AnalysisState {
 
 export const useAnalysisState = () => {
   const [currentAnalysis, setCurrentAnalysisState] = useState<TerritoryAnalysis | null>(() => {
-    // Safely load saved analysis from localStorage
+    // Safely load saved analysis from localStorage with corruption check
     const saved = safeStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = safeStorage.safeParse(saved, null);
-        if (parsed) {
+        if (parsed && parsed.id && parsed.criteriaColumns) {
           console.log('Loaded saved analysis from localStorage:', parsed.id);
           return {
             ...parsed,
@@ -32,6 +32,9 @@ export const useAnalysisState = () => {
               createdAt: new Date(col.createdAt)
             })) || []
           };
+        } else {
+          console.log('Corrupted analysis data found, clearing...');
+          safeStorage.removeItem(STORAGE_KEY);
         }
       } catch (error) {
         console.error('Failed to load saved analysis:', error);
@@ -42,13 +45,15 @@ export const useAnalysisState = () => {
   });
 
   const [storedCBSAData, setStoredCBSAData] = useState<CBSAData[]>(() => {
-    // Load CBSA data from localStorage
+    // Load CBSA data from localStorage with validation
     const saved = safeStorage.getItem(CBSA_DATA_KEY);
     if (saved) {
       try {
         const parsed = safeStorage.safeParse(saved, []);
-        console.log('Loaded saved CBSA data from localStorage:', parsed.length, 'items');
-        return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log('Loaded saved CBSA data from localStorage:', parsed.length, 'items');
+          return parsed;
+        }
       } catch (error) {
         console.error('Failed to load saved CBSA data:', error);
         safeStorage.removeItem(CBSA_DATA_KEY);
@@ -57,38 +62,47 @@ export const useAnalysisState = () => {
     return [];
   });
 
-  // Enhanced setCurrentAnalysis function that ensures proper updates
+  // Enhanced setCurrentAnalysis function with validation
   const setCurrentAnalysis = (analysis: TerritoryAnalysis | null) => {
     console.log('Setting current analysis:', analysis?.id);
-    setCurrentAnalysisState(analysis);
     
-    // Force a small delay to ensure state updates are processed
-    setTimeout(() => {
-      console.log('Analysis state updated successfully');
-    }, 0);
+    // Validate analysis structure before setting
+    if (analysis && (!analysis.id || !Array.isArray(analysis.criteriaColumns))) {
+      console.error('Invalid analysis structure provided:', analysis);
+      return;
+    }
+    
+    setCurrentAnalysisState(analysis);
   };
 
-  // Save analysis to localStorage whenever it changes
+  // Save analysis to localStorage with validation
   useEffect(() => {
-    if (currentAnalysis) {
+    if (currentAnalysis && currentAnalysis.id && Array.isArray(currentAnalysis.criteriaColumns)) {
       console.log('Saving analysis to localStorage:', currentAnalysis.id, 'with', currentAnalysis.criteriaColumns.length, 'columns');
-      safeStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
-    } else {
+      try {
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(currentAnalysis));
+      } catch (error) {
+        console.error('Failed to save analysis to localStorage:', error);
+      }
+    } else if (currentAnalysis === null) {
       console.log('Removing analysis from localStorage');
       safeStorage.removeItem(STORAGE_KEY);
     }
   }, [currentAnalysis]);
 
-  // Save CBSA data to localStorage whenever it changes
+  // Save CBSA data to localStorage with validation
   useEffect(() => {
-    if (storedCBSAData.length > 0) {
+    if (Array.isArray(storedCBSAData) && storedCBSAData.length > 0) {
       console.log('Saving CBSA data to localStorage:', storedCBSAData.length, 'items');
-      safeStorage.setItem(CBSA_DATA_KEY, JSON.stringify(storedCBSAData));
-    } else {
-      console.log('No CBSA data to save or clearing CBSA data');
-      // Only remove if explicitly set to empty, not if it's just uninitialized
+      try {
+        safeStorage.setItem(CBSA_DATA_KEY, JSON.stringify(storedCBSAData));
+      } catch (error) {
+        console.error('Failed to save CBSA data to localStorage:', error);
+      }
+    } else if (storedCBSAData.length === 0) {
       const saved = safeStorage.getItem(CBSA_DATA_KEY);
-      if (saved && storedCBSAData.length === 0) {
+      if (saved) {
+        console.log('Clearing empty CBSA data from localStorage');
         safeStorage.removeItem(CBSA_DATA_KEY);
       }
     }
@@ -96,12 +110,32 @@ export const useAnalysisState = () => {
 
   const saveAnalysisState = (state: AnalysisState) => {
     console.log('Saving analysis state:', state.id);
-    safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(state));
+    try {
+      safeStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.error('Failed to save analysis state:', error);
+    }
   };
 
   const getAnalysisState = (): AnalysisState | null => {
     const saved = safeStorage.getItem(ANALYSIS_STATE_KEY);
-    return saved ? safeStorage.safeParse(saved, null) : null;
+    if (!saved) return null;
+    
+    try {
+      const parsed = safeStorage.safeParse(saved, null);
+      // Validate the parsed state structure
+      if (parsed && parsed.id && parsed.status && typeof parsed.startTime === 'number') {
+        return parsed;
+      } else {
+        console.log('Invalid analysis state structure, clearing...');
+        safeStorage.removeItem(ANALYSIS_STATE_KEY);
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to parse analysis state:', error);
+      safeStorage.removeItem(ANALYSIS_STATE_KEY);
+      return null;
+    }
   };
 
   const clearAnalysisState = () => {
@@ -119,9 +153,45 @@ export const useAnalysisState = () => {
   };
 
   const setCBSAData = (data: CBSAData[]) => {
+    if (!Array.isArray(data)) {
+      console.error('Invalid CBSA data provided:', data);
+      return;
+    }
     console.log('Setting CBSA data:', data.length, 'items');
     setStoredCBSAData(data);
   };
+
+  // Clean up corrupted states on mount
+  useEffect(() => {
+    const cleanupCorruptedStates = () => {
+      try {
+        // Check for corrupted analysis state
+        const analysisState = getAnalysisState();
+        if (analysisState && analysisState.status === 'running') {
+          const elapsed = Date.now() - analysisState.startTime;
+          // Clear states that have been running for more than 15 minutes
+          if (elapsed > 15 * 60 * 1000) {
+            console.log('Cleaning up stale running analysis state');
+            clearAnalysisState();
+          }
+        }
+        
+        // Validate stored analysis structure
+        const storedAnalysis = safeStorage.getItem(STORAGE_KEY);
+        if (storedAnalysis) {
+          const parsed = safeStorage.safeParse(storedAnalysis, null);
+          if (!parsed || !parsed.id || !Array.isArray(parsed.criteriaColumns)) {
+            console.log('Cleaning up corrupted analysis data');
+            safeStorage.removeItem(STORAGE_KEY);
+          }
+        }
+      } catch (error) {
+        console.error('Error during state cleanup:', error);
+      }
+    };
+
+    cleanupCorruptedStates();
+  }, []);
 
   return {
     currentAnalysis,

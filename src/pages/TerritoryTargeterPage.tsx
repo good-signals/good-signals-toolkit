@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { CBSAData } from '@/types/territoryTargeterTypes';
 import { useCBSAStatus } from '@/hooks/territory-targeter/useCBSAStatus';
@@ -5,6 +6,7 @@ import { useTerritoryScoring } from '@/hooks/useTerritoryScoring';
 import { useExecutiveSummary } from '@/hooks/territory-targeter/useExecutiveSummary';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountSettings } from '@/hooks/territory-targeter/useAccountSettings';
+import TerritoryTargeterErrorBoundary from '@/components/territory-targeter/TerritoryTargeterErrorBoundary';
 import TerritoryHeader from '@/components/territory-targeter/TerritoryHeader';
 import PromptInput from '@/components/territory-targeter/PromptInput';
 import TerritoryNotices from '@/components/territory-targeter/TerritoryNotices';
@@ -17,7 +19,7 @@ import ErrorDisplay from '@/components/territory-targeter/ErrorDisplay';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { toast } from '@/hooks/use-toast';
 
-const TerritoryTargeterPage: React.FC = () => {
+const TerritoryTargeterPageContent: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [analysisMode, setAnalysisMode] = useState<'manual' | 'ai'>('ai');
   const [scoringMode, setScoringMode] = useState<'fast' | 'detailed'>('fast');
@@ -26,7 +28,7 @@ const TerritoryTargeterPage: React.FC = () => {
   const { cbsaData, isInitialized, handleStatusChange } = useCBSAStatus();
   const { accountGoodThreshold, accountBadThreshold, refreshThresholds } = useAccountSettings(user?.id);
 
-  // Refresh thresholds when the page becomes visible (user navigates back from settings)
+  // Refresh thresholds when the page becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
@@ -162,14 +164,13 @@ const TerritoryTargeterPage: React.FC = () => {
     }
   };
 
-  // Create a wrapper function that matches the expected signature
   const handleGenerateExecutiveSummaryWrapper = () => {
     handleGenerateExecutiveSummary(cbsaData);
   };
 
   // Don't render until CBSA data is initialized
   if (!isInitialized) {
-    return <div className="container mx-auto py-8 px-4 text-center">Loading...</div>;
+    return <div className="container mx-auto py-8 px-4 text-center">Loading market data...</div>;
   }
 
   const hasAnalysisData = currentAnalysis && currentAnalysis.criteriaColumns.length > 0;
@@ -178,7 +179,6 @@ const TerritoryTargeterPage: React.FC = () => {
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <TerritoryHeader />
       
-      {/* 1. Prompt */}
       <PromptInput
         value={prompt}
         onChange={setPrompt}
@@ -207,7 +207,7 @@ const TerritoryTargeterPage: React.FC = () => {
 
       <ErrorDisplay error={error} />
 
-      {/* 2. Generative Executive Summary */}
+      {/* Executive Summary */}
       <FinalExecutiveSummary
         executiveSummary={executiveSummary}
         isGeneratingSummary={isGeneratingSummary}
@@ -217,14 +217,14 @@ const TerritoryTargeterPage: React.FC = () => {
         cbsaData={cbsaData}
       />
 
-      {/* 3. AI Logic */}
+      {/* AI Logic Summary */}
       {hasAnalysisData && (
         <ExecutiveSummary
           criteriaColumns={currentAnalysis.criteriaColumns}
         />
       )}
 
-      {/* 4. Column Management */}
+      {/* Column Management */}
       {hasAnalysisData && (
         <ColumnManagement
           criteriaColumns={currentAnalysis.criteriaColumns}
@@ -233,7 +233,7 @@ const TerritoryTargeterPage: React.FC = () => {
         />
       )}
 
-      {/* 5. Territory Analysis */}
+      {/* Territory Analysis Table */}
       {hasAnalysisData && (
         <CBSATable
           cbsaData={cbsaData}
@@ -248,6 +248,14 @@ const TerritoryTargeterPage: React.FC = () => {
         />
       )}
     </div>
+  );
+};
+
+const TerritoryTargeterPage: React.FC = () => {
+  return (
+    <TerritoryTargeterErrorBoundary>
+      <TerritoryTargeterPageContent />
+    </TerritoryTargeterErrorBoundary>
   );
 };
 

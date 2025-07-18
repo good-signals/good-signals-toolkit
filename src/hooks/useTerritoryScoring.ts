@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CBSAData, AIScoreResponse, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
 import { toast } from '@/hooks/use-toast';
@@ -11,8 +11,9 @@ export const useTerritoryScoring = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
-  const [analysisMode, setAnalysisMode] = useState<'fast' | 'detailed'>('detailed');
-  const [estimatedDuration, setEstimatedDuration] = useState<number>(75);
+  const [analysisMode, setAnalysisMode] = useState<'fast' | 'detailed'>('fast');
+  const [estimatedDuration, setEstimatedDuration] = useState<number>(60);
+  const isProcessingRef = useRef(false);
 
   const {
     currentAnalysis,
@@ -41,52 +42,44 @@ export const useTerritoryScoring = () => {
     deleteColumn: deleteColumnOperation
   } = useColumnOperations();
 
-  // Check for in-progress analysis on mount
+  // Improved startup state check
   useEffect(() => {
     try {
       const analysisState = getAnalysisState();
       
-      if (analysisState) {
-        console.log('Found saved analysis state:', analysisState);
+      if (analysisState && analysisState.status === 'running') {
+        // Check if analysis has been running too long
+        const elapsed = Date.now() - analysisState.startTime;
+        const maxRunTime = 15 * 60 * 1000; // 15 minutes max
         
-        if (analysisState.status === 'running') {
-          // Check if analysis has been running too long (timeout after 12 minutes now)
-          const elapsed = Date.now() - analysisState.startTime;
-          if (elapsed > 12 * 60 * 1000) {
-            console.log('Analysis timed out, cleaning up stale state');
-            clearAnalysisState();
-            
-            toast({
-              title: "Analysis Timed Out",
-              description: "Your previous analysis took too long and was cancelled. Please try again with a simpler prompt or use Fast Analysis mode.",
-              variant: "destructive",
-            });
-            return;
-          }
-          
-          // Resume tracking the analysis
-          console.log('Resuming analysis tracking for:', analysisState.id);
-          setIsLoading(true);
-          setAnalysisStartTime(analysisState.startTime);
+        if (elapsed > maxRunTime) {
+          console.log('Analysis timed out, cleaning up stale state');
+          clearAnalysisState();
           
           toast({
-            title: "Analysis Resumed",
-            description: "Continuing your territory analysis in the background...",
+            title: "Previous Analysis Timed Out",
+            description: "Your previous analysis took too long and was cancelled. You can start a new analysis.",
+            variant: "destructive",
           });
-        } else if (analysisState.status === 'completed') {
-          // Clean up completed analysis state
-          console.log('Cleaning up completed analysis state');
+        } else {
+          // Don't resume automatic tracking to avoid conflicts
+          console.log('Found previous running analysis, but not resuming to avoid conflicts');
           clearAnalysisState();
         }
       }
     } catch (error) {
-      console.error('Failed to parse saved analysis state:', error);
+      console.error('Failed to check saved analysis state:', error);
       clearAnalysisState();
     }
   }, []);
 
   const cancelAnalysis = () => {
     console.log('Cancelling territory analysis...');
+    
+    // Mark as not processing
+    isProcessingRef.current = false;
+    
+    // Cancel the request
     cancelRequest();
     
     // Clean up state
@@ -99,24 +92,30 @@ export const useTerritoryScoring = () => {
     
     toast({
       title: "Analysis Cancelled",
-      description: "Territory analysis has been cancelled. You can start a new analysis.",
+      description: "Territory analysis has been cancelled.",
     });
   };
 
-  const runScoring = async (prompt: string, cbsaData: CBSAData[], mode: 'fast' | 'detailed' = 'detailed') => {
+  const runScoring = async (prompt: string, cbsaData: CBSAData[], mode: 'fast' | 'detailed' = 'fast') => {
     console.log('=== RUN SCORING START ===');
     console.log('Starting territory scoring analysis...');
     console.log('Prompt:', prompt);
     console.log('Markets to analyze:', cbsaData.length);
     console.log('Analysis mode:', mode);
-    console.log('Current loading state:', isLoading);
     
     // Prevent multiple simultaneous analyses
-    if (isLoading) {
+    if (isLoading || isProcessingRef.current) {
       console.log('Analysis already in progress, rejecting new request');
-      throw new Error('Analysis already in progress. Please wait for the current analysis to complete.');
+      toast({
+        title: "Analysis in Progress",
+        description: "Please wait for the current analysis to complete before starting a new one.",
+        variant: "destructive",
+      });
+      return;
     }
 
+    // Mark as processing
+    isProcessingRef.current = true;
     setIsLoading(true);
     setError(null);
     setAnalysisMode(mode);
@@ -132,7 +131,6 @@ export const useTerritoryScoring = () => {
     setAnalysisStartTime(startTime);
 
     console.log('Analysis ID:', analysisId);
-    console.log('Start time:', startTime);
 
     // Estimate duration and provide user feedback
     const duration = estimateAnalysisDuration(prompt, cbsaData.length, mode);
@@ -142,7 +140,7 @@ export const useTerritoryScoring = () => {
     // Create new abort controller for this request
     analysisRequestRef.current = new AbortController();
 
-    // Save analysis state to localStorage for persistence
+    // Save analysis state for recovery
     const analysisState = {
       id: analysisId,
       prompt,
@@ -151,13 +149,13 @@ export const useTerritoryScoring = () => {
       status: 'running' as const
     };
     
-    console.log('Saving analysis state to localStorage');
+    console.log('Saving analysis state');
     saveAnalysisState(analysisState);
 
-    // Show initial feedback with estimated time
+    // Show initial feedback
     toast({
       title: `Starting ${mode === 'fast' ? 'Fast' : 'Detailed'} Analysis`,
-      description: `Estimated completion time: ${Math.round(duration / 60)} minutes. Analyzing ${cbsaData.length} markets...`,
+      description: `Analyzing ${cbsaData.length} markets. This may take ${Math.round(duration / 60)} minutes.`,
     });
 
     try {
@@ -165,83 +163,55 @@ export const useTerritoryScoring = () => {
 
       console.log('Starting AI analysis...');
       try {
-        // Try main analysis approach first
-        if (cbsaData.length > 50 || mode === 'fast') {
-          console.log('Using chunked processing approach');
-          // Use chunked processing for large datasets or fast mode
-          aiResponse = await processMarketsInChunks(prompt, cbsaData, analysisId, mode);
-        } else {
-          console.log('Using single request approach');
-          // Single request for smaller datasets in detailed mode
-          const { data, error } = await supabase.functions.invoke('territory-scoring', {
-            body: {
-              userPrompt: prompt,
-              cbsaData: cbsaData,
-              analysisMode: mode
-            }
-          });
-
-          if (error) {
-            console.error('Supabase function error:', error);
-            throw new Error(`Analysis failed: ${error.message}`);
-          }
-
-          if (!data.success) {
-            console.error('Analysis returned failure:', data.error);
-            throw new Error(data.error || 'Unknown error occurred');
-          }
-
-          aiResponse = data.data;
-        }
+        // Use chunked processing for better reliability
+        aiResponse = await processMarketsInChunks(prompt, cbsaData, analysisId, mode);
         console.log('AI analysis completed successfully');
       } catch (primaryError) {
         console.error('Primary analysis failed:', primaryError);
         
-        // Check if this was an abort error
-        if (primaryError instanceof Error && (primaryError.name === 'AbortError' || primaryError.message === 'Analysis was cancelled')) {
-          console.log('Analysis was cancelled by user - returning undefined');
+        // Check if this was a cancellation
+        if (primaryError instanceof Error && (primaryError.name === 'AbortError' || primaryError.message.includes('cancelled'))) {
+          console.log('Analysis was cancelled by user');
           return undefined;
         }
         
         // If we were doing detailed analysis, try fast mode as fallback
         if (mode === 'detailed') {
           console.log('Detailed analysis failed, trying fast mode fallback');
-          aiResponse = await retryWithSimpleAnalysis(prompt, cbsaData, analysisId);
+          try {
+            aiResponse = await retryWithSimpleAnalysis(prompt, cbsaData, analysisId);
+          } catch (fallbackError) {
+            console.log('Fallback also failed');
+            throw primaryError;
+          }
         } else {
-          console.log('Fast mode analysis failed, no fallback available');
           throw primaryError;
         }
       }
 
-      // Check if request was aborted
+      // Check if request was aborted after completion
       if (analysisRequestRef.current?.signal.aborted) {
-        console.log('Analysis request was aborted after completion - returning undefined');
+        console.log('Analysis was aborted after completion');
         return undefined;
       }
 
-      console.log('Received AI response:', {
-        title: aiResponse.suggested_title,
-        scoresCount: aiResponse.scores?.length || 0
-      });
-      
+      console.log('Processing AI response...');
       // Validate response data
-      if (!aiResponse.scores || aiResponse.scores.length === 0) {
-        console.error('No market scores in response');
+      if (!aiResponse.scores || !Array.isArray(aiResponse.scores) || aiResponse.scores.length === 0) {
         throw new Error('No market scores were returned. Please try rephrasing your criteria.');
       }
 
-      console.log('Creating new criteria column...');
       // Create new criteria column
       const newColumn: CriteriaColumn = {
         id: crypto.randomUUID(),
-        title: aiResponse.suggested_title,
+        title: aiResponse.suggested_title || 'Analysis Results',
         prompt: prompt,
         scores: aiResponse.scores,
-        logicSummary: aiResponse.prompt_summary,
+        logicSummary: aiResponse.prompt_summary || '',
         analysisMode: mode,
         createdAt: new Date(),
         isManuallyOverridden: {},
-        isIncludedInSignalScore: true // Default to included
+        isIncludedInSignalScore: true
       };
 
       // Add to existing analysis or create new one
@@ -255,7 +225,7 @@ export const useTerritoryScoring = () => {
         };
       } else {
         console.log('Creating new analysis');
-        const averageScore = aiResponse.scores.reduce((sum, score) => sum + score.score, 0) / aiResponse.scores.length;
+        const averageScore = aiResponse.scores.reduce((sum, score) => sum + (score.score || 0), 0) / aiResponse.scores.length;
         updatedAnalysis = {
           id: analysisId,
           criteriaColumns: [newColumn],
@@ -265,62 +235,50 @@ export const useTerritoryScoring = () => {
         };
       }
 
-      console.log('Setting current analysis with updated data:', updatedAnalysis.id);
-      console.log('Updated analysis has', updatedAnalysis.criteriaColumns.length, 'columns');
-      
-      // Force update the analysis state
+      console.log('Setting updated analysis');
       setCurrentAnalysis(updatedAnalysis);
       
-      // Update analysis state to completed
+      // Update state to completed
       const completedState = { ...analysisState, status: 'completed' as const };
       saveAnalysisState(completedState);
-      console.log('Updated analysis state to completed');
       
-      // Clean up analysis state after a short delay
+      // Clean up after success
       setTimeout(() => {
         clearAnalysisState();
-        console.log('Cleaned up analysis state');
       }, 2000);
       
       const actualDuration = Math.round((Date.now() - startTime) / 1000);
-      console.log('Analysis completed successfully in', actualDuration, 'seconds');
+      console.log('Analysis completed in', actualDuration, 'seconds');
       
       toast({
-        title: "Territory Analysis Complete",
-        description: `Successfully added "${aiResponse.suggested_title}" criteria with ${aiResponse.scores.length} market scores in ${Math.round(actualDuration / 60)} minutes.`,
+        title: "Analysis Complete",
+        description: `Successfully added "${aiResponse.suggested_title}" with ${aiResponse.scores.length} market scores.`,
       });
 
       console.log('=== RUN SCORING SUCCESS ===');
-      
-      // Force a re-render by updating the state again after a brief delay
-      setTimeout(() => {
-        console.log('Forcing final state update for UI refresh');
-        setCurrentAnalysis(updatedAnalysis);
-      }, 100);
-      
       return updatedAnalysis;
+      
     } catch (err) {
       console.error('=== RUN SCORING ERROR ===');
       
-      // Check if this was an abort error
-      if (err instanceof Error && (err.name === 'AbortError' || err.message === 'Analysis was cancelled')) {
-        console.log('Analysis was cancelled by user');
+      // Check if this was a cancellation
+      if (err instanceof Error && (err.name === 'AbortError' || err.message.includes('cancelled'))) {
+        console.log('Analysis was cancelled');
         return undefined;
       }
 
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Territory scoring error:', errorMessage);
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack available');
       setError(errorMessage);
       
-      // Update analysis state to failed
+      // Update state to failed
       const failedState = { ...analysisState, status: 'failed' as const };
       saveAnalysisState(failedState);
       
       // Provide helpful error feedback
       let userFriendlyMessage = errorMessage;
       if (errorMessage.includes('timeout') || errorMessage.includes('took too long')) {
-        userFriendlyMessage = `Analysis timed out. Try using Fast Analysis mode or simplifying your prompt. Complex analyses can take up to 12 minutes.`;
+        userFriendlyMessage = `Analysis timed out. Try using Fast Analysis mode or simplifying your prompt.`;
       }
       
       toast({
@@ -332,6 +290,7 @@ export const useTerritoryScoring = () => {
       throw err;
     } finally {
       console.log('=== RUN SCORING CLEANUP ===');
+      isProcessingRef.current = false;
       setIsLoading(false);
       setAnalysisStartTime(null);
       analysisRequestRef.current = null;
@@ -346,18 +305,16 @@ export const useTerritoryScoring = () => {
       type, 
       cbsaData, 
       currentAnalysis,
-      // onRefreshStart callback
       (startTime: number) => {
         setIsLoading(true);
         setAnalysisStartTime(startTime);
         const column = currentAnalysis.criteriaColumns.find(c => c.id === columnId);
         if (column) {
-          setAnalysisMode(column.analysisMode || 'detailed');
-          const duration = estimateAnalysisDuration(column.prompt, cbsaData.length, column.analysisMode || 'detailed');
+          setAnalysisMode(column.analysisMode || 'fast');
+          const duration = estimateAnalysisDuration(column.prompt, cbsaData.length, column.analysisMode || 'fast');
           setEstimatedDuration(duration);
         }
       },
-      // onRefreshEnd callback
       () => {
         setIsLoading(false);
         setAnalysisStartTime(null);
@@ -387,17 +344,15 @@ export const useTerritoryScoring = () => {
 
   const deleteColumn = (columnId: string) => {
     if (!currentAnalysis) return;
-    console.log('Deleting column:', columnId, 'from analysis:', currentAnalysis.id);
+    console.log('Deleting column:', columnId);
     
     const updatedAnalysis = deleteColumnOperation(columnId, currentAnalysis);
-    console.log('Delete operation result:', updatedAnalysis ? 'Updated analysis' : 'Clear all');
     
     if (updatedAnalysis === null) {
-      // All columns were deleted, clear entire analysis
       console.log('All columns deleted, clearing analysis');
       clearAnalysis();
     } else if (updatedAnalysis) {
-      console.log('Setting updated analysis with', updatedAnalysis.criteriaColumns.length, 'remaining columns');
+      console.log('Setting updated analysis after column deletion');
       setCurrentAnalysis(updatedAnalysis);
     }
   };
@@ -430,6 +385,7 @@ export const useTerritoryScoring = () => {
       if (analysisRequestRef.current) {
         analysisRequestRef.current.abort();
       }
+      isProcessingRef.current = false;
     };
   }, []);
 

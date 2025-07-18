@@ -7,7 +7,7 @@ import { toast } from '@/hooks/use-toast';
 export const useAnalysisProcessing = () => {
   const analysisRequestRef = useRef<AbortController | null>(null);
 
-  // Process markets in chunks to avoid timeouts
+  // Process markets in chunks with improved error handling
   const processMarketsInChunks = async (prompt: string, cbsaData: CBSAData[], analysisId: string, mode: 'fast' | 'detailed') => {
     console.log('=== CHUNK PROCESSING START ===');
     const chunkSize = mode === 'fast' ? 50 : 30;
@@ -23,94 +23,117 @@ export const useAnalysisProcessing = () => {
     let combinedSummary = '';
     let suggestedTitle = '';
 
-    // Set a timeout for the entire chunked operation
-    const timeoutDuration = mode === 'fast' ? 10 * 60 * 1000 : 15 * 60 * 1000; // 10 or 15 minutes
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Analysis timed out after ${timeoutDuration / 60000} minutes. Try using Fast Analysis mode or simplifying your prompt.`));
-      }, timeoutDuration);
-    });
+    // Set more reasonable timeouts
+    const timeoutDuration = mode === 'fast' ? 8 * 60 * 1000 : 12 * 60 * 1000; // 8 or 12 minutes
+    const timeoutId = setTimeout(() => {
+      if (analysisRequestRef.current) {
+        analysisRequestRef.current.abort();
+        console.log('Analysis timed out and was aborted');
+      }
+    }, timeoutDuration);
 
     try {
-      const processingPromise = (async () => {
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i];
-          console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
-          
-          // Check if request was aborted before processing each chunk
-          if (analysisRequestRef.current?.signal.aborted) {
-            console.log('Analysis was cancelled during chunk processing');
-            throw new Error('Analysis was cancelled');
-          }
-          
-          try {
-            const { data, error } = await supabase.functions.invoke('territory-scoring', {
-              body: {
-                userPrompt: prompt,
-                cbsaData: chunk,
-                analysisMode: mode,
-                isChunked: chunks.length > 1,
-                chunkIndex: i,
-                totalChunks: chunks.length
-              }
-            });
-
-            if (error) {
-              console.error(`Chunk ${i + 1} error:`, error);
-              throw new Error(`Chunk ${i + 1} failed: ${error.message}`);
-            }
-
-            if (!data.success) {
-              console.error(`Chunk ${i + 1} returned failure:`, data.error);
-              throw new Error(`Chunk ${i + 1} returned error: ${data.error}`);
-            }
-
-            console.log(`Chunk ${i + 1} completed successfully with ${data.data.scores.length} scores`);
-            allScores = [...allScores, ...data.data.scores];
-            
-            if (i === 0) {
-              combinedSummary = data.data.prompt_summary;
-              suggestedTitle = data.data.suggested_title;
-            }
-
-            if (chunks.length > 1) {
-              toast({
-                title: "Processing Markets",
-                description: `Completed ${i + 1} of ${chunks.length} chunks (${allScores.length}/${cbsaData.length} markets scored)`,
-              });
-            }
-          } catch (chunkError) {
-            console.error(`Chunk ${i + 1} processing failed:`, chunkError);
-            
-            // If it's a cancellation, re-throw it
-            if (chunkError instanceof Error && (chunkError.message.includes('cancelled') || chunkError.message.includes('abort'))) {
-              throw chunkError;
-            }
-            
-            // For other errors, provide more context
-            const errorMessage = chunkError instanceof Error ? chunkError.message : 'Unknown error';
-            throw new Error(`Failed to process chunk ${i + 1}/${chunks.length}: ${errorMessage}`);
-          }
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
+        
+        // Check if request was aborted before processing each chunk
+        if (analysisRequestRef.current?.signal.aborted) {
+          console.log('Analysis was cancelled during chunk processing');
+          throw new Error('Analysis was cancelled');
         }
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('territory-scoring', {
+            body: {
+              userPrompt: prompt,
+              cbsaData: chunk,
+              analysisMode: mode,
+              isChunked: chunks.length > 1,
+              chunkIndex: i,
+              totalChunks: chunks.length
+            },
+            signal: analysisRequestRef.current?.signal
+          });
 
-        return {
-          suggested_title: suggestedTitle,
-          prompt_summary: combinedSummary,
-          scores: allScores
-        };
-      })();
+          if (error) {
+            console.error(`Chunk ${i + 1} error:`, error);
+            // Don't throw immediately for single chunk failures, try to continue
+            if (chunks.length === 1) {
+              throw new Error(`Analysis failed: ${error.message}`);
+            } else {
+              console.log(`Chunk ${i + 1} failed, continuing with remaining chunks...`);
+              continue;
+            }
+          }
 
-      // Race between processing and timeout
-      const result = await Promise.race([processingPromise, timeoutPromise]);
+          if (!data?.success) {
+            console.error(`Chunk ${i + 1} returned failure:`, data?.error);
+            if (chunks.length === 1) {
+              throw new Error(`Analysis returned error: ${data?.error || 'Unknown error'}`);
+            } else {
+              console.log(`Chunk ${i + 1} failed, continuing with remaining chunks...`);
+              continue;
+            }
+          }
+
+          console.log(`Chunk ${i + 1} completed successfully with ${data.data.scores?.length || 0} scores`);
+          
+          if (data.data.scores && Array.isArray(data.data.scores)) {
+            allScores = [...allScores, ...data.data.scores];
+          }
+          
+          if (i === 0) {
+            combinedSummary = data.data.prompt_summary || '';
+            suggestedTitle = data.data.suggested_title || 'Analysis Results';
+          }
+
+          if (chunks.length > 1) {
+            toast({
+              title: "Processing Markets",
+              description: `Completed ${i + 1} of ${chunks.length} chunks (${allScores.length}/${cbsaData.length} markets scored)`,
+            });
+          }
+        } catch (chunkError) {
+          console.error(`Chunk ${i + 1} processing failed:`, chunkError);
+          
+          // If it's a cancellation, re-throw it
+          if (chunkError instanceof Error && (chunkError.message.includes('cancelled') || chunkError.message.includes('abort'))) {
+            throw chunkError;
+          }
+          
+          // For single chunk operations, throw the error
+          if (chunks.length === 1) {
+            throw chunkError;
+          }
+          
+          // For multi-chunk operations, log and continue
+          console.log(`Continuing processing despite chunk ${i + 1} failure...`);
+        }
+      }
+
+      // Clear the timeout since we completed successfully
+      clearTimeout(timeoutId);
+
+      if (allScores.length === 0) {
+        throw new Error('No market scores were generated. Please try again with a simpler prompt.');
+      }
+
+      const result = {
+        suggested_title: suggestedTitle,
+        prompt_summary: combinedSummary,
+        scores: allScores
+      };
+
       console.log('=== CHUNK PROCESSING SUCCESS ===');
       return result as AIScoreResponse;
 
     } catch (error) {
       console.error('=== CHUNK PROCESSING ERROR ===');
-      console.error('Error:', error);
+      clearTimeout(timeoutId);
       
-      if (error instanceof Error && error.message.includes('timed out')) {
-        console.log('Chunk processing timed out');
+      if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('abort'))) {
+        console.log('Chunk processing was cancelled');
       }
       
       throw error;
