@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody } from '@/components/ui/table';
 import { CBSAData, CriteriaColumn, ManualScoreOverride } from '@/types/territoryTargeterTypes';
@@ -198,7 +197,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
       {/* Table with sticky header */}
       <div className="relative border rounded-lg overflow-hidden">
         <div className="max-h-[600px] overflow-auto">
-          <Table className="relative">
+          <table className="w-full caption-bottom text-sm relative">
             <CBSATableHeader 
               hasScores={hasScores}
               criteriaColumns={criteriaColumns}
@@ -207,7 +206,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
               onRefreshColumn={handleRefreshColumn}
               refreshingColumnId={refreshingColumnId}
             />
-            <TableBody>
+            <tbody className="[&_tr:last-child]:border-0">
               {sortedData.map((row, index) => (
                 <CBSATableRow
                   key={row.id}
@@ -220,8 +219,8 @@ const CBSATable: React.FC<CBSATableProps> = ({
                   isEvenRow={index % 2 === 0}
                 />
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
       </div>
 
