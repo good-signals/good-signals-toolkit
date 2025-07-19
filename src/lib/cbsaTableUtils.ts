@@ -23,9 +23,8 @@ export const formatPopulationGrowth = (growth: number) => {
 };
 
 export const getGrowthColor = (growth: number) => {
-  if (growth > 0.03) return 'text-green-600'; // Above 3% growth
-  if (growth > 0) return 'text-green-500'; // Positive growth
-  if (growth > -0.01) return 'text-yellow-600'; // Slight decline
-  return 'text-red-500'; // Significant decline
+  if (growth > 0) return 'text-green-600'; // Positive growth
+  if (growth < 0) return 'text-red-600'; // Negative growth
+  return 'text-muted-foreground'; // Zero growth
 };
 
