@@ -21,21 +21,22 @@ export const getSignalStatus = (
     // Ensure score is a valid number between 0 and 100
     const validScore = Math.max(0, Math.min(100, Number(score)));
     
-    // Convert score from percentage (0-100) to decimal (0-1) for comparison with thresholds
-    const scoreDecimal = validScore / 100;
-
-    // Use provided thresholds or fall back to defaults
-    const goodThreshold = typeof accountGoodThreshold === 'number' ? accountGoodThreshold : DEFAULT_GOOD_THRESHOLD;
-    const badThreshold = typeof accountBadThreshold === 'number' ? accountBadThreshold : DEFAULT_BAD_THRESHOLD;
+    // Use provided thresholds or fall back to defaults (convert to percentage if decimal)
+    const goodThreshold = typeof accountGoodThreshold === 'number' ? 
+      (accountGoodThreshold <= 1 ? accountGoodThreshold * 100 : accountGoodThreshold) : 
+      DEFAULT_GOOD_THRESHOLD * 100;
+    const badThreshold = typeof accountBadThreshold === 'number' ? 
+      (accountBadThreshold <= 1 ? accountBadThreshold * 100 : accountBadThreshold) : 
+      DEFAULT_BAD_THRESHOLD * 100;
 
     // Ensure thresholds are valid numbers
-    const validGoodThreshold = isNaN(goodThreshold) ? DEFAULT_GOOD_THRESHOLD : goodThreshold;
-    const validBadThreshold = isNaN(badThreshold) ? DEFAULT_BAD_THRESHOLD : badThreshold;
+    const validGoodThreshold = isNaN(goodThreshold) ? DEFAULT_GOOD_THRESHOLD * 100 : goodThreshold;
+    const validBadThreshold = isNaN(badThreshold) ? DEFAULT_BAD_THRESHOLD * 100 : badThreshold;
 
-    if (scoreDecimal >= validGoodThreshold) {
+    if (validScore >= validGoodThreshold) {
       return { text: 'Good', color: 'text-green-600', iconColor: 'text-green-500' };
     }
-    if (scoreDecimal <= validBadThreshold) {
+    if (validScore <= validBadThreshold) {
       return { text: 'Bad', color: 'text-red-600', iconColor: 'text-red-500' };
     }
     return { text: 'Neutral', color: 'text-yellow-600', iconColor: 'text-yellow-500' };
