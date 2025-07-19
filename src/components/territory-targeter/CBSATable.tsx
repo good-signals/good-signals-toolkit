@@ -195,33 +195,34 @@ const CBSATable: React.FC<CBSATableProps> = ({
         </p>
       </div>
 
-      {/* Table with frozen header and first column */}
-      <div className="relative max-h-[600px] overflow-auto border rounded-lg">
-        <Table className="relative">
-          <CBSATableHeader 
-            hasScores={hasScores}
-            criteriaColumns={criteriaColumns}
-            sortConfig={sortConfig} 
-            onSort={handleSort}
-            onRefreshColumn={handleRefreshColumn}
-            refreshingColumnId={refreshingColumnId}
-            className="sticky top-0 z-30 bg-background shadow-sm"
-          />
-          <TableBody>
-            {sortedData.map((row, index) => (
-              <CBSATableRow
-                key={row.id}
-                row={row}
-                criteriaColumns={criteriaColumns}
-                accountGoodThreshold={accountGoodThreshold}
-                accountBadThreshold={accountBadThreshold}
-                onStatusChange={handleStatusChange}
-                onScoreClick={handleScoreClick}
-                isEvenRow={index % 2 === 0}
-              />
-            ))}
-          </TableBody>
-        </Table>
+      {/* Table with sticky header */}
+      <div className="relative border rounded-lg overflow-hidden">
+        <div className="max-h-[600px] overflow-auto">
+          <Table className="relative">
+            <CBSATableHeader 
+              hasScores={hasScores}
+              criteriaColumns={criteriaColumns}
+              sortConfig={sortConfig} 
+              onSort={handleSort}
+              onRefreshColumn={handleRefreshColumn}
+              refreshingColumnId={refreshingColumnId}
+            />
+            <TableBody>
+              {sortedData.map((row, index) => (
+                <CBSATableRow
+                  key={row.id}
+                  row={row}
+                  criteriaColumns={criteriaColumns}
+                  accountGoodThreshold={accountGoodThreshold}
+                  accountBadThreshold={accountBadThreshold}
+                  onStatusChange={handleStatusChange}
+                  onScoreClick={handleScoreClick}
+                  isEvenRow={index % 2 === 0}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Manual Score Override Dialog - only show if we have criteria columns */}
