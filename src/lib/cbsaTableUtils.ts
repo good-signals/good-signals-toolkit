@@ -2,13 +2,13 @@
 export const getScorePillClasses = (signalStatus: { text: string; color: string; iconColor: string }) => {
   switch (signalStatus.text) {
     case 'Good':
-      return 'bg-green-500 text-white';
+      return 'bg-green-600 text-white hover:bg-green-700';
     case 'Bad':
-      return 'bg-red-500 text-white';
+      return 'bg-red-600 text-white hover:bg-red-700';
     case 'Neutral':
-      return 'bg-yellow-500 text-white';
+      return 'bg-yellow-600 text-white hover:bg-yellow-700';
     default:
-      return 'bg-gray-400 text-white';
+      return 'bg-muted text-muted-foreground hover:bg-muted/80';
   }
 };
 
