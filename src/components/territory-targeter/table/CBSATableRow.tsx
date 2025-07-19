@@ -47,6 +47,14 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
 }) => {
   const signalStatus = getSignalStatus(row.marketSignalScore, accountGoodThreshold, accountBadThreshold);
   
+  // Add debug logging for market signal score
+  console.log(`Market Signal Score for ${row.name}:`, {
+    score: row.marketSignalScore,
+    goodThreshold: accountGoodThreshold,
+    badThreshold: accountBadThreshold,
+    signalStatus
+  });
+  
   // Combine all reasoning into one text (only if we have criteria columns)
   const combinedReasoning = criteriaColumns.length > 0 ? criteriaColumns
     .map((column, index) => {
@@ -88,6 +96,15 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
         const scoreData = row.criteriaScores[column.id];
         const isManualOverride = column.isManuallyOverridden?.[row.name];
         
+        // Add debug logging for individual column scores
+        const columnSignalStatus = getSignalStatus(scoreData?.score, accountGoodThreshold, accountBadThreshold);
+        console.log(`Column score for ${row.name} - ${column.title}:`, {
+          score: scoreData?.score,
+          goodThreshold: accountGoodThreshold,
+          badThreshold: accountBadThreshold,
+          signalStatus: columnSignalStatus
+        });
+        
         return (
           <TableCell key={column.id} className="text-center">
             {scoreData?.score !== null && scoreData?.score !== undefined ? (
@@ -96,9 +113,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => onScoreClick(row.name, column.id)}
-                  className={`px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(
-                    getSignalStatus(scoreData.score, accountGoodThreshold, accountBadThreshold)
-                  )} ${isManualOverride ? 'ring-2 ring-blue-400' : ''}`}
+                  className={`px-3 py-1 rounded-full text-sm font-semibold ${getScorePillClasses(columnSignalStatus)} ${isManualOverride ? 'ring-2 ring-blue-400' : ''}`}
                 >
                   {scoreData.score}%
                   {isManualOverride && <Edit className="ml-1 h-3 w-3" />}
@@ -138,3 +153,4 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
 };
 
 export default CBSATableRow;
+
