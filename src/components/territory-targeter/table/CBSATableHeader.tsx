@@ -42,7 +42,7 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
   const showMarketSignalScore = hasScores && criteriaColumns.length > 1;
 
   return (
-    <TableHeader className={cn(className)}>
+    <TableHeader className={cn("sticky top-0 z-20 bg-background", className)}>
       <TableRow>
         <TableHead className="w-[200px] sticky left-0 z-10 bg-background border-r">
           <Button 
