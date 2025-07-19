@@ -214,17 +214,40 @@ export const useTerritoryScoring = () => {
         isIncludedInSignalScore: true
       };
 
-      // Add to existing analysis or create new one
-      let updatedAnalysis;
-      if (currentAnalysis) {
-        console.log('Adding column to existing analysis');
-        updatedAnalysis = {
-          ...currentAnalysis,
-          criteriaColumns: [...currentAnalysis.criteriaColumns, newColumn],
-          includedColumns: [...(currentAnalysis.includedColumns || []), newColumn.id]
-        };
-      } else {
-        console.log('Creating new analysis');
+  // Add to existing analysis or create new one
+  let updatedAnalysis;
+  if (currentAnalysis) {
+    console.log('Adding column to existing analysis');
+    // Check if this is a refresh of an existing column (same prompt)
+    const existingColumnIndex = currentAnalysis.criteriaColumns.findIndex(
+      col => col.prompt === prompt
+    );
+    
+    if (existingColumnIndex !== -1) {
+      console.log('Refreshing existing column instead of creating new one');
+      // Update existing column with new scores
+      const updatedColumns = [...currentAnalysis.criteriaColumns];
+      updatedColumns[existingColumnIndex] = {
+        ...updatedColumns[existingColumnIndex],
+        scores: aiResponse.scores,
+        logicSummary: aiResponse.prompt_summary || updatedColumns[existingColumnIndex].logicSummary,
+        analysisMode: mode
+      };
+      
+      updatedAnalysis = {
+        ...currentAnalysis,
+        criteriaColumns: updatedColumns
+      };
+    } else {
+      // Create new column
+      updatedAnalysis = {
+        ...currentAnalysis,
+        criteriaColumns: [...currentAnalysis.criteriaColumns, newColumn],
+        includedColumns: [...(currentAnalysis.includedColumns || []), newColumn.id]
+      };
+    }
+  } else {
+    console.log('Creating new analysis');
         const averageScore = aiResponse.scores.reduce((sum, score) => sum + (score.score || 0), 0) / aiResponse.scores.length;
         updatedAnalysis = {
           id: analysisId,
