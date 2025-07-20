@@ -47,7 +47,7 @@ export const useColumnOperations = () => {
           title: "No Markets to Refresh",
           description: "All markets already have scores for this criteria.",
         });
-        return;
+        return currentAnalysis;
       }
 
       // Show initial toast with progress feedback
@@ -108,6 +108,8 @@ export const useColumnOperations = () => {
         description: errorMessage,
         variant: "destructive",
       });
+      
+      return currentAnalysis;
     } finally {
       setRefreshingColumnId(null);
       setRefreshStartTime(null);
