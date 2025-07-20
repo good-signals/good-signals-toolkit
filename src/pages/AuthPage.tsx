@@ -122,7 +122,7 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <Tabs defaultValue="signup" className="w-[400px] md:w-[550px]">
+      <Tabs defaultValue="signin" className="w-[400px] md:w-[550px]">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
