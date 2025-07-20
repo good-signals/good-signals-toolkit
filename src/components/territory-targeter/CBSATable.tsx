@@ -201,6 +201,7 @@ const CBSATable: React.FC<CBSATableProps> = ({
             <CBSATableHeader 
               hasScores={hasScores}
               criteriaColumns={criteriaColumns}
+              tableData={tableData}
               sortConfig={sortConfig} 
               onSort={handleSort}
               onRefreshColumn={handleRefreshColumn}

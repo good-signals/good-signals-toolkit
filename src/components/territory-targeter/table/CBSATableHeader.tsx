@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { CriteriaColumn } from '@/types/territoryTargeterTypes';
+import { CriteriaColumn, CBSATableRowData } from '@/types/territoryTargeterTypes';
 import ColumnRefreshOptions from '../ColumnRefreshOptions';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,7 @@ export type SortConfig = {
 interface CBSATableHeaderProps {
   hasScores: boolean;
   criteriaColumns: CriteriaColumn[];
+  tableData: CBSATableRowData[];
   sortConfig: SortConfig;
   onSort: (key: SortConfig['key']) => void;
   onRefreshColumn?: (columnId: string, type: 'all' | 'na-only') => void;
@@ -24,6 +26,7 @@ interface CBSATableHeaderProps {
 const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
   hasScores,
   criteriaColumns,
+  tableData,
   sortConfig,
   onSort,
   onRefreshColumn,
@@ -105,8 +108,10 @@ const CBSATableHeader: React.FC<CBSATableHeaderProps> = ({
           </Button>
         </TableHead>
         {hasScores && criteriaColumns.map((column) => {
-          const columnHasNA = column.scores.some(score => 
-            score.score === null || score.score === undefined
+          // Check for N/A values in the actual table data being displayed
+          const columnHasNA = tableData.some(row => 
+            row.criteriaScores[column.id]?.score === null || 
+            row.criteriaScores[column.id]?.score === undefined
           );
           
           const isThisColumnRefreshing = refreshingColumnId === column.id;
