@@ -127,7 +127,7 @@ const AuthPage: React.FC = () => {
           <img 
             src="/lovable-uploads/e0f30057-a370-4243-b8e2-e484f752f9ed.png" 
             alt="Good Signals" 
-            className="h-16 w-auto"
+            className="h-32 w-auto"
           />
         </div>
         <Tabs defaultValue="signin" className="w-full">
