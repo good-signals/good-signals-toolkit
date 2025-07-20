@@ -34,10 +34,12 @@ export const useColumnOperations = () => {
       // Determine which markets to refresh
       let marketsToRefresh = cbsaData;
       if (type === 'na-only') {
-        const naMarkets = column.scores
-          .filter(score => score.score === null || score.score === undefined)
-          .map(score => score.market);
-        marketsToRefresh = cbsaData.filter(cbsa => naMarkets.includes(cbsa.name));
+        // Find markets that have N/A scores in this column
+        const naMarkets = cbsaData.filter(cbsa => {
+          const score = column.scores.find(s => s.market === cbsa.name);
+          return !score || score.score === null || score.score === undefined;
+        });
+        marketsToRefresh = naMarkets;
       }
 
       if (marketsToRefresh.length === 0) {
