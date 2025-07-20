@@ -122,10 +122,18 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <Tabs defaultValue="signin" className="w-[400px] md:w-[550px]">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="signin">Sign In</TabsTrigger>
-          <TabsTrigger value="signup">Sign Up</TabsTrigger>
+      <div className="w-[400px] md:w-[550px]">
+        <div className="flex justify-center mb-8">
+          <img 
+            src="/lovable-uploads/e0f30057-a370-4243-b8e2-e484f752f9ed.png" 
+            alt="Good Signals" 
+            className="h-16 w-auto"
+          />
+        </div>
+        <Tabs defaultValue="signin" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Sign In</TabsTrigger>
+            <TabsTrigger value="signup">Sign Up</TabsTrigger>
         </TabsList>
         <TabsContent value="signin">
           <SignInForm onForgotPassword={() => setShowForgotPassword(true)} />
@@ -133,7 +141,8 @@ const AuthPage: React.FC = () => {
         <TabsContent value="signup">
           <SignUpForm />
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
     </div>
   );
 };
