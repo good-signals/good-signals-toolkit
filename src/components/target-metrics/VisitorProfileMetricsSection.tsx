@@ -248,8 +248,8 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">Visitor Profile Metrics</span>
-                    <Badge variant="outline" className="text-xs">
-                      Special
+                    <Badge variant="secondary" className="text-xs">
+                      Optional
                     </Badge>
                     {fields.length > 0 && (
                       <Badge variant="secondary" className="text-xs">
