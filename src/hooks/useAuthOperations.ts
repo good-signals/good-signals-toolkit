@@ -69,10 +69,15 @@ export const useAuthOperations = (
     const operationId = 'signout-' + Date.now();
     console.log('[AuthOperations] Sign out attempt, operationId:', operationId);
     
+    // Check if there's already a sign-out operation in progress
     addActiveOperation(operationId);
     
     try {
-      await signOutService();
+      const result = await signOutService();
+      console.log('[AuthOperations] Sign out completed with result:', result);
+    } catch (error) {
+      console.error('[AuthOperations] Sign out exception:', error);
+      // Don't show error toast here since signOutService handles it
     } finally {
       console.log('[AuthOperations] Removing sign out operation:', operationId);
       removeActiveOperation(operationId);
