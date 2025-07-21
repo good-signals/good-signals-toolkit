@@ -459,10 +459,6 @@ export const TargetMetricsBuilderPage = () => {
                   control={form.control}
                   enabledSections={form.watch('enabled_optional_sections') || []}
                   onSectionToggle={handleSectionToggle}
-                />
-                
-                <VisitorProfileMetricsSection 
-                  control={form.control} 
                   metricSetId={metricSetId}
                 />
                 

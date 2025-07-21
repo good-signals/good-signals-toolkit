@@ -5,17 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { TargetMetricsFormData, REQUIRED_METRIC_CATEGORIES, OPTIONAL_METRIC_CATEGORIES, SITE_VISIT_CATEGORY, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import { sortCategoriesByOrder, getEnabledCategories } from '@/config/targetMetricsConfig';
 import { CollapsibleMetricSection } from './CollapsibleMetricSection';
+import VisitorProfileMetricsSection from './VisitorProfileMetricsSection';
 
 interface PredefinedMetricsSectionProps {
   control: Control<TargetMetricsFormData>;
   enabledSections?: string[];
   onSectionToggle?: (sectionName: string, enabled: boolean) => void;
+  metricSetId?: string;
 }
 
 const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
   control,
   enabledSections = [],
   onSectionToggle,
+  metricSetId,
 }) => {
   const { fields } = useFieldArray({
     control,
@@ -67,6 +70,8 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
     return enabledSections.includes(category);
   };
 
+  const isVisitorProfileEnabled = enabledSections.includes(VISITOR_PROFILE_CATEGORY);
+
   if (allCategories.length === 0) {
     return (
       <Card>
@@ -96,24 +101,37 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {sortedCategories.map((category) => {
+        {sortedCategories.map((category, index) => {
           const sectionType = getSectionType(category);
           const isEnabled = isSectionEnabled(category);
           const isExpanded = expandedSections[category] ?? (sectionType === 'required'); // Default required sections to expanded
           const categoryMetrics = metricsByCategory[category] || [];
 
+          // Insert Visitor Profile section after Financial Performance
+          const shouldInsertVisitorProfile = category === "Financial Performance";
+
           return (
-            <CollapsibleMetricSection
-              key={category}
-              sectionName={category}
-              sectionType={sectionType}
-              isEnabled={isEnabled}
-              isExpanded={isExpanded}
-              onToggleEnabled={(enabled) => handleToggleEnabled(category, enabled)}
-              onToggleExpanded={(expanded) => handleToggleExpanded(category, expanded)}
-              metrics={categoryMetrics}
-              control={control}
-            />
+            <React.Fragment key={category}>
+              <CollapsibleMetricSection
+                sectionName={category}
+                sectionType={sectionType}
+                isEnabled={isEnabled}
+                isExpanded={isExpanded}
+                onToggleEnabled={(enabled) => handleToggleEnabled(category, enabled)}
+                onToggleExpanded={(expanded) => handleToggleExpanded(category, expanded)}
+                metrics={categoryMetrics}
+                control={control}
+              />
+              
+              {shouldInsertVisitorProfile && (
+                <VisitorProfileMetricsSection
+                  control={control}
+                  metricSetId={metricSetId}
+                  isEnabled={isVisitorProfileEnabled}
+                  onToggleEnabled={(enabled) => handleToggleEnabled(VISITOR_PROFILE_CATEGORY, enabled)}
+                />
+              )}
+            </React.Fragment>
           );
         })}
 
