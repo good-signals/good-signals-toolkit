@@ -56,7 +56,7 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
   };
 
   const getSectionType = (category: string): 'required' | 'optional' | 'special' => {
-    if (REQUIRED_METRIC_CATEGORIES.includes(category)) return 'required';
+    if (REQUIRED_METRIC_CATEGORIES.includes(category as any)) return 'required';
     if (category === VISITOR_PROFILE_CATEGORY || category === SITE_VISIT_CATEGORY) return 'special';
     return 'optional';
   };

@@ -3,7 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useFieldArray, Control } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TargetMetricsFormData, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import VisitorProfileMetricForm from './VisitorProfileMetricForm';
 import { saveIndividualMetric, updateIndividualMetric, deleteIndividualMetric, getMetricsForSet } from '@/services/targetMetrics/individualMetricService';
@@ -13,15 +16,20 @@ import { useToast } from '@/hooks/use-toast';
 interface VisitorProfileMetricsSectionProps {
   control: Control<TargetMetricsFormData>;
   metricSetId?: string;
+  isEnabled?: boolean;
+  onToggleEnabled?: (enabled: boolean) => void;
 }
 
 const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> = ({
   control,
   metricSetId,
+  isEnabled = true,
+  onToggleEnabled,
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const { user } = useUser();
   const { toast } = useToast();
 
@@ -229,87 +237,122 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
   const editingMetric = editingIndex !== null ? fields[editingIndex] : null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Visitor Profile Metrics</CardTitle>
-        <CardDescription>
-          Define custom metrics for tracking visitor demographics and characteristics
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h4 className="text-sm font-medium">Your Visitor Profile Metrics</h4>
-          <Button 
-            type="button" 
-            onClick={handleAddClick} 
-            size="sm"
-            disabled={isLoading}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Metric
-          </Button>
-        </div>
-
-        {(!fields || fields.length === 0) ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No visitor profile metrics defined yet.</p>
-            <p className="text-sm">Click "Add Metric" to create your first visitor profile metric.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="flex items-center justify-between p-4 border rounded-lg bg-card"
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{field.label}</div>
-                  <div className="text-sm text-muted-foreground">
-                    Target: {field.target_value} ({field.measurement_type}) • 
-                    {field.higher_is_better ? ' Higher is better' : ' Lower is better'}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      startEditingMetric(index);
-                    }}
-                    disabled={isLoading}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDeleteMetric(index);
-                    }}
-                    disabled={isLoading}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+    <Card className={!isEnabled ? "opacity-60" : ""}>
+      <Collapsible open={isEnabled && isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {isEnabled && (isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
+                {!isEnabled && <ChevronRight className="h-4 w-4 opacity-50" />}
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    Visitor Profile Metrics
+                    <Badge variant="outline" className="text-xs">
+                      Special
+                    </Badge>
+                    {fields.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {fields.length} metric{fields.length !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Define custom metrics for tracking visitor demographics and characteristics
+                  </CardDescription>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              <div className="flex items-center gap-2">
+                {onToggleEnabled && (
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Switch
+                      checked={isEnabled}
+                      onCheckedChange={onToggleEnabled}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <CardContent className="space-y-4 pt-0">
+            <div className="flex justify-between items-center">
+              <h4 className="text-sm font-medium">Your Visitor Profile Metrics</h4>
+              <Button 
+                type="button" 
+                onClick={handleAddClick} 
+                size="sm"
+                disabled={isLoading || !isEnabled}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Metric
+              </Button>
+            </div>
 
-        <VisitorProfileMetricForm
-          open={isFormOpen}
-          onOpenChange={handleFormClose}
-          onSubmit={editingIndex !== null ? (data) => handleEditMetric(editingIndex, data) : handleAddMetric}
-          initialData={editingMetric || undefined}
-          isEditing={editingIndex !== null}
-        />
-      </CardContent>
+            {(!fields || fields.length === 0) ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No visitor profile metrics defined yet.</p>
+                <p className="text-sm">Click "Add Metric" to create your first visitor profile metric.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {fields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="flex items-center justify-between p-4 border rounded-lg bg-card"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium">{field.label}</div>
+                      <div className="text-sm text-muted-foreground">
+                        Target: {field.target_value} ({field.measurement_type}) • 
+                        {field.higher_is_better ? ' Higher is better' : ' Lower is better'}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          startEditingMetric(index);
+                        }}
+                        disabled={isLoading || !isEnabled}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteMetric(index);
+                        }}
+                        disabled={isLoading || !isEnabled}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <VisitorProfileMetricForm
+              open={isFormOpen}
+              onOpenChange={handleFormClose}
+              onSubmit={editingIndex !== null ? (data) => handleEditMetric(editingIndex, data) : handleAddMetric}
+              initialData={editingMetric || undefined}
+              isEditing={editingIndex !== null}
+            />
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };
