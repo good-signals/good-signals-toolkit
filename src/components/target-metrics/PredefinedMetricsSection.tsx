@@ -1,39 +1,36 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Control, useFieldArray } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TargetMetricsFormData, REQUIRED_METRIC_CATEGORIES } from '@/types/targetMetrics';
+import { TargetMetricsFormData, REQUIRED_METRIC_CATEGORIES, OPTIONAL_METRIC_CATEGORIES, SITE_VISIT_CATEGORY, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import { sortCategoriesByOrder, getEnabledCategories } from '@/config/targetMetricsConfig';
-import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
+import { CollapsibleMetricSection } from './CollapsibleMetricSection';
 
 interface PredefinedMetricsSectionProps {
   control: Control<TargetMetricsFormData>;
   enabledSections?: string[];
+  onSectionToggle?: (sectionName: string, enabled: boolean) => void;
 }
 
 const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
   control,
   enabledSections = [],
+  onSectionToggle,
 }) => {
   const { fields } = useFieldArray({
     control,
     name: "predefined_metrics",
   });
 
-  // Get enabled categories (required + user-selected optional)
-  const allowedCategories = getEnabledCategories(enabledSections);
+  // State to track which sections are expanded
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  // Get all categories that should be displayed
+  const allCategories = [...REQUIRED_METRIC_CATEGORIES, ...OPTIONAL_METRIC_CATEGORIES];
   
-  // Group metrics by category and filter by enabled sections
+  // Group metrics by category
   const metricsByCategory = fields.reduce((acc, metric, index) => {
     const category = metric.category;
-    
-    // Only include metrics from enabled categories
-    if (!allowedCategories.includes(category)) {
-      return acc;
-    }
     
     if (!acc[category]) {
       acc[category] = [];
@@ -42,9 +39,35 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
     return acc;
   }, {} as Record<string, Array<any>>);
 
-  const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
+  // Get sorted categories that exist in the data
+  const sortedCategories = sortCategoriesByOrder(allCategories);
 
-  if (fields.length === 0) {
+  const handleToggleExpanded = (sectionName: string, expanded: boolean) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionName]: expanded
+    }));
+  };
+
+  const handleToggleEnabled = (sectionName: string, enabled: boolean) => {
+    if (onSectionToggle) {
+      onSectionToggle(sectionName, enabled);
+    }
+  };
+
+  const getSectionType = (category: string): 'required' | 'optional' | 'special' => {
+    if (REQUIRED_METRIC_CATEGORIES.includes(category)) return 'required';
+    if (category === VISITOR_PROFILE_CATEGORY || category === SITE_VISIT_CATEGORY) return 'special';
+    return 'optional';
+  };
+
+  const isSectionEnabled = (category: string): boolean => {
+    const sectionType = getSectionType(category);
+    if (sectionType === 'required' || sectionType === 'special') return true;
+    return enabledSections.includes(category);
+  };
+
+  if (allCategories.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -69,78 +92,36 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
       <CardHeader>
         <CardTitle>Target Metrics</CardTitle>
         <CardDescription>
-          Set your target values for each metric category
+          Set your target values for each metric category. Toggle sections on/off and expand/collapse as needed.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-8">
-        {sortedCategories.map((category) => (
-          <div key={category} className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary border-b pb-2">
-              {category}
-            </h3>
-            
-            <div className="space-y-4">
-              {metricsByCategory[category].map((metric) => {
-                const isDropdownMetric = specificDropdownMetrics.includes(metric.metric_identifier);
-                const dropdownOptions = metricDropdownOptions[metric.metric_identifier] || [];
+      <CardContent className="space-y-4">
+        {sortedCategories.map((category) => {
+          const sectionType = getSectionType(category);
+          const isEnabled = isSectionEnabled(category);
+          const isExpanded = expandedSections[category] ?? (sectionType === 'required'); // Default required sections to expanded
+          const categoryMetrics = metricsByCategory[category] || [];
 
-                return (
-                  <div
-                    key={metric.metric_identifier}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg bg-card"
-                  >
-                    <div className="sm:w-2/3 mb-2 sm:mb-0">
-                      <FormLabel className="text-base font-medium">
-                        {metric.label}
-                      </FormLabel>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {metric.higher_is_better ? "(Higher is better)" : "(Lower is better)"}
-                      </div>
-                    </div>
-                    
-                    <div className="sm:w-1/3">
-                      <FormField
-                        control={control}
-                        name={`predefined_metrics.${metric.index}.target_value`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              {isDropdownMetric ? (
-                                <Select
-                                  onValueChange={(value) => field.onChange(parseFloat(value))}
-                                  value={String(field.value || '')}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select target" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {dropdownOptions.map(option => (
-                                      <SelectItem key={option.value} value={String(option.value)}>
-                                        {option.label} ({option.value})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <Input
-                                  type="number"
-                                  placeholder="Enter target value"
-                                  {...field}
-                                  onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                                />
-                              )}
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          return (
+            <CollapsibleMetricSection
+              key={category}
+              sectionName={category}
+              sectionType={sectionType}
+              isEnabled={isEnabled}
+              isExpanded={isExpanded}
+              onToggleEnabled={(enabled) => handleToggleEnabled(category, enabled)}
+              onToggleExpanded={(expanded) => handleToggleExpanded(category, expanded)}
+              metrics={categoryMetrics}
+              control={control}
+            />
+          );
+        })}
+
+        <div className="text-xs text-muted-foreground pt-4 border-t">
+          <p><strong>Required sections</strong> are always enabled and contain essential metrics.</p>
+          <p><strong>Optional sections</strong> can be toggled on/off based on your needs.</p>
+          <p><strong>Special sections</strong> like Site Visit contain no target metrics but are used for assessment ratings.</p>
+        </div>
       </CardContent>
     </Card>
   );
