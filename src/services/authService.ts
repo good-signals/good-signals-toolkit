@@ -48,21 +48,7 @@ export const updatePasswordService = async (newPassword: string) => {
 
 export const signOutService = async () => {
   try {
-    // First check if there's an active session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.warn('Error checking session during sign out:', sessionError.message);
-    }
-    
-    // If no session exists, treat as successful sign out
-    if (!session) {
-      console.log('No active session found, treating as successful sign out');
-      toast.success('Signed out successfully!');
-      return { error: null };
-    }
-    
-    // Attempt to sign out with Supabase
+    // Always attempt to sign out with Supabase to clear all auth state
     const { error } = await supabase.auth.signOut();
     
     if (error) {
