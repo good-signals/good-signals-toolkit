@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Target, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Target, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getTargetMetricSetById,
@@ -23,10 +23,12 @@ import {
 } from '@/types/targetMetrics';
 import { getDefaultEnabledOptionalSections } from '@/config/targetMetricsConfig';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
+import { getStandardMetricSettings } from '@/services/standardMetricsService';
 import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
 import { OptionalSectionToggle } from '@/components/target-metrics/OptionalSectionToggle';
+import { TemplateSelectionStep } from '@/components/target-metrics/TemplateSelectionStep';
 
 export const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -34,6 +36,8 @@ export const TargetMetricsBuilderPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<'template' | 'configuration'>('template');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   const form = useForm<TargetMetricsFormData>({
     resolver: zodResolver(TargetMetricsFormSchema),
@@ -45,6 +49,13 @@ export const TargetMetricsBuilderPage = () => {
       enabled_optional_sections: getDefaultEnabledOptionalSections(),
     },
   });
+
+  // Skip template selection for editing existing metric sets
+  useEffect(() => {
+    if (metricSetId) {
+      setCurrentStep('configuration');
+    }
+  }, [metricSetId]);
 
   // Get account ID for the user
   useEffect(() => {
@@ -65,6 +76,71 @@ export const TargetMetricsBuilderPage = () => {
     };
     fetchAccountId();
   }, [user?.id]);
+
+  // Load template metrics when template is selected
+  const { data: templateMetrics } = useQuery({
+    queryKey: ['templateMetrics', selectedTemplateId],
+    queryFn: () => selectedTemplateId ? getStandardMetricSettings(selectedTemplateId) : null,
+    enabled: !!selectedTemplateId && currentStep === 'template',
+  });
+
+  // Populate form with template data when template is selected
+  useEffect(() => {
+    if (templateMetrics && selectedTemplateId && currentStep === 'template') {
+      console.log('[TargetMetricsBuilderPage] Populating form with template metrics:', templateMetrics.length);
+      
+      // Reset arrays first
+      form.setValue('predefined_metrics', []);
+      form.setValue('custom_metrics', []);
+      form.setValue('visitor_profile_metrics', []);
+      
+      // Populate metrics from template
+      templateMetrics.forEach((setting) => {
+        if (setting.category === VISITOR_PROFILE_CATEGORY) {
+          const currentMetrics = form.getValues('visitor_profile_metrics') || [];
+          form.setValue('visitor_profile_metrics', [
+            ...currentMetrics,
+            {
+              metric_identifier: setting.metric_identifier,
+              label: setting.label,
+              category: VISITOR_PROFILE_CATEGORY,
+              target_value: setting.target_value,
+              measurement_type: (setting.measurement_type as "Index" | "Amount" | "Percentage") || "Index",
+              higher_is_better: setting.higher_is_better,
+            },
+          ]);
+        } else if (setting.metric_identifier.startsWith('custom_')) {
+          // This is a custom metric
+          const currentMetrics = form.getValues('custom_metrics') || [];
+          form.setValue('custom_metrics', [
+            ...currentMetrics,
+            {
+              metric_identifier: setting.metric_identifier,
+              label: setting.label,
+              category: setting.category,
+              target_value: setting.target_value,
+              higher_is_better: setting.higher_is_better,
+              units: setting.units || setting.measurement_type || '',
+              is_custom: true as const,
+            },
+          ]);
+        } else {
+          // This is a predefined metric
+          const currentMetrics = form.getValues('predefined_metrics') || [];
+          form.setValue('predefined_metrics', [
+            ...currentMetrics,
+            {
+              metric_identifier: setting.metric_identifier,
+              label: setting.label,
+              category: setting.category,
+              target_value: setting.target_value,
+              higher_is_better: setting.higher_is_better,
+            },
+          ]);
+        }
+      });
+    }
+  }, [templateMetrics, selectedTemplateId, currentStep, form]);
 
   // Load existing metric set if editing
   const { data: existingMetricSet, isLoading: isLoadingMetricSet, error: metricSetError } = useQuery({
@@ -123,7 +199,7 @@ export const TargetMetricsBuilderPage = () => {
                 category: setting.category,
                 target_value: setting.target_value,
                 higher_is_better: setting.higher_is_better,
-                units: setting.measurement_type, // Using measurement_type to store units for custom metrics
+                units: setting.measurement_type,
                 is_custom: true as const,
                 id: setting.id,
               },
@@ -149,6 +225,20 @@ export const TargetMetricsBuilderPage = () => {
       }
     }
   }, [existingMetricSet, form]);
+
+  const handleTemplateSelect = (templateId: string | null) => {
+    setSelectedTemplateId(templateId);
+  };
+
+  const handleContinueFromTemplate = () => {
+    if (selectedTemplateId === null) {
+      // Starting from scratch - initialize with empty arrays but keep existing structure
+      form.setValue('predefined_metrics', []);
+      form.setValue('custom_metrics', []);
+      form.setValue('visitor_profile_metrics', []);
+    }
+    setCurrentStep('configuration');
+  };
 
   // Save/Update mutation with assessment recalculation
   const saveMutation = useMutation({
@@ -267,6 +357,51 @@ export const TargetMetricsBuilderPage = () => {
     );
   }
 
+  // Show template selection step for new metric sets
+  if (!metricSetId && currentStep === 'template') {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-6 w-6" />
+                Create Target Metrics Set
+              </CardTitle>
+              <CardDescription>
+                Choose how you want to start creating your target metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TemplateSelectionStep
+                onTemplateSelect={handleTemplateSelect}
+                selectedTemplateId={selectedTemplateId}
+              />
+              <div className="flex gap-4 mt-8">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/target-metric-sets')}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleContinueFromTemplate}
+                  disabled={selectedTemplateId === undefined}
+                >
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show configuration step
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -334,10 +469,23 @@ export const TargetMetricsBuilderPage = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate('/target-metric-sets')}
+                    onClick={() => {
+                      if (!metricSetId && currentStep === 'configuration') {
+                        setCurrentStep('template');
+                      } else {
+                        navigate('/target-metric-sets');
+                      }
+                    }}
                     disabled={saveMutation.isPending}
                   >
-                    Cancel
+                    {!metricSetId && currentStep === 'configuration' ? (
+                      <>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to Template
+                      </>
+                    ) : (
+                      'Cancel'
+                    )}
                   </Button>
                   <Button type="submit" disabled={saveMutation.isPending}>
                     {saveMutation.isPending ? (
