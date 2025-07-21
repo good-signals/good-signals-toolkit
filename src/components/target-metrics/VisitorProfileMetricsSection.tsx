@@ -246,8 +246,8 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
                 {isEnabled && (isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
                 {!isEnabled && <ChevronRight className="h-4 w-4 opacity-50" />}
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    Visitor Profile Metrics
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Visitor Profile Metrics</span>
                     <Badge variant="outline" className="text-xs">
                       Special
                     </Badge>
@@ -256,10 +256,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
                         {fields.length} metric{fields.length !== 1 ? 's' : ''}
                       </Badge>
                     )}
-                  </CardTitle>
-                  <CardDescription>
-                    Define custom metrics for tracking visitor demographics and characteristics
-                  </CardDescription>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
