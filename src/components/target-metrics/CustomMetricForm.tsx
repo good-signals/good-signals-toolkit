@@ -9,11 +9,25 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { REQUIRED_METRIC_CATEGORIES, OPTIONAL_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
+
+// Get available sections for custom metrics
+const getAvailableSections = () => {
+  return [
+    ...REQUIRED_METRIC_CATEGORIES,
+    ...OPTIONAL_METRIC_CATEGORIES,
+    VISITOR_PROFILE_CATEGORY,
+    'Customer Experience', // Common custom category
+    'Operational Excellence', // Common custom category
+    'Brand & Marketing', // Common custom category
+  ];
+};
 
 const CustomMetricFormSchema = z.object({
   name: z.string().min(1, "Metric name is required"),
   description: z.string().optional(),
-  category: z.string().min(1, "Category is required"),
+  category: z.string().min(1, "Section is required"),
   units: z.string().optional(),
   target_value: z.coerce.number().min(0, "Target value must be positive"),
   higher_is_better: z.boolean(),
@@ -127,10 +141,21 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
               name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Customer Experience" {...field} />
-                  </FormControl>
+                  <FormLabel>Section</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a section for this metric" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {getAvailableSections().map((section) => (
+                        <SelectItem key={section} value={section}>
+                          {section}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
