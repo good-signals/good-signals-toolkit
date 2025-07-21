@@ -21,7 +21,7 @@ import {
   type TargetMetricsFormData,
   VISITOR_PROFILE_CATEGORY,
 } from '@/types/targetMetrics';
-import { getDefaultEnabledOptionalSections } from '@/config/targetMetricsConfig';
+import { getDefaultEnabledOptionalSections, generateEmptyPredefinedMetrics } from '@/config/targetMetricsConfig';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import { getStandardMetricSettings } from '@/services/standardMetricsService';
 import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
@@ -232,8 +232,12 @@ export const TargetMetricsBuilderPage = () => {
 
   const handleContinueFromTemplate = () => {
     if (selectedTemplateId === null) {
-      // Starting from scratch - initialize with empty arrays but keep existing structure
-      form.setValue('predefined_metrics', []);
+      // Starting from scratch - populate with all available predefined metrics with default values
+      console.log('[TargetMetricsBuilderPage] Starting from scratch - populating with empty predefined metrics');
+      const enabledOptionalSections = form.getValues('enabled_optional_sections') || [];
+      const emptyPredefinedMetrics = generateEmptyPredefinedMetrics(enabledOptionalSections);
+      
+      form.setValue('predefined_metrics', emptyPredefinedMetrics);
       form.setValue('custom_metrics', []);
       form.setValue('visitor_profile_metrics', []);
     }

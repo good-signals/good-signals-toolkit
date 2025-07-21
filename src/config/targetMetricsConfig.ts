@@ -1,4 +1,3 @@
-
 import { 
   PredefinedMetricCategory, 
   UserCustomMetricSetting,
@@ -101,6 +100,21 @@ export const sortCategoriesByOrder = (categories: string[]): string[] => {
     // If neither is in the defined order, sort alphabetically
     return a.localeCompare(b);
   });
+};
+
+// New utility function to generate empty predefined metrics for "Start from Scratch"
+export const generateEmptyPredefinedMetrics = (enabledOptionalSections: string[] = []) => {
+  const allowedCategories = getEnabledCategories(enabledOptionalSections);
+  
+  return predefinedMetricsConfig
+    .filter(config => allowedCategories.includes(config.category))
+    .map(config => ({
+      metric_identifier: config.metric_identifier,
+      label: config.label,
+      category: config.category,
+      target_value: 0, // Default target value for start from scratch
+      higher_is_better: config.higher_is_better,
+    }));
 };
 
 export function getDefaultMetricValue(metricIdentifier: string): UserCustomMetricSetting | undefined {

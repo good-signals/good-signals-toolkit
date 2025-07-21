@@ -50,13 +50,14 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
         <CardHeader>
           <CardTitle>Target Metrics</CardTitle>
           <CardDescription>
-            No predefined metrics are configured for this metric set
+            Set your target values for each metric category
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <p>This metric set doesn't have any predefined metrics configured.</p>
-            <p className="text-sm">Predefined metrics are typically imported when creating a new metric set.</p>
+            <p>No predefined metrics are currently loaded.</p>
+            <p className="text-sm mt-2">This can happen if you're starting from scratch and haven't selected any template, or if there was an issue loading the metrics.</p>
+            <p className="text-sm">Try selecting a template or refreshing the page.</p>
           </div>
         </CardContent>
       </Card>
