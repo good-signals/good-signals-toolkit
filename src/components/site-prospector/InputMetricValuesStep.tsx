@@ -20,7 +20,7 @@ import SiteVisitSection from './metric-input/SiteVisitSection';
 import { safeStorage } from '@/utils/safeStorage';
 
 // Import shared config
-import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
+import { sortCategoriesByOrder, getEnabledCategories } from '@/config/targetMetricsConfig';
 import { specificDropdownMetrics } from '@/config/metricDisplayConfig';
 
 // Constants for special image metric identifiers
@@ -576,7 +576,11 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     return acc;
   }, {} as Record<string, Array<{ id: string; originalIndex: number; metric_identifier: string; label: string; category: string; entered_value: number | null; notes?: string | null; image_url?: string | null; target_value?: number; higher_is_better?: boolean; measurement_type?: string | null }>>);
 
-  const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
+  // Filter categories by enabled sections
+  const enabledSections = metricSet?.enabled_optional_sections || [];
+  const allowedCategories = getEnabledCategories(enabledSections);
+  const filteredCategories = Object.keys(metricsByCategory).filter(cat => allowedCategories.includes(cat));
+  const sortedCategories = sortCategoriesByOrder(filteredCategories);
 
   // Type the siteVisitRatingFields properly
   const typedSiteVisitRatingFields = siteVisitRatingFields.map(field => ({

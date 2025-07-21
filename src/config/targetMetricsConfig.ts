@@ -1,5 +1,14 @@
 
-import { PredefinedMetricCategory, UserCustomMetricSetting } from '@/types/targetMetrics';
+import { 
+  PredefinedMetricCategory, 
+  UserCustomMetricSetting,
+  REQUIRED_METRIC_CATEGORIES,
+  OPTIONAL_METRIC_CATEGORIES,
+  SITE_VISIT_CATEGORY,
+  VISITOR_PROFILE_CATEGORY,
+  isRequiredCategory,
+  isOptionalCategory
+} from '@/types/targetMetrics';
 
 export interface PredefinedMetricConfig {
   metric_identifier: string;
@@ -59,15 +68,18 @@ export const nonEditableMetricIdentifiers: string[] = [
   "demand_supply_balance",
 ];
 
-// Define the correct order for sections
+// Define the correct order for sections - required sections first, then optional, then special
 export const SECTION_ORDER = [
+  // Required sections (always shown first)
   "Traffic",
-  "Trade Area", 
-  "Market Coverage & Saturation",
-  "Visitor Profile",
-  "Demand & Spending",
-  "Expenses",
+  "Trade Area",
   "Financial Performance",
+  // Optional sections (user can toggle)
+  "Market Coverage & Saturation",
+  "Demand & Spending", 
+  "Expenses",
+  // Special sections
+  "Visitor Profile",
   "Site Visit"
 ];
 
@@ -105,3 +117,33 @@ export function getDefaultMetricValue(metricIdentifier: string): UserCustomMetri
   }
   return undefined;
 }
+
+// Helper functions for section management
+export const getSectionType = (category: string): 'required' | 'optional' | 'special' => {
+  if (isRequiredCategory(category)) return 'required';
+  if (isOptionalCategory(category)) return 'optional';
+  return 'special';
+};
+
+export const getSectionDisplayName = (category: string): string => {
+  switch (category) {
+    case VISITOR_PROFILE_CATEGORY:
+      return 'Visitor Profile (Custom)';
+    case SITE_VISIT_CATEGORY:
+      return 'Site Visit (Always Included)';
+    default:
+      return category;
+  }
+};
+
+export const getDefaultEnabledOptionalSections = (): string[] => {
+  return [...OPTIONAL_METRIC_CATEGORIES];
+};
+
+// Filter categories based on enabled sections
+export const getEnabledCategories = (enabledOptionalSections: string[]): string[] => {
+  return [
+    ...REQUIRED_METRIC_CATEGORIES,
+    ...enabledOptionalSections.filter(section => OPTIONAL_METRIC_CATEGORIES.includes(section as any))
+  ];
+};

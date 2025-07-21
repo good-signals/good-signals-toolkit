@@ -5,25 +5,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TargetMetricsFormData } from '@/types/targetMetrics';
-import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
+import { TargetMetricsFormData, REQUIRED_METRIC_CATEGORIES } from '@/types/targetMetrics';
+import { sortCategoriesByOrder, getEnabledCategories } from '@/config/targetMetricsConfig';
 import { metricDropdownOptions, specificDropdownMetrics } from '@/config/metricDisplayConfig';
 
 interface PredefinedMetricsSectionProps {
   control: Control<TargetMetricsFormData>;
+  enabledSections?: string[];
 }
 
 const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
   control,
+  enabledSections = [],
 }) => {
   const { fields } = useFieldArray({
     control,
     name: "predefined_metrics",
   });
 
-  // Group metrics by category
+  // Get enabled categories (required + user-selected optional)
+  const allowedCategories = getEnabledCategories(enabledSections);
+  
+  // Group metrics by category and filter by enabled sections
   const metricsByCategory = fields.reduce((acc, metric, index) => {
     const category = metric.category;
+    
+    // Only include metrics from enabled categories
+    if (!allowedCategories.includes(category)) {
+      return acc;
+    }
+    
     if (!acc[category]) {
       acc[category] = [];
     }

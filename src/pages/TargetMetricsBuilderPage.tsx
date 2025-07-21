@@ -21,10 +21,12 @@ import {
   type TargetMetricsFormData,
   VISITOR_PROFILE_CATEGORY,
 } from '@/types/targetMetrics';
+import { getDefaultEnabledOptionalSections } from '@/config/targetMetricsConfig';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
+import { OptionalSectionToggle } from '@/components/target-metrics/OptionalSectionToggle';
 
 export const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -40,6 +42,7 @@ export const TargetMetricsBuilderPage = () => {
       predefined_metrics: [],
       custom_metrics: [],
       visitor_profile_metrics: [],
+      enabled_optional_sections: getDefaultEnabledOptionalSections(),
     },
   });
 
@@ -81,6 +84,9 @@ export const TargetMetricsBuilderPage = () => {
       
       form.setValue('metric_set_name', existingMetricSet.name);
       form.setValue('metric_set_id', existingMetricSet.id);
+      
+      // Set enabled optional sections (fallback to all if not specified for backward compatibility)
+      form.setValue('enabled_optional_sections', existingMetricSet.enabled_optional_sections || getDefaultEnabledOptionalSections());
       
       // Reset arrays first
       form.setValue('predefined_metrics', []);
@@ -297,7 +303,22 @@ export const TargetMetricsBuilderPage = () => {
                   )}
                 />
                 
-                <PredefinedMetricsSection control={form.control} />
+                <OptionalSectionToggle
+                  enabledSections={form.watch('enabled_optional_sections') || []}
+                  onSectionToggle={(sectionName: string, enabled: boolean) => {
+                    const currentSections = form.getValues('enabled_optional_sections') || [];
+                    const updatedSections = enabled
+                      ? [...currentSections.filter(s => s !== sectionName), sectionName]
+                      : currentSections.filter(s => s !== sectionName);
+                    form.setValue('enabled_optional_sections', updatedSections);
+                  }}
+                  className="mb-6"
+                />
+                
+                <PredefinedMetricsSection 
+                  control={form.control}
+                  enabledSections={form.watch('enabled_optional_sections') || []}
+                />
                 
                 <VisitorProfileMetricsSection 
                   control={form.control} 

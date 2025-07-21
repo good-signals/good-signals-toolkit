@@ -18,6 +18,9 @@ const saveUserCustomMetricSettings = async (userId: string, metricSetId: string,
     throw deleteError;
   }
 
+  // Save enabled optional sections
+  await saveEnabledOptionalSections(metricSetId, formData.enabled_optional_sections || []);
+
   // Get account for user
   const accountId = await getAccountForUser(userId);
   if (!accountId) {
@@ -97,6 +100,56 @@ const saveUserCustomMetricSettings = async (userId: string, metricSetId: string,
   return { success: true };
 };
 
+// Helper function to save enabled optional sections
+const saveEnabledOptionalSections = async (metricSetId: string, enabledSections: string[]) => {
+  console.log('[saveEnabledOptionalSections] Saving enabled sections for metric set:', metricSetId, enabledSections);
+  
+  // First delete existing enabled sections for this metric set
+  const { error: deleteError } = await supabase
+    .from('target_metric_set_enabled_sections')
+    .delete()
+    .eq('metric_set_id', metricSetId);
+
+  if (deleteError) {
+    console.error('[saveEnabledOptionalSections] Error deleting existing enabled sections:', deleteError);
+    throw deleteError;
+  }
+
+  // Insert new enabled sections
+  if (enabledSections.length > 0) {
+    const sectionsToInsert = enabledSections.map(sectionName => ({
+      metric_set_id: metricSetId,
+      section_name: sectionName,
+    }));
+
+    const { error } = await supabase
+      .from('target_metric_set_enabled_sections')
+      .insert(sectionsToInsert);
+
+    if (error) {
+      console.error('[saveEnabledOptionalSections] Error saving enabled sections:', error);
+      throw error;
+    }
+  }
+
+  console.log('[saveEnabledOptionalSections] Successfully saved enabled sections');
+};
+
+// Helper function to get enabled optional sections
+const getEnabledOptionalSections = async (metricSetId: string): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from('target_metric_set_enabled_sections')
+    .select('section_name')
+    .eq('metric_set_id', metricSetId);
+
+  if (error) {
+    console.error('[getEnabledOptionalSections] Error fetching enabled sections:', error);
+    return []; // Return empty array as fallback
+  }
+
+  return data?.map(row => row.section_name) || [];
+};
+
 export const getTargetMetricSetById = async (id: string, userId: string): Promise<TargetMetricSet | null> => {
   console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);
   
@@ -128,13 +181,17 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
     console.warn('[getTargetMetricSetById] Metric set was likely created without proper standard metrics import.');
   }
 
+  // Get enabled optional sections
+  const enabledSections = await getEnabledOptionalSections(data.id);
+  
   return {
     id: data.id,
     account_id: data.account_id,
     name: data.name,
     created_at: data.created_at,
     updated_at: data.updated_at,
-    user_custom_metrics_settings: data.user_custom_metrics_settings || []
+    user_custom_metrics_settings: data.user_custom_metrics_settings || [],
+    enabled_optional_sections: enabledSections
   };
 };
 

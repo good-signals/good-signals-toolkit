@@ -1,21 +1,30 @@
 
 import { z } from 'zod';
 
-export const PREDEFINED_METRIC_CATEGORIES = [
+export const REQUIRED_METRIC_CATEGORIES = [
   "Traffic",
-  "Trade Area",
-  "Market Coverage & Saturation",
-  "Demand & Spending",
-  "Expenses",
+  "Trade Area", 
   "Financial Performance",
 ] as const;
 
+export const OPTIONAL_METRIC_CATEGORIES = [
+  "Market Coverage & Saturation",
+  "Demand & Spending",
+  "Expenses",
+] as const;
+
+export const PREDEFINED_METRIC_CATEGORIES = [...REQUIRED_METRIC_CATEGORIES, ...OPTIONAL_METRIC_CATEGORIES] as const;
+
 export const VISITOR_PROFILE_CATEGORY = "Visitor Profile" as const;
+export const SITE_VISIT_CATEGORY = "Site Visit" as const;
 
 export const ALL_METRIC_CATEGORIES = [...PREDEFINED_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY] as const;
 
+export type RequiredMetricCategory = typeof REQUIRED_METRIC_CATEGORIES[number];
+export type OptionalMetricCategory = typeof OPTIONAL_METRIC_CATEGORIES[number];
 export type PredefinedMetricCategory = typeof PREDEFINED_METRIC_CATEGORIES[number];
 export type VisitorProfileCategory = typeof VISITOR_PROFILE_CATEGORY;
+export type SiteVisitCategory = typeof SITE_VISIT_CATEGORY;
 export type MetricCategory = typeof ALL_METRIC_CATEGORIES[number];
 
 export const MEASUREMENT_TYPES = ["Index", "Amount", "Percentage"] as const;
@@ -79,6 +88,7 @@ export const TargetMetricSetSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   user_custom_metrics_settings: z.array(UserCustomMetricSettingSchema).optional(),
+  enabled_optional_sections: z.array(z.string()).optional(),
 });
 export type TargetMetricSet = z.infer<typeof TargetMetricSetSchema>;
 
@@ -120,5 +130,19 @@ export const TargetMetricsFormSchema = z.object({
   predefined_metrics: z.array(PredefinedMetricFormSchema),
   custom_metrics: z.array(CustomMetricFormSchema),
   visitor_profile_metrics: z.array(VisitorProfileMetricFormSchema),
+  enabled_optional_sections: z.array(z.string()).default([]), // Track which optional sections are enabled
 });
 export type TargetMetricsFormData = z.infer<typeof TargetMetricsFormSchema>;
+
+// Helper functions for section categorization
+export const isRequiredCategory = (category: string): category is RequiredMetricCategory => {
+  return REQUIRED_METRIC_CATEGORIES.includes(category as RequiredMetricCategory);
+};
+
+export const isOptionalCategory = (category: string): category is OptionalMetricCategory => {
+  return OPTIONAL_METRIC_CATEGORIES.includes(category as OptionalMetricCategory);
+};
+
+export const isSiteVisitCategory = (category: string): category is SiteVisitCategory => {
+  return category === SITE_VISIT_CATEGORY;
+};

@@ -399,6 +399,38 @@ export type Database = {
           },
         ]
       }
+      standard_target_metric_set_enabled_sections: {
+        Row: {
+          created_at: string
+          id: string
+          metric_set_id: string
+          section_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric_set_id: string
+          section_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric_set_id?: string
+          section_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standard_target_metric_set_enabled_sections_metric_set_id_fkey"
+            columns: ["metric_set_id"]
+            isOneToOne: false
+            referencedRelation: "standard_target_metric_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       standard_target_metric_sets: {
         Row: {
           created_at: string
@@ -472,6 +504,38 @@ export type Database = {
             columns: ["metric_set_id"]
             isOneToOne: false
             referencedRelation: "standard_target_metric_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      target_metric_set_enabled_sections: {
+        Row: {
+          created_at: string
+          id: string
+          metric_set_id: string
+          section_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric_set_id: string
+          section_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric_set_id?: string
+          section_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "target_metric_set_enabled_sections_metric_set_id_fkey"
+            columns: ["metric_set_id"]
+            isOneToOne: false
+            referencedRelation: "target_metric_sets"
             referencedColumns: ["id"]
           },
         ]
