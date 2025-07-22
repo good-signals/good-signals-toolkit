@@ -73,12 +73,12 @@ export const SECTION_ORDER = [
   "Traffic",
   "Trade Area",
   "Financial Performance",
+  "Visitor Profile",
   // Optional sections (user can toggle)
   "Market Coverage & Saturation",
   "Demand & Spending", 
   "Expenses",
   // Special sections
-  "Visitor Profile",
   "Site Visit"
 ];
 
