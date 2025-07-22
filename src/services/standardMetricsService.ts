@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   StandardTargetMetricSet, 
@@ -47,6 +48,108 @@ export const getStandardMetricSettings = async (metricSetId: string): Promise<St
   }
   
   return data || [];
+};
+
+// Helper function to save enabled optional sections for standard sets
+const saveStandardEnabledOptionalSections = async (metricSetId: string, enabledSections: string[]) => {
+  console.log('[saveStandardEnabledOptionalSections] Saving enabled sections for standard metric set:', metricSetId, enabledSections);
+  
+  // First delete existing enabled sections for this metric set
+  const { error: deleteError } = await supabase
+    .from('standard_target_metric_set_enabled_sections')
+    .delete()
+    .eq('metric_set_id', metricSetId);
+
+  if (deleteError) {
+    console.error('[saveStandardEnabledOptionalSections] Error deleting existing enabled sections:', deleteError);
+    throw deleteError;
+  }
+
+  // Insert new enabled sections
+  if (enabledSections.length > 0) {
+    const sectionsToInsert = enabledSections.map(sectionName => ({
+      metric_set_id: metricSetId,
+      section_name: sectionName,
+    }));
+
+    const { error } = await supabase
+      .from('standard_target_metric_set_enabled_sections')
+      .insert(sectionsToInsert);
+
+    if (error) {
+      console.error('[saveStandardEnabledOptionalSections] Error saving enabled sections:', error);
+      throw error;
+    }
+  }
+
+  console.log('[saveStandardEnabledOptionalSections] Successfully saved enabled sections');
+};
+
+// Helper function to get enabled optional sections for standard sets
+const getStandardEnabledOptionalSections = async (metricSetId: string): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from('standard_target_metric_set_enabled_sections')
+    .select('section_name')
+    .eq('metric_set_id', metricSetId);
+
+  if (error) {
+    console.error('[getStandardEnabledOptionalSections] Error fetching enabled sections:', error);
+    return []; // Return empty array as fallback
+  }
+
+  return data?.map(row => row.section_name) || [];
+};
+
+// Helper function to infer enabled sections from existing metrics for standard sets
+const inferStandardEnabledSectionsFromMetrics = (metrics: StandardTargetMetricSetting[]): string[] => {
+  const categories = new Set<string>();
+  
+  // Extract unique categories from metrics
+  metrics.forEach(metric => {
+    if (metric.category) {
+      categories.add(metric.category);
+    }
+  });
+
+  return Array.from(categories);
+};
+
+export const getStandardMetricSetWithSettings = async (id: string): Promise<{
+  metricSet: StandardTargetMetricSet | null;
+  settings: StandardTargetMetricSetting[];
+  enabledSections: string[];
+}> => {
+  console.log('[getStandardMetricSetWithSettings] Fetching standard metric set:', id);
+  
+  // Get the metric set
+  const metricSet = await getStandardMetricSetById(id);
+  
+  if (!metricSet) {
+    return { metricSet: null, settings: [], enabledSections: [] };
+  }
+
+  // Get the settings
+  const settings = await getStandardMetricSettings(id);
+  
+  // Get enabled optional sections from database
+  let enabledSections = await getStandardEnabledOptionalSections(id);
+  
+  // If no enabled sections found in database but we have metrics, infer from existing metrics
+  if (enabledSections.length === 0 && settings.length > 0) {
+    console.log('[getStandardMetricSetWithSettings] No enabled sections found, inferring from existing metrics');
+    const inferredSections = inferStandardEnabledSectionsFromMetrics(settings);
+    enabledSections = inferredSections;
+    console.log('[getStandardMetricSetWithSettings] Inferred enabled sections:', inferredSections);
+  }
+  
+  console.log('[getStandardMetricSetWithSettings] Retrieved standard metric set with settings:', {
+    metricSetId: metricSet.id,
+    metricSetName: metricSet.name,
+    settingsCount: settings.length,
+    enabledSections: enabledSections
+  });
+
+  return { metricSet, settings, enabledSections };
 };
 
 export const createStandardMetricSet = async (data: CreateStandardMetricSetData): Promise<StandardTargetMetricSet> => {
@@ -108,6 +211,9 @@ export const saveStandardMetricSettings = async (metricSetId: string, formData: 
     .from('standard_target_metric_settings')
     .delete()
     .eq('metric_set_id', metricSetId);
+
+  // Save enabled optional sections
+  await saveStandardEnabledOptionalSections(metricSetId, formData.enabled_optional_sections || []);
 
   // Prepare all metrics to insert
   const metricsToInsert = [];
@@ -182,17 +288,16 @@ export const copyStandardMetricSetToAccount = async (
     newName
   });
 
-  // Get the standard metric set
-  const standardSet = await getStandardMetricSetById(standardSetId);
+  // Get the standard metric set with settings and enabled sections
+  const { metricSet: standardSet, settings: standardSettings, enabledSections } = await getStandardMetricSetWithSettings(standardSetId);
+  
   if (!standardSet) {
     throw new Error('Standard metric set not found');
   }
 
   console.log('[copyStandardMetricSetToAccount] Found standard set:', standardSet.name);
-
-  // Get the standard metric settings
-  const standardSettings = await getStandardMetricSettings(standardSetId);
   console.log('[copyStandardMetricSetToAccount] Found standard settings:', standardSettings.length);
+  console.log('[copyStandardMetricSetToAccount] Found enabled sections:', enabledSections);
 
   if (standardSettings.length === 0) {
     throw new Error('No standard metric settings found for this set');
@@ -214,6 +319,28 @@ export const copyStandardMetricSetToAccount = async (
   }
 
   console.log('[copyStandardMetricSetToAccount] Created new target set:', newTargetSet.id);
+
+  // Copy the enabled sections to target_metric_set_enabled_sections
+  if (enabledSections.length > 0) {
+    const sectionsToInsert = enabledSections.map(sectionName => ({
+      metric_set_id: newTargetSet.id,
+      section_name: sectionName,
+    }));
+
+    const { error: sectionsError } = await supabase
+      .from('target_metric_set_enabled_sections')
+      .insert(sectionsToInsert);
+
+    if (sectionsError) {
+      console.error('Error copying enabled sections:', sectionsError);
+      // Clean up the target set if sections insert fails
+      await supabase
+        .from('target_metric_sets')
+        .delete()
+        .eq('id', newTargetSet.id);
+      throw sectionsError;
+    }
+  }
 
   // Copy the settings to user_custom_metrics_settings
   const userSettingsToInsert = standardSettings.map(setting => ({
@@ -246,7 +373,7 @@ export const copyStandardMetricSetToAccount = async (
     }
   }
 
-  console.log(`[copyStandardMetricSetToAccount] Successfully copied ${userSettingsToInsert.length} metrics from standard set "${standardSet.name}" to user account`);
+  console.log(`[copyStandardMetricSetToAccount] Successfully copied ${userSettingsToInsert.length} metrics and ${enabledSections.length} enabled sections from standard set "${standardSet.name}" to user account`);
   
   // Return the new target set with a properly typed structure
   return {
@@ -256,6 +383,7 @@ export const copyStandardMetricSetToAccount = async (
       id: '', // Will be generated by DB
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    }))
+    })),
+    enabled_optional_sections: enabledSections
   };
 };

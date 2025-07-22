@@ -31,6 +31,7 @@ export interface StandardMetricsFormData {
   metric_set_id?: string;
   metric_set_name: string;
   metric_set_description?: string;
+  enabled_optional_sections: string[];
   predefined_metrics: Array<{
     metric_identifier: string;
     label: string;
