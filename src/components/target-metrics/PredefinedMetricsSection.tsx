@@ -19,6 +19,8 @@ interface PredefinedMetricsSectionProps {
   enabledSections?: string[];
   onSectionToggle?: (sectionName: string, enabled: boolean) => void;
   metricSetId?: string;
+  accountId?: string;
+  onAddCustomMetric?: () => void;
 }
 
 const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
@@ -26,6 +28,8 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
   enabledSections = [],
   onSectionToggle,
   metricSetId,
+  accountId,
+  onAddCustomMetric,
 }) => {
   const { fields } = useFieldArray({
     control,
@@ -42,12 +46,7 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
   const [customMetricFormOpen, setCustomMetricFormOpen] = useState(false);
   const [preselectedSection, setPreselectedSection] = useState<string | null>(null);
 
-  // Get account ID from first custom metric or form values
-  const accountId = customFields.length > 0 ? 
-    (customFields[0] as any)?.account_id : 
-    undefined;
-
-  // Fetch custom sections from database
+  // Fetch custom sections from database using the passed accountId
   const { data: customSections = [] } = useQuery({
     queryKey: ['customSections', accountId],
     queryFn: () => accountId ? getCustomSections(accountId) : [],
@@ -264,6 +263,19 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Global Add Custom Metric Button */}
+        <div className="flex justify-end mb-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onAddCustomMetric}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Custom Metric
+          </Button>
+        </div>
+
         {/* Render predefined sections */}
         {sortedPredefinedCategories.map((category) => {
           const sectionType = getSectionType(category);
@@ -275,7 +287,7 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
           const shouldInsertVisitorProfile = category === "Financial Performance";
 
           return (
-            <React.Fragment key={category}>
+            <div key={category}>
               <CollapsibleMetricSection
                 sectionName={category}
                 sectionType={sectionType as 'required' | 'optional' | 'special'}
@@ -295,7 +307,7 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
                   onToggleEnabled={(enabled) => handleToggleEnabled(VISITOR_PROFILE_CATEGORY, enabled)}
                 />
               )}
-            </React.Fragment>
+            </div>
           );
         })}
 

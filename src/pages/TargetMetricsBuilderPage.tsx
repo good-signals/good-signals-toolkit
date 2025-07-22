@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,6 +29,7 @@ import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorPro
 
 import { TemplateSelectionStep } from "@/components/target-metrics/TemplateSelectionStep";
 import { CustomSectionManagement } from "@/components/target-metrics/CustomSectionManagement";
+import CustomMetricForm from '@/components/target-metrics/CustomMetricForm';
 
 const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
@@ -39,6 +40,7 @@ const TargetMetricsBuilderPage = () => {
   const [currentStep, setCurrentStep] = useState<'template' | 'configuration'>('template');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [sectionManagementOpen, setSectionManagementOpen] = useState(false);
+  const [customMetricFormOpen, setCustomMetricFormOpen] = useState(false);
 
   const form = useForm<TargetMetricsFormData>({
     resolver: zodResolver(TargetMetricsFormSchema),
@@ -420,6 +422,24 @@ const TargetMetricsBuilderPage = () => {
     }
   };
 
+  const handleAddCustomMetric = () => {
+    setCustomMetricFormOpen(true);
+  };
+
+  const handleCustomMetricSubmit = (data: any) => {
+    const newMetric = {
+      metric_identifier: `custom_${Date.now()}`,
+      label: data.name,
+      category: data.category,
+      target_value: data.target_value,
+      higher_is_better: data.higher_is_better,
+      units: data.units,
+      is_custom: true as const,
+    };
+    appendCustom(newMetric);
+    setCustomMetricFormOpen(false);
+  };
+
   // Show configuration step
   return (
     <div className="container mx-auto py-8 px-4">
@@ -481,6 +501,8 @@ const TargetMetricsBuilderPage = () => {
                   enabledSections={form.watch('enabled_optional_sections') || []}
                   onSectionToggle={handleSectionToggle}
                   metricSetId={metricSetId}
+                  accountId={accountId}
+                  onAddCustomMetric={handleAddCustomMetric}
                 />
 
                 <div className="flex gap-4">
@@ -523,11 +545,20 @@ const TargetMetricsBuilderPage = () => {
       </div>
       
       {accountId && (
-        <CustomSectionManagement
-          open={sectionManagementOpen}
-          onOpenChange={setSectionManagementOpen}
-          accountId={accountId}
-        />
+        <>
+          <CustomSectionManagement
+            open={sectionManagementOpen}
+            onOpenChange={setSectionManagementOpen}
+            accountId={accountId}
+          />
+          
+          <CustomMetricForm
+            open={customMetricFormOpen}
+            onOpenChange={setCustomMetricFormOpen}
+            onSubmit={handleCustomMetricSubmit}
+            isEditing={false}
+          />
+        </>
       )}
     </div>
   );
