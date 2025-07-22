@@ -782,7 +782,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     categoriesCount: sortedCategories.length,
     siteVisitRatingsCount: siteVisitRatingFields.length,
     isFormReady,
-    formInitialized
+    formInitialized,
+    metricSetData: metricSet,
+    userCustomMetricsSettings: metricSet?.user_custom_metrics_settings
   });
 
   // Display message if no custom metrics but site visit ratings exist
