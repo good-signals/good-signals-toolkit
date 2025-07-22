@@ -4,7 +4,9 @@ import {
   UserCustomMetricSetting, 
   TargetMetricSet,
   CreateTargetMetricSetData,
-  TargetMetricsFormData
+  TargetMetricsFormData,
+  OPTIONAL_METRIC_CATEGORIES,
+  VISITOR_PROFILE_CATEGORY
 } from '@/types/targetMetrics';
 import { getAccountForUser } from './targetMetrics/accountHelpers';
 import { copyStandardMetricSetToAccount } from './standardMetricsService';
@@ -44,6 +46,42 @@ export const getTargetMetricSets = async (accountId: string) => {
   return data || [];
 };
 
+// Helper function to get enabled optional sections
+const getEnabledOptionalSections = async (metricSetId: string): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from('target_metric_set_enabled_sections')
+    .select('section_name')
+    .eq('metric_set_id', metricSetId);
+
+  if (error) {
+    console.error('[getEnabledOptionalSections] Error fetching enabled sections:', error);
+    return []; // Return empty array as fallback
+  }
+
+  return data?.map(row => row.section_name) || [];
+};
+
+// Helper function to infer enabled sections from metrics (for legacy metric sets)
+const inferEnabledSectionsFromMetrics = (metrics: any[]): string[] => {
+  const categoriesInMetrics = [...new Set(metrics.map(metric => metric.category))];
+  const enabledSections: string[] = [];
+  
+  // Check which optional categories have metrics
+  OPTIONAL_METRIC_CATEGORIES.forEach(category => {
+    if (categoriesInMetrics.includes(category)) {
+      enabledSections.push(category);
+    }
+  });
+  
+  // Always include visitor profile if there are visitor profile metrics
+  if (categoriesInMetrics.includes(VISITOR_PROFILE_CATEGORY)) {
+    enabledSections.push(VISITOR_PROFILE_CATEGORY);
+  }
+  
+  console.log('[inferEnabledSectionsFromMetrics] Inferred sections:', enabledSections);
+  return enabledSections;
+};
+
 export const getTargetMetricSetById = async (id: string, userId?: string) => {
   console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);
   
@@ -71,7 +109,8 @@ export const getTargetMetricSetById = async (id: string, userId?: string) => {
 
   console.log('[getTargetMetricSetById] Retrieved metric set:', {
     metricSetId: metricSetData.id,
-    metricSetName: metricSetData.name
+    metricSetName: metricSetData.name,
+    hasEnabledSectionsData: metricSetData.has_enabled_sections_data
   });
 
   // Now get the user's custom metrics settings for this metric set
@@ -99,10 +138,23 @@ export const getTargetMetricSetById = async (id: string, userId?: string) => {
     console.warn('[getTargetMetricSetById] No user_custom_metrics_settings found for metric set and user combination.');
     console.warn('[getTargetMetricSetById] This may indicate the metric set needs to be repaired or the user needs to be assigned metrics.');
   }
+
+  // Get enabled optional sections
+  let enabledSections = await getEnabledOptionalSections(metricSetData.id);
+  
+  // For legacy metric sets (has_enabled_sections_data = false), infer sections from metrics if no explicit sections are stored
+  if (!metricSetData.has_enabled_sections_data && enabledSections.length === 0 && userCustomMetricsSettings.length > 0) {
+    console.log('[getTargetMetricSetById] Legacy metric set - inferring enabled sections from metrics');
+    const inferredSections = inferEnabledSectionsFromMetrics(userCustomMetricsSettings);
+    enabledSections = inferredSections;
+  }
+
+  console.log('[getTargetMetricSetById] Final enabled sections:', enabledSections);
   
   return {
     ...metricSetData,
-    user_custom_metrics_settings: userCustomMetricsSettings
+    user_custom_metrics_settings: userCustomMetricsSettings,
+    enabled_optional_sections: enabledSections
   };
 };
 
