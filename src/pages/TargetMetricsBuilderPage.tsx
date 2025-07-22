@@ -436,7 +436,8 @@ const TargetMetricsBuilderPage = () => {
       units: data.units,
       is_custom: true as const,
     };
-    appendCustom(newMetric);
+    const currentCustomMetrics = form.getValues('custom_metrics') || [];
+    form.setValue('custom_metrics', [...currentCustomMetrics, newMetric]);
     setCustomMetricFormOpen(false);
   };
 

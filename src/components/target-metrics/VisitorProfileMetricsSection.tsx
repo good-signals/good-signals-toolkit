@@ -237,44 +237,46 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
   const editingMetric = editingIndex !== null ? fields[editingIndex] : null;
 
   return (
-    <Card className={!isEnabled ? "opacity-60" : ""}>
-      <Collapsible open={isEnabled && isExpanded} onOpenChange={setIsExpanded}>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {isEnabled && (isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
-                {!isEnabled && <ChevronRight className="h-4 w-4 opacity-50" />}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Visitor Profile Metrics</span>
-                    <Badge variant="secondary" className="text-xs">
-                      Optional
-                    </Badge>
-                    {fields.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {fields.length} metric{fields.length !== 1 ? 's' : ''}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {onToggleEnabled && (
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Switch
-                      checked={isEnabled}
-                      onCheckedChange={onToggleEnabled}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-        </CollapsibleTrigger>
-        
+    <Collapsible open={isEnabled ? isExpanded : false} onOpenChange={setIsExpanded}>
+      <div className={`border rounded-lg ${!isEnabled ? 'bg-muted/30 opacity-70' : 'bg-card'}`}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center space-x-3 flex-1">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center space-x-2 hover:text-primary transition-colors"
+                disabled={!isEnabled}
+              >
+                <ChevronDown 
+                  className={`h-4 w-4 transition-transform ${isEnabled && isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                />
+                <span className="cursor-pointer font-medium">
+                  Visitor Profile Metrics
+                </span>
+              </button>
+            </CollapsibleTrigger>
+            
+            <Badge variant="secondary">
+              Optional
+            </Badge>
+            
+            {fields.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                ({fields.length} metric{fields.length !== 1 ? 's' : ''})
+              </span>
+            )}
+          </div>
+          
+          {onToggleEnabled && (
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={onToggleEnabled}
+              className=""
+            />
+          )}
+        </div>
         <CollapsibleContent>
-          <CardContent className="space-y-4 pt-0">
+          <div className="p-4">
             <div className="flex justify-between items-center">
               <h4 className="text-sm font-medium">Your Visitor Profile Metrics</h4>
               <Button 
@@ -347,10 +349,10 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
               initialData={editingMetric || undefined}
               isEditing={editingIndex !== null}
             />
-          </CardContent>
+          </div>
         </CollapsibleContent>
-      </Collapsible>
-    </Card>
+      </div>
+    </Collapsible>
   );
 };
 
