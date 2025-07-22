@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,17 +10,33 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { REQUIRED_METRIC_CATEGORIES, OPTIONAL_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
+import { SECTION_ORDER } from '@/config/targetMetricsConfig';
 
-// Get available sections for custom metrics
+// Get available sections for custom metrics in the correct order
 const getAvailableSections = () => {
-  return [
+  const allSections = [
     ...REQUIRED_METRIC_CATEGORIES,
     ...OPTIONAL_METRIC_CATEGORIES,
     VISITOR_PROFILE_CATEGORY,
-    'Customer Experience', // Common custom category
-    'Operational Excellence', // Common custom category
-    'Brand & Marketing', // Common custom category
   ];
+  
+  // Sort sections according to SECTION_ORDER
+  return allSections.sort((a, b) => {
+    const indexA = SECTION_ORDER.indexOf(a);
+    const indexB = SECTION_ORDER.indexOf(b);
+    
+    // If both sections are in the defined order, sort by their position
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    
+    // If only one is in the defined order, prioritize it
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    
+    // If neither is in the defined order, sort alphabetically
+    return a.localeCompare(b);
+  });
 };
 
 const CustomMetricFormSchema = z.object({
