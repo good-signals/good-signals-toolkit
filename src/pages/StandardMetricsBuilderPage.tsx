@@ -208,13 +208,12 @@ const StandardMetricsBuilderPage: React.FC = () => {
         form.reset(draftData);
       } else {
         console.log('No draft found, initializing with defaults');
-        const enabledOptionalCategories = getEnabledCategories(OPTIONAL_METRIC_CATEGORIES);
         
         const defaultFormData: StandardMetricsFormData = {
           metric_set_id: undefined,
           metric_set_name: "",
           metric_set_description: "",
-          enabled_optional_sections: [...enabledOptionalCategories, VISITOR_PROFILE_CATEGORY],
+          enabled_optional_sections: [VISITOR_PROFILE_CATEGORY, ...Array.from(OPTIONAL_METRIC_CATEGORIES)],
           predefined_metrics: createDefaultPredefinedMetrics(),
           custom_metrics: [],
           visitor_profile_metrics: [],
@@ -379,7 +378,7 @@ const StandardMetricsBuilderPage: React.FC = () => {
           </Card>
 
           <PredefinedMetricsSection
-            control={form.control}
+            control={form.control as any}
             enabledSections={form.watch('enabled_optional_sections') || []}
             onSectionToggle={handleSectionToggle}
           />
