@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getGoogleMapsApiKey } from '@/services/googleMapsService';
 
 // Define the AddressComponents interface for consistent typing
 export interface AddressComponents {
@@ -37,8 +37,9 @@ const useGooglePlacesAutocomplete = () => {
   const [loading, setLoading] = useState(false);
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
 
-  // Check if Google Maps is already loaded
+  // Check if Google Maps is already loaded and load API key
   useEffect(() => {
     let isMounted = true;
     let checkInterval: NodeJS.Timeout;
@@ -55,80 +56,103 @@ const useGooglePlacesAutocomplete = () => {
       return false;
     };
 
-    // First check if it's already loaded
-    if (checkGoogleMapsLoaded()) {
-      return;
-    }
-
-    // Create global callback function
-    window.initGooglePlaces = () => {
-      console.log('[AddressAutocompleteInput] Google Maps API loaded via callback');
-      if (isMounted && checkGoogleMapsLoaded()) {
-        setIsGoogleLoaded(true);
-        setApiError(null);
-      }
-    };
-
-    // Check if script already exists
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]') as HTMLScriptElement;
-    if (existingScript) {
-      console.log('[AddressAutocompleteInput] Google Maps script already exists, waiting for load...');
-      
-      // If script exists but Google isn't loaded yet, wait for it
-      checkInterval = setInterval(() => {
-        if (checkGoogleMapsLoaded() && isMounted) {
-          clearInterval(checkInterval);
+    const loadGoogleMapsScript = async () => {
+      try {
+        setIsLoadingApiKey(true);
+        
+        // First check if it's already loaded
+        if (checkGoogleMapsLoaded()) {
+          setIsLoadingApiKey(false);
+          return;
         }
-      }, 200);
 
-      // Cleanup after timeout
-      setTimeout(() => {
-        if (checkInterval) clearInterval(checkInterval);
-        if (!window.google || !window.google.maps) {
-          console.error('[AddressAutocompleteInput] Google Maps failed to load within timeout');
+        // Check if script already exists
+        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]') as HTMLScriptElement;
+        if (existingScript) {
+          console.log('[AddressAutocompleteInput] Google Maps script already exists, waiting for load...');
+          
+          // If script exists but Google isn't loaded yet, wait for it
+          checkInterval = setInterval(() => {
+            if (checkGoogleMapsLoaded() && isMounted) {
+              clearInterval(checkInterval);
+              setIsLoadingApiKey(false);
+            }
+          }, 200);
+
+          // Cleanup after timeout
+          setTimeout(() => {
+            if (checkInterval) clearInterval(checkInterval);
+            if (!window.google || !window.google.maps) {
+              console.error('[AddressAutocompleteInput] Google Maps failed to load within timeout');
+              if (isMounted) {
+                setApiError('Google Maps API failed to load');
+                setIsLoadingApiKey(false);
+              }
+            }
+          }, 15000);
+          return;
+        }
+
+        // Fetch API key from Supabase edge function
+        console.log('[AddressAutocompleteInput] Fetching Google Maps API key...');
+        const apiKey = await getGoogleMapsApiKey();
+        
+        if (!apiKey) {
           if (isMounted) {
-            setApiError('Google Maps API failed to load');
+            setApiError('Unable to load Google Maps API key. Please check your configuration.');
+            setIsLoadingApiKey(false);
           }
+          return;
         }
-      }, 15000);
-      return;
-    }
 
-    // Load script if it doesn't exist
-    console.log('[AddressAutocompleteInput] Loading Google Maps script...');
-    const script = document.createElement('script');
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCYg8pkH1rO2z8p6YtsocdhG0s-FKInCnU';
-    
-    if (!apiKey || apiKey === 'your-api-key-here') {
-      console.error('[AddressAutocompleteInput] Invalid or missing Google Maps API key');
-      if (isMounted) {
-        setApiError('Google Maps API key not configured');
-      }
-      return;
-    }
+        // Create global callback function
+        window.initGooglePlaces = () => {
+          console.log('[AddressAutocompleteInput] Google Maps API loaded via callback');
+          if (isMounted && checkGoogleMapsLoaded()) {
+            setIsGoogleLoaded(true);
+            setApiError(null);
+            setIsLoadingApiKey(false);
+          }
+        };
 
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGooglePlaces`;
-    script.async = true;
-    script.defer = true;
-    
-    script.onerror = (error) => {
-      console.error('[AddressAutocompleteInput] Failed to load Google Maps API script:', error);
-      if (isMounted) {
-        setApiError('Failed to load Google Maps API');
+        // Load script with the fetched API key
+        console.log('[AddressAutocompleteInput] Loading Google Maps script...');
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGooglePlaces`;
+        script.async = true;
+        script.defer = true;
+        
+        script.onerror = (error) => {
+          console.error('[AddressAutocompleteInput] Failed to load Google Maps API script:', error);
+          if (isMounted) {
+            setApiError('Failed to load Google Maps API. Please check your API key configuration.');
+            setIsLoadingApiKey(false);
+          }
+        };
+        
+        document.head.appendChild(script);
+
+        // Set timeout for loading
+        setTimeout(() => {
+          if (!window.google || !window.google.maps) {
+            console.error('[AddressAutocompleteInput] Google Maps loading timeout');
+            if (isMounted) {
+              setApiError('Google Maps API loading timeout. Please try again.');
+              setIsLoadingApiKey(false);
+            }
+          }
+        }, 15000);
+
+      } catch (error) {
+        console.error('[AddressAutocompleteInput] Error loading Google Maps:', error);
+        if (isMounted) {
+          setApiError('Failed to initialize Google Maps. Please try again.');
+          setIsLoadingApiKey(false);
+        }
       }
     };
-    
-    document.head.appendChild(script);
 
-    // Set timeout for loading
-    setTimeout(() => {
-      if (!window.google || !window.google.maps) {
-        console.error('[AddressAutocompleteInput] Google Maps loading timeout');
-        if (isMounted) {
-          setApiError('Google Maps API loading timeout');
-        }
-      }
-    }, 15000);
+    loadGoogleMapsScript();
 
     return () => {
       isMounted = false;
@@ -163,8 +187,8 @@ const useGooglePlacesAutocomplete = () => {
       return;
     }
 
-    if (apiError) {
-      console.warn('[AddressAutocompleteInput] Skipping prediction request due to API error:', apiError);
+    if (apiError || isLoadingApiKey) {
+      console.warn('[AddressAutocompleteInput] Skipping prediction request due to API error or loading:', { apiError, isLoadingApiKey });
       return;
     }
 
@@ -173,7 +197,7 @@ const useGooglePlacesAutocomplete = () => {
       const request: google.maps.places.AutocompletionRequest = {
         input: input.trim(),
         componentRestrictions: { country: ['us', 'ca'] },
-        types: ['geocode'] // Fixed: Use 'geocode' for addresses instead of conflicting types
+        types: ['geocode']
       };
 
       console.log('[AddressAutocompleteInput] Requesting predictions for:', input, 'with request:', request);
@@ -186,7 +210,7 @@ const useGooglePlacesAutocomplete = () => {
             status, 
             statusName: google.maps.places.PlacesServiceStatus[status],
             resultsCount: results?.length || 0,
-            results: results?.slice(0, 3) // Log first 3 results for debugging
+            results: results?.slice(0, 3)
           });
           
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
@@ -204,9 +228,8 @@ const useGooglePlacesAutocomplete = () => {
             });
             setPredictions([]);
             
-            // Provide more specific error messages
             if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
-              setApiError('Google Places API access denied. Please check your API key and ensure Places API is enabled.');
+              setApiError('Google Places API access denied. Please check your API key configuration.');
             } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
               setApiError('Google Places API quota exceeded. Please try again later.');
             } else if (status === google.maps.places.PlacesServiceStatus.INVALID_REQUEST) {
@@ -274,7 +297,6 @@ const useGooglePlacesAutocomplete = () => {
               if (types.includes('country')) components.country = component.long_name;
             });
 
-            // Construct address line 1
             if (streetNumber && route) {
               components.addressLine1 = `${streetNumber} ${route}`;
             } else if (result.name && result.types?.includes('establishment')) {
@@ -302,7 +324,8 @@ const useGooglePlacesAutocomplete = () => {
     getPlaceDetails, 
     setPredictions,
     isGoogleLoaded,
-    apiError
+    apiError,
+    isLoadingApiKey
   };
 };
 
@@ -326,7 +349,8 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
     getPlaceDetails, 
     setPredictions,
     isGoogleLoaded,
-    apiError
+    apiError,
+    isLoadingApiKey
   } = useGooglePlacesAutocomplete();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,7 +365,7 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
     if (value.trim() === "") {
       setShowSuggestions(false);
       setPredictions([]);
-    } else if (isGoogleLoaded && !apiError) {
+    } else if (isGoogleLoaded && !apiError && !isLoadingApiKey) {
       setShowSuggestions(true);
       // Debounce the API call
       debounceTimeoutRef.current = setTimeout(() => {
@@ -349,7 +373,11 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         getPlacePredictions(value);
       }, 300);
     } else {
-      console.warn('[AddressAutocompleteInput] Cannot search - Google not loaded or API error:', { isGoogleLoaded, apiError });
+      console.warn('[AddressAutocompleteInput] Cannot search - Google not loaded, API error, or loading API key:', { 
+        isGoogleLoaded, 
+        apiError, 
+        isLoadingApiKey 
+      });
     }
   };
 
@@ -365,27 +393,24 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       onAddressSelect(addressDetails);
     } catch (error) {
       console.error('[AddressAutocompleteInput] Error selecting address:', error);
-      // Show user-friendly error but don't break the flow
     }
   };
 
   const handleInputFocus = () => {
-    if (address && predictions.length > 0 && !apiError) {
+    if (address && predictions.length > 0 && !apiError && !isLoadingApiKey) {
       setShowSuggestions(true);
-    } else if (address && isGoogleLoaded && !apiError) {
+    } else if (address && isGoogleLoaded && !apiError && !isLoadingApiKey) {
       getPlacePredictions(address);
       setShowSuggestions(true);
     }
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
-    // Only hide suggestions if not clicking on dropdown
     if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
       setTimeout(() => setShowSuggestions(false), 200);
     }
   };
 
-  // Cleanup debounce timeout on unmount
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
@@ -393,6 +418,14 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       }
     };
   }, []);
+
+  const getPlaceholderText = () => {
+    if (isLoadingApiKey) return "Loading Google Maps...";
+    if (apiError) return "Address search unavailable";
+    return "Start typing an address...";
+  };
+
+  const isInputDisabled = isLoadingApiKey || !!apiError;
 
   return (
     <div className="relative">
@@ -404,24 +437,24 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         onChange={handleInputChange}
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
-        placeholder={apiError ? "Address search unavailable" : "Start typing an address..."}
+        placeholder={getPlaceholderText()}
         className={`${error ? 'border-destructive' : ''}`}
         autoComplete="off"
-        disabled={!!apiError}
+        disabled={isInputDisabled}
       />
       {error && <p className="text-sm text-destructive mt-1">{error}</p>}
       {apiError && (
         <p className="text-sm text-destructive mt-1">
           {apiError}
-          {apiError.includes('API key') && (
+          {apiError.includes('configuration') && (
             <span className="block text-xs mt-1">
-              Check that your Google Maps API key is valid and has Places API enabled.
+              Please check that your Google Maps API key is configured in Supabase and has Places API enabled.
             </span>
           )}
         </p>
       )}
       
-      {showSuggestions && isGoogleLoaded && !apiError && (predictions.length > 0 || loading) && (
+      {showSuggestions && isGoogleLoaded && !apiError && !isLoadingApiKey && (predictions.length > 0 || loading) && (
         <div 
           ref={dropdownRef}
           className="absolute z-50 w-full border bg-card shadow-lg rounded-md mt-1 max-h-60 overflow-y-auto"
@@ -454,9 +487,9 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
         </div>
       )}
       
-      {!isGoogleLoaded && !apiError && address && (
+      {isLoadingApiKey && address && (
         <div className="absolute z-50 w-full border bg-card shadow-lg rounded-md mt-1 p-3 text-sm text-muted-foreground">
-          Loading Google Places...
+          Loading Google Maps API...
         </div>
       )}
     </div>
