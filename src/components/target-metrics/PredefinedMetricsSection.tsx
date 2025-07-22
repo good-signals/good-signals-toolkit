@@ -4,7 +4,9 @@ import { Control, useFieldArray } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { TargetMetricsFormData, REQUIRED_METRIC_CATEGORIES, OPTIONAL_METRIC_CATEGORIES, SITE_VISIT_CATEGORY, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import { sortCategoriesByOrder, getEnabledCategories } from '@/config/targetMetricsConfig';
 import { getCustomSections } from '@/services/customMetricSectionsService';
@@ -135,6 +137,104 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
 
   const isVisitorProfileEnabled = enabledSections.includes(VISITOR_PROFILE_CATEGORY);
 
+  // Custom section component for rendering custom sections with toggle/collapse behavior
+  const CustomSectionRenderer = ({ sectionName }: { sectionName: string }) => {
+    const isEnabled = isSectionEnabled(sectionName);
+    const isExpanded = expandedSections[sectionName] ?? false;
+    const categoryMetrics = customMetricsByCategory[sectionName] || [];
+
+    return (
+      <Card className={!isEnabled ? "opacity-60" : ""}>
+        <div className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleToggleExpanded(sectionName, !isExpanded)}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {isEnabled && (isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
+                {!isEnabled && <ChevronRight className="h-4 w-4 opacity-50" />}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{sectionName}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      Custom
+                    </Badge>
+                    {categoryMetrics.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {categoryMetrics.length} metric{categoryMetrics.length !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {onSectionToggle && (
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Switch
+                      checked={isEnabled}
+                      onCheckedChange={(checked) => handleToggleEnabled(sectionName, checked)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        </div>
+        
+        {isEnabled && isExpanded && (
+          <CardContent className="space-y-4 pt-0">
+            {categoryMetrics.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                <p className="text-sm mb-3">No metrics in this section yet</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAddMetricToSection(sectionName)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Metric
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {categoryMetrics.map((metric) => (
+                  <div
+                    key={metric.id || metric.index}
+                    className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">{metric.label}</span>
+                        {metric.units && (
+                          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
+                            {metric.units}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Target: {metric.target_value} 
+                        {metric.higher_is_better ? ' (higher is better)' : ' (lower is better)'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAddMetricToSection(sectionName)}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Another Metric
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+    );
+  };
+
   if (allCategories.length === 0) {
     return (
       <Card>
@@ -199,89 +299,10 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
           );
         })}
 
-        {/* Render custom sections */}
-        {sortedCustomSections.map((sectionName) => {
-          const sectionType = getSectionType(sectionName);
-          const isEnabled = isSectionEnabled(sectionName);
-          const isExpanded = expandedSections[sectionName] ?? false;
-          const categoryMetrics = customMetricsByCategory[sectionName] || [];
-
-          return (
-            <div key={sectionName} className="border rounded-lg">
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-primary">{sectionName}</h3>
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                      Custom
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleToggleExpanded(sectionName, !isExpanded)}
-                  >
-                    {isExpanded ? 'Collapse' : 'Expand'}
-                  </Button>
-                </div>
-                
-                {isExpanded && (
-                  <div className="space-y-3">
-                    {categoryMetrics.length === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
-                        <p className="text-sm mb-3">No metrics in this section yet</p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddMetricToSection(sectionName)}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Metric
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        {categoryMetrics.map((metric) => (
-                          <div
-                            key={metric.id || metric.index}
-                            className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium">{metric.label}</span>
-                                {metric.units && (
-                                  <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
-                                    {metric.units}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                Target: {metric.target_value} 
-                                {metric.higher_is_better ? ' (higher is better)' : ' (lower is better)'}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddMetricToSection(sectionName)}
-                          className="w-full"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Another Metric
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {/* Render custom sections with the same behavior as predefined sections */}
+        {sortedCustomSections.map((sectionName) => (
+          <CustomSectionRenderer key={sectionName} sectionName={sectionName} />
+        ))}
 
         <div className="text-xs text-muted-foreground pt-4 border-t">
           <p><strong>Required sections</strong> are always enabled and contain essential metrics.</p>
