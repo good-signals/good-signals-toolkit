@@ -164,8 +164,10 @@ const TargetMetricsBuilderPage = () => {
       form.setValue('metric_set_name', existingMetricSet.name);
       form.setValue('metric_set_id', existingMetricSet.id);
       
-      // Set enabled optional sections (fallback to all if not specified for backward compatibility)
-      form.setValue('enabled_optional_sections', existingMetricSet.enabled_optional_sections || getDefaultEnabledOptionalSections());
+      // Set enabled optional sections - use the ones from database or fallback to default
+      const enabledSections = existingMetricSet.enabled_optional_sections || getDefaultEnabledOptionalSections();
+      form.setValue('enabled_optional_sections', enabledSections);
+      console.log('[TargetMetricsBuilderPage] Setting enabled sections:', enabledSections);
       
       // Reset arrays first
       form.setValue('predefined_metrics', []);
