@@ -257,6 +257,18 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({
     };
   };
 
+  // Group metrics by category
+  const groupedMetrics = fields.reduce((acc, field, index) => {
+    const category = field.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push({ ...field, index });
+    return acc;
+  }, {} as Record<string, Array<typeof fields[0] & { index: number }>>);
+
+  const categories = Object.keys(groupedMetrics).sort();
+
   return (
     <Card>
       <CardHeader>
@@ -269,7 +281,7 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {fields.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -288,52 +300,56 @@ const CustomMetricsSection: React.FC<CustomMetricsSectionProps> = ({
             </div>
           ) : (
             <>
-              <div className="grid gap-3">
-                {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium">{field.label}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {field.category}
-                        </Badge>
-                        {field.units && (
-                          <Badge variant="secondary" className="text-xs">
-                            {field.units}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Target: {field.target_value} 
-                        {field.higher_is_better ? ' (higher is better)' : ' (lower is better)'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => openEditForm(e, index)}
-                        disabled={isLoading}
+              {/* Render metrics grouped by category */}
+              {categories.map((category) => (
+                <div key={category} className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0">
+                  <h3 className="text-lg font-semibold text-primary">{category}</h3>
+                  <div className="grid gap-3">
+                    {groupedMetrics[category].map((field) => (
+                      <div
+                        key={field.id}
+                        className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
                       >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleRemoveMetric(e, index)}
-                        disabled={isLoading}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium">{field.label}</span>
+                            {field.units && (
+                              <Badge variant="secondary" className="text-xs">
+                                {field.units}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Target: {field.target_value} 
+                            {field.higher_is_better ? ' (higher is better)' : ' (lower is better)'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => openEditForm(e, field.index)}
+                            disabled={isLoading}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handleRemoveMetric(e, field.index)}
+                            disabled={isLoading}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+              
               <Button 
                 type="button" 
                 variant="outline" 
