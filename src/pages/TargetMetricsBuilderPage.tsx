@@ -26,7 +26,7 @@ import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import { getStandardMetricSettings } from '@/services/standardMetricsService';
 import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
-import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
+
 import { TemplateSelectionStep } from "@/components/target-metrics/TemplateSelectionStep";
 import { CustomSectionManagement } from "@/components/target-metrics/CustomSectionManagement";
 
@@ -480,11 +480,6 @@ const TargetMetricsBuilderPage = () => {
                   control={form.control}
                   enabledSections={form.watch('enabled_optional_sections') || []}
                   onSectionToggle={handleSectionToggle}
-                  metricSetId={metricSetId}
-                />
-                
-                <CustomMetricsSection 
-                  control={form.control}
                   metricSetId={metricSetId}
                 />
 
