@@ -2,6 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -9,35 +10,40 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { REQUIRED_METRIC_CATEGORIES, OPTIONAL_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
+import { Badge } from '@/components/ui/badge';
 import { SECTION_ORDER } from '@/config/targetMetricsConfig';
+import { getCustomSections } from '@/services/customMetricSectionsService';
+import { getUserAccount } from '@/services/userAccountService';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Get available sections for custom metrics in the correct order
-const getAvailableSections = () => {
-  const allSections = [
-    ...REQUIRED_METRIC_CATEGORIES,
-    ...OPTIONAL_METRIC_CATEGORIES,
-    VISITOR_PROFILE_CATEGORY,
-  ];
-  
-  // Sort sections according to SECTION_ORDER
-  return allSections.sort((a, b) => {
-    const indexA = SECTION_ORDER.indexOf(a);
-    const indexB = SECTION_ORDER.indexOf(b);
-    
-    // If both sections are in the defined order, sort by their position
-    if (indexA !== -1 && indexB !== -1) {
-      return indexA - indexB;
-    }
-    
-    // If only one is in the defined order, prioritize it
-    if (indexA !== -1) return -1;
-    if (indexB !== -1) return 1;
-    
-    // If neither is in the defined order, sort alphabetically
-    return a.localeCompare(b);
+// Get the available sections in the correct order
+function useAvailableSections() {
+  const [accountId, setAccountId] = React.useState<string | undefined>();
+  const { user } = useAuth();
+
+  React.useEffect(() => {
+    const fetchAccountId = async () => {
+      if (!user?.id) return;
+      try {
+        const account = await getUserAccount(user.id);
+        setAccountId(account?.id);
+      } catch (error) {
+        console.error('Error fetching account:', error);
+      }
+    };
+    fetchAccountId();
+  }, [user?.id]);
+
+  const { data: customSections = [] } = useQuery({
+    queryKey: ['customSections', accountId],
+    queryFn: () => getCustomSections(accountId!),
+    enabled: !!accountId,
   });
-};
+
+  // Combine predefined sections with custom sections
+  const customSectionNames = customSections.map(section => section.name);
+  return [...SECTION_ORDER, ...customSectionNames];
+}
 
 const CustomMetricFormSchema = z.object({
   name: z.string().min(1, "Metric name is required"),
@@ -65,6 +71,8 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
   initialData,
   isEditing = false,
 }) => {
+  const availableSections = useAvailableSections();
+  
   const form = useForm<CustomMetricFormData>({
     resolver: zodResolver(CustomMetricFormSchema),
     defaultValues: {
@@ -123,6 +131,11 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
     onOpenChange(open);
   };
 
+  // Check if a section is custom (not in SECTION_ORDER)
+  const isCustomSection = (section: string) => {
+    return !SECTION_ORDER.includes(section);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="sm:max-w-[425px]" onClick={(e) => e.stopPropagation()}>
@@ -164,9 +177,16 @@ const CustomMetricForm: React.FC<CustomMetricFormProps> = ({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {getAvailableSections().map((section) => (
+                      {availableSections.map((section) => (
                         <SelectItem key={section} value={section}>
-                          {section}
+                          <div className="flex items-center gap-2">
+                            {section}
+                            {isCustomSection(section) && (
+                              <Badge variant="secondary" className="text-xs">
+                                Custom
+                              </Badge>
+                            )}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>

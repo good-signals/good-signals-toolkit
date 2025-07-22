@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, ArrowRight, Save, Target, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Target, Loader2, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getTargetMetricSetById,
@@ -27,9 +27,10 @@ import { getStandardMetricSettings } from '@/services/standardMetricsService';
 import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
 import VisitorProfileMetricsSection from '@/components/target-metrics/VisitorProfileMetricsSection';
 import CustomMetricsSection from '@/components/target-metrics/CustomMetricsSection';
-import { TemplateSelectionStep } from '@/components/target-metrics/TemplateSelectionStep';
+import { TemplateSelectionStep } from "@/components/target-metrics/TemplateSelectionStep";
+import { CustomSectionManagement } from "@/components/target-metrics/CustomSectionManagement";
 
-export const TargetMetricsBuilderPage = () => {
+const TargetMetricsBuilderPage = () => {
   const { metricSetId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -37,6 +38,7 @@ export const TargetMetricsBuilderPage = () => {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<'template' | 'configuration'>('template');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [sectionManagementOpen, setSectionManagementOpen] = useState(false);
 
   const form = useForm<TargetMetricsFormData>({
     resolver: zodResolver(TargetMetricsFormSchema),
@@ -422,6 +424,25 @@ export const TargetMetricsBuilderPage = () => {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-start mb-8">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold">Target Metrics Builder</h1>
+            <p className="text-muted-foreground">
+              {metricSetId ? "Edit your target metric set" : "Create a new target metric set to define success criteria for your site assessments"}
+            </p>
+          </div>
+          {accountId && (
+            <Button
+              variant="outline"
+              onClick={() => setSectionManagementOpen(true)}
+              className="shrink-0"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Sections
+            </Button>
+          )}
+        </div>
+        
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -505,6 +526,14 @@ export const TargetMetricsBuilderPage = () => {
           </CardContent>
         </Card>
       </div>
+      
+      {accountId && (
+        <CustomSectionManagement
+          open={sectionManagementOpen}
+          onOpenChange={setSectionManagementOpen}
+          accountId={accountId}
+        />
+      )}
     </div>
   );
 };
