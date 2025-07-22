@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { TargetMetricSet, CreateTargetMetricSetData, TargetMetricsFormData, OPTIONAL_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import { getAccountForUser } from './accountHelpers';
@@ -172,7 +171,7 @@ const inferEnabledSectionsFromMetrics = (metrics: any[]): string[] => {
 };
 
 export const getTargetMetricSetById = async (id: string, userId: string): Promise<TargetMetricSet | null> => {
-  console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);
+  console.log('[getTargetMetricSetById] Starting fetch - ID:', id, 'User ID:', userId);
   
   // First get the target metric set
   const { data: metricSetData, error: metricSetError } = await supabase
@@ -198,6 +197,11 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
   });
 
   // Now get the user's custom metrics settings for this metric set
+  console.log('[getTargetMetricSetById] Querying user_custom_metrics_settings with:', {
+    metric_set_id: id,
+    user_id: userId
+  });
+
   const { data: userMetrics, error: userMetricsError } = await supabase
     .from('user_custom_metrics_settings')
     .select('*')
@@ -206,21 +210,36 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
 
   if (userMetricsError) {
     console.error('[getTargetMetricSetById] Error fetching user custom metrics settings:', userMetricsError);
+    console.error('[getTargetMetricSetById] Error details:', userMetricsError.message, userMetricsError.details);
     // Continue with empty array rather than failing completely
   }
 
   const userCustomMetricsSettings = userMetrics || [];
 
-  console.log('[getTargetMetricSetById] Retrieved user metrics settings:', {
+  console.log('[getTargetMetricSetById] User metrics query result:', {
     settingsCount: userCustomMetricsSettings.length,
     hasSettings: userCustomMetricsSettings.length > 0,
-    settings: userCustomMetricsSettings
+    rawData: userCustomMetricsSettings,
+    queryParams: { metric_set_id: id, user_id: userId }
   });
 
   // If no settings found, this might be a data integrity issue
   if (userCustomMetricsSettings.length === 0) {
     console.warn('[getTargetMetricSetById] No user_custom_metrics_settings found for metric set and user combination.');
     console.warn('[getTargetMetricSetById] This may indicate the metric set needs to be repaired or the user needs to be assigned metrics.');
+    
+    // Let's also check if there are ANY metrics for this metric set with any user
+    const { data: anyMetrics, error: anyMetricsError } = await supabase
+      .from('user_custom_metrics_settings')
+      .select('user_id, metric_identifier, label')
+      .eq('metric_set_id', id)
+      .limit(5);
+    
+    console.log('[getTargetMetricSetById] Any metrics for this metric set:', {
+      found: anyMetrics?.length || 0,
+      data: anyMetrics,
+      error: anyMetricsError
+    });
   }
 
   // Get enabled optional sections
@@ -232,8 +251,8 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
     const inferredSections = inferEnabledSectionsFromMetrics(userCustomMetricsSettings);
     enabledSections = inferredSections;
   }
-  
-  return {
+
+  const finalResult = {
     id: metricSetData.id,
     account_id: metricSetData.account_id,
     name: metricSetData.name,
@@ -243,6 +262,17 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
     user_custom_metrics_settings: userCustomMetricsSettings,
     enabled_optional_sections: enabledSections
   };
+
+  console.log('[getTargetMetricSetById] Final result being returned:', {
+    id: finalResult.id,
+    name: finalResult.name,
+    settingsCount: finalResult.user_custom_metrics_settings.length,
+    enabledSectionsCount: finalResult.enabled_optional_sections.length,
+    enabledSections: finalResult.enabled_optional_sections,
+    firstFewSettings: finalResult.user_custom_metrics_settings.slice(0, 3)
+  });
+  
+  return finalResult;
 };
 
 export const getTargetMetricSets = async (accountId: string): Promise<TargetMetricSet[]> => {
