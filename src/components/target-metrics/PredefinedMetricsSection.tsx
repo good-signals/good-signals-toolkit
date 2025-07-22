@@ -178,7 +178,7 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
             <React.Fragment key={category}>
               <CollapsibleMetricSection
                 sectionName={category}
-                sectionType={sectionType}
+                sectionType={sectionType as 'required' | 'optional' | 'special'}
                 isEnabled={isEnabled}
                 isExpanded={isExpanded}
                 onToggleEnabled={(enabled) => handleToggleEnabled(category, enabled)}
@@ -295,7 +295,7 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
         open={customMetricFormOpen}
         onOpenChange={setCustomMetricFormOpen}
         onSubmit={handleCustomMetricSubmit}
-        preselectedCategory={preselectedSection}
+        initialData={preselectedSection ? { category: preselectedSection } : undefined}
         isEditing={false}
       />
     </Card>
