@@ -1,3 +1,4 @@
+
 import { 
   PredefinedMetricCategory, 
   UserCustomMetricSetting,
@@ -154,10 +155,30 @@ export const getDefaultEnabledOptionalSections = (): string[] => {
   return []; // Start with all optional sections disabled by default
 };
 
-// Filter categories based on enabled sections
-export const getEnabledCategories = (enabledOptionalSections: string[]): string[] => {
-  return [
-    ...REQUIRED_METRIC_CATEGORIES,
-    ...enabledOptionalSections.filter(section => OPTIONAL_METRIC_CATEGORIES.includes(section as any))
-  ];
+// FIXED: Filter categories based on enabled sections
+// The database stores ALL enabled sections (both required and optional), 
+// not just optional ones, so we need to handle this properly
+export const getEnabledCategories = (enabledSections: string[]): string[] => {
+  console.log('[getEnabledCategories] Input enabled sections:', enabledSections);
+  
+  // If no enabled sections provided, return just the required categories
+  if (!enabledSections || enabledSections.length === 0) {
+    console.log('[getEnabledCategories] No enabled sections provided, returning required categories only');
+    return [...REQUIRED_METRIC_CATEGORIES];
+  }
+  
+  // The enabledSections already contains ALL enabled sections (both required and optional)
+  // We just need to validate that all required sections are included
+  const allEnabledCategories = [...enabledSections];
+  
+  // Ensure all required categories are included (add any missing ones)
+  REQUIRED_METRIC_CATEGORIES.forEach(requiredCategory => {
+    if (!allEnabledCategories.includes(requiredCategory)) {
+      console.warn(`[getEnabledCategories] Required category '${requiredCategory}' missing from enabled sections, adding it`);
+      allEnabledCategories.push(requiredCategory);
+    }
+  });
+  
+  console.log('[getEnabledCategories] Final enabled categories:', allEnabledCategories);
+  return allEnabledCategories;
 };
