@@ -190,6 +190,23 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     },
   });
 
+  // Add debug logging when metric set is fetched
+  useEffect(() => {
+    if (metricSet) {
+      console.log('[InputMetricValuesStep] Metric set fetched successfully:', {
+        metricSetId: metricSet?.id,
+        metricSetName: metricSet?.name,
+        userCustomMetricsCount: metricSet?.user_custom_metrics_settings?.length || 0,
+        enabledSectionsCount: metricSet?.enabled_optional_sections?.length || 0,
+        enabledSections: metricSet?.enabled_optional_sections,
+        hasEnabledSectionsData: metricSet?.has_enabled_sections_data
+      });
+    }
+    if (metricSetError) {
+      console.error('[InputMetricValuesStep] Metric set fetch error:', metricSetError);
+    }
+  }, [metricSet, metricSetError]);
+
   const { data: existingMetricValuesData, isLoading: isLoadingExistingValues, error: existingValuesError } = useQuery<AssessmentMetricValue[], Error>({
     queryKey: ['assessmentMetricValues', assessmentId],
     queryFn: () => {
