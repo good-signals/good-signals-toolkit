@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { 
@@ -48,41 +47,63 @@ export const getTargetMetricSets = async (accountId: string) => {
 export const getTargetMetricSetById = async (id: string, userId?: string) => {
   console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);
   
-  const { data, error } = await supabase
-    .from('target_metric_sets')
-    .select(`
-      *,
-      user_custom_metrics_settings (*)
-    `)
-    .eq('id', id)
-    .single();
-  
-  if (error) {
-    console.error('[getTargetMetricSetById] Error fetching target metric set:', error);
+  if (!userId) {
+    console.error('[getTargetMetricSetById] User ID is required');
     return null;
   }
-  
-  console.log('[getTargetMetricSetById] Retrieved metric set with settings:', {
-    metricSetId: data?.id,
-    metricSetName: data?.name,
-    settingsCount: data?.user_custom_metrics_settings?.length || 0,
-    hasSettings: !!data?.user_custom_metrics_settings,
-    settings: data?.user_custom_metrics_settings
+
+  // First get the target metric set
+  const { data: metricSetData, error: metricSetError } = await supabase
+    .from('target_metric_sets')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (metricSetError) {
+    console.error('[getTargetMetricSetById] Error fetching target metric set:', metricSetError);
+    return null;
+  }
+
+  if (!metricSetData) {
+    console.error('[getTargetMetricSetById] No metric set found with id:', id);
+    return null;
+  }
+
+  console.log('[getTargetMetricSetById] Retrieved metric set:', {
+    metricSetId: metricSetData.id,
+    metricSetName: metricSetData.name
   });
 
-  // If no settings found and we have a user ID, this might be a data integrity issue
-  if ((!data?.user_custom_metrics_settings || data.user_custom_metrics_settings.length === 0) && userId) {
-    console.warn('[getTargetMetricSetById] No user_custom_metrics_settings found for metric set. This may indicate a data integrity issue.');
-    console.warn('[getTargetMetricSetById] Metric set was likely created without proper standard metrics import.');
-    
-    // Return the metric set anyway, but log the issue for debugging
-    return {
-      ...data,
-      user_custom_metrics_settings: []
-    };
+  // Now get the user's custom metrics settings for this metric set
+  const { data: userMetrics, error: userMetricsError } = await supabase
+    .from('user_custom_metrics_settings')
+    .select('*')
+    .eq('metric_set_id', id)
+    .eq('user_id', userId);
+
+  if (userMetricsError) {
+    console.error('[getTargetMetricSetById] Error fetching user custom metrics settings:', userMetricsError);
+    // Continue with empty array rather than failing completely
+  }
+
+  const userCustomMetricsSettings = userMetrics || [];
+
+  console.log('[getTargetMetricSetById] Retrieved user metrics settings:', {
+    settingsCount: userCustomMetricsSettings.length,
+    hasSettings: userCustomMetricsSettings.length > 0,
+    settings: userCustomMetricsSettings
+  });
+
+  // If no settings found, this might be a data integrity issue
+  if (userCustomMetricsSettings.length === 0) {
+    console.warn('[getTargetMetricSetById] No user_custom_metrics_settings found for metric set and user combination.');
+    console.warn('[getTargetMetricSetById] This may indicate the metric set needs to be repaired or the user needs to be assigned metrics.');
   }
   
-  return data;
+  return {
+    ...metricSetData,
+    user_custom_metrics_settings: userCustomMetricsSettings
+  };
 };
 
 export const createTargetMetricSet = async (name: string, account: any) => {
