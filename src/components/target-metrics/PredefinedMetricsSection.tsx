@@ -300,12 +300,14 @@ const PredefinedMetricsSection: React.FC<PredefinedMetricsSectionProps> = ({
               />
               
               {shouldInsertVisitorProfile && (
-                <VisitorProfileMetricsSection
-                  control={control}
-                  metricSetId={metricSetId}
-                  isEnabled={isVisitorProfileEnabled}
-                  onToggleEnabled={(enabled) => handleToggleEnabled(VISITOR_PROFILE_CATEGORY, enabled)}
-                />
+                <div className="mt-4">
+                  <VisitorProfileMetricsSection
+                    control={control}
+                    metricSetId={metricSetId}
+                    isEnabled={isVisitorProfileEnabled}
+                    onToggleEnabled={(enabled) => handleToggleEnabled(VISITOR_PROFILE_CATEGORY, enabled)}
+                  />
+                </div>
               )}
             </div>
           );
