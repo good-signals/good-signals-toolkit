@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, ArrowRight, ArrowLeft, Save } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { saveAssessmentMetricValues, getAssessmentMetricValues, getSiteVisitRatings, saveSiteVisitRatings, updateSiteStatus, getAssessmentDetails } from '@/services/siteAssessmentService';
@@ -18,6 +18,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import CategorySection from './metric-input/CategorySection';
 import SiteVisitSection from './metric-input/SiteVisitSection';
 import { safeStorage } from '@/utils/safeStorage';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Import shared config
 import { sortCategoriesByOrder, getEnabledCategories } from '@/config/targetMetricsConfig';
@@ -79,6 +80,69 @@ interface InputMetricValuesStepProps {
   onBack: () => void;
 }
 
+// Loading states component for better user feedback
+const LoadingStateDisplay: React.FC<{ 
+  isLoadingMetricSet: boolean; 
+  isLoadingExistingValues: boolean; 
+  isLoadingSiteVisitRatings: boolean;
+  metricSetError: Error | null;
+  existingValuesError: Error | null;
+  siteVisitRatingsError: Error | null;
+}> = ({ 
+  isLoadingMetricSet, 
+  isLoadingExistingValues, 
+  isLoadingSiteVisitRatings,
+  metricSetError,
+  existingValuesError,
+  siteVisitRatingsError
+}) => {
+  const loadingSteps = [
+    { label: 'Loading metric set configuration', isLoading: isLoadingMetricSet, error: metricSetError },
+    { label: 'Loading existing metric values', isLoading: isLoadingExistingValues, error: existingValuesError },
+    { label: 'Loading site visit ratings', isLoading: isLoadingSiteVisitRatings, error: siteVisitRatingsError },
+  ];
+
+  return (
+    <div className="flex justify-center items-center min-h-64">
+      <div className="space-y-4 w-full max-w-md">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-lg font-medium">Loading Assessment Data</p>
+        </div>
+        
+        <div className="space-y-2">
+          {loadingSteps.map((step, index) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              {step.error ? (
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              ) : step.isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              ) : (
+                <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
+                  <div className="h-2 w-2 rounded-full bg-white" />
+                </div>
+              )}
+              <span className={step.error ? 'text-destructive' : step.isLoading ? 'text-foreground' : 'text-muted-foreground'}>
+                {step.label}
+                {step.error && ' - Error occurred'}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {(metricSetError || existingValuesError || siteVisitRatingsError) && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Some data failed to load. You may still be able to proceed, but some features might not work correctly.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   assessmentId,
   targetMetricSetId,
@@ -91,33 +155,67 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const [isFormReady, setIsFormReady] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
 
+  // Enhanced debug logging
+  console.log('[InputMetricValuesStep] Component mounted with:', {
+    assessmentId,
+    targetMetricSetId,
+    userId: user?.id,
+    timestamp: new Date().toISOString()
+  });
+
   // Add query for current assessment details to get site status
   const { data: currentAssessment } = useQuery({
     queryKey: ['assessment', assessmentId],
-    queryFn: () => getAssessmentDetails(assessmentId),
+    queryFn: () => {
+      console.log('[InputMetricValuesStep] Fetching assessment details for:', assessmentId);
+      return getAssessmentDetails(assessmentId);
+    },
     enabled: !!assessmentId,
+    staleTime: 30 * 1000,
+    retry: 2,
   });
 
   const { data: metricSet, isLoading: isLoadingMetricSet, error: metricSetError } = useQuery<TargetMetricSet | null, Error>({
     queryKey: ['targetMetricSet', targetMetricSetId, user?.id],
     queryFn: () => {
       if (!user?.id) throw new Error('User not authenticated');
-      console.log('[InputMetricValuesStep] Fetching metric set:', targetMetricSetId);
+      console.log('[InputMetricValuesStep] Fetching metric set:', { targetMetricSetId, userId: user.id });
       return getTargetMetricSetById(targetMetricSetId, user.id);
     },
     enabled: !!user?.id && !!targetMetricSetId,
+    staleTime: 60 * 1000,
+    retry: (failureCount, error) => {
+      console.error('[InputMetricValuesStep] Metric set query failed:', { failureCount, error: error.message });
+      return failureCount < 2;
+    },
   });
 
-  const { data: existingMetricValuesData, isLoading: isLoadingExistingValues } = useQuery<AssessmentMetricValue[], Error>({
+  const { data: existingMetricValuesData, isLoading: isLoadingExistingValues, error: existingValuesError } = useQuery<AssessmentMetricValue[], Error>({
     queryKey: ['assessmentMetricValues', assessmentId],
-    queryFn: () => getAssessmentMetricValues(assessmentId),
+    queryFn: () => {
+      console.log('[InputMetricValuesStep] Fetching existing metric values for:', assessmentId);
+      return getAssessmentMetricValues(assessmentId);
+    },
     enabled: !!assessmentId,
+    staleTime: 30 * 1000,
+    retry: (failureCount, error) => {
+      console.error('[InputMetricValuesStep] Existing values query failed:', { failureCount, error: error.message });
+      return failureCount < 2;
+    },
   });
   
-  const { data: existingSiteVisitRatingsData, isLoading: isLoadingSiteVisitRatings } = useQuery<AssessmentSiteVisitRatingInsert[], Error>({
+  const { data: existingSiteVisitRatingsData, isLoading: isLoadingSiteVisitRatings, error: siteVisitRatingsError } = useQuery<AssessmentSiteVisitRatingInsert[], Error>({
     queryKey: ['siteVisitRatings', assessmentId],
-    queryFn: () => getSiteVisitRatings(assessmentId),
+    queryFn: () => {
+      console.log('[InputMetricValuesStep] Fetching site visit ratings for:', assessmentId);
+      return getSiteVisitRatings(assessmentId);
+    },
     enabled: !!assessmentId,
+    staleTime: 30 * 1000,
+    retry: (failureCount, error) => {
+      console.error('[InputMetricValuesStep] Site visit ratings query failed:', { failureCount, error: error.message });
+      return failureCount < 2;
+    },
   });
   
   const form = useForm<MetricValuesFormData>({
@@ -126,6 +224,35 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   });
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting }, watch, setValue } = form;
+
+  // Enhanced logging for data states
+  useEffect(() => {
+    console.log('[InputMetricValuesStep] Data loading states:', {
+      isLoadingMetricSet,
+      isLoadingExistingValues,
+      isLoadingSiteVisitRatings,
+      hasMetricSet: !!metricSet,
+      hasExistingValues: !!existingMetricValuesData,
+      hasSiteVisitRatings: !!existingSiteVisitRatingsData,
+      metricSetError: metricSetError?.message,
+      existingValuesError: existingValuesError?.message,
+      siteVisitRatingsError: siteVisitRatingsError?.message,
+      formInitialized,
+      isFormReady
+    });
+  }, [
+    isLoadingMetricSet,
+    isLoadingExistingValues,
+    isLoadingSiteVisitRatings,
+    metricSet,
+    existingMetricValuesData,
+    existingSiteVisitRatingsData,
+    metricSetError,
+    existingValuesError,
+    siteVisitRatingsError,
+    formInitialized,
+    isFormReady
+  ]);
 
   // Add safety checks for form methods
   const safeWatch = (...args: Parameters<typeof watch>) => {
@@ -185,11 +312,11 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       const savedDataJson = safeStorage.sessionGetItem(getFormDataSessionKey(assessmentId));
       if (savedDataJson) {
         const savedData = safeStorage.safeParse(savedDataJson, {} as Partial<MetricValuesFormData>);
-        console.log('Loaded saved form data from session storage:', savedData);
+        console.log('[InputMetricValuesStep] Loaded saved form data from session storage:', savedData);
         return savedData;
       }
     } catch (error) {
-      console.warn('Failed to load saved form data from session storage:', error);
+      console.warn('[InputMetricValuesStep] Failed to load saved form data from session storage:', error);
     }
     return null;
   };
@@ -218,9 +345,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             };
             
             safeStorage.sessionSetItem(getFormDataSessionKey(assessmentId), JSON.stringify(serializableData));
-            console.log('Form data saved to session storage:', serializableData);
+            console.log('[InputMetricValuesStep] Form data saved to session storage');
           } catch (error) {
-            console.warn('Failed to save form data to session storage:', error);
+            console.warn('[InputMetricValuesStep] Failed to save form data to session storage:', error);
           }
         }, 500);
 
@@ -242,27 +369,36 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const clearSessionStorageOnCompletion = () => {
     safeStorage.sessionRemoveItem(getFormDataSessionKey(assessmentId));
     safeStorage.sessionRemoveItem(getImageDataSessionKey(assessmentId));
-    console.log('Session storage cleared after assessment completion');
+    console.log('[InputMetricValuesStep] Session storage cleared after assessment completion');
   };
 
-  // Initialize form data with enhanced safety
+  // Initialize form data with enhanced safety and progressive loading
   useEffect(() => {
-    console.log('[InputMetricValuesStep] useEffect triggered - metricSet:', metricSet);
-    console.log('[InputMetricValuesStep] Available metrics:', metricSet?.user_custom_metrics_settings?.length || 0);
+    console.log('[InputMetricValuesStep] Form initialization effect triggered');
     
-    // Don't initialize if we don't have the required data
-    if (!metricSet || isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings) {
+    // Progressive loading: Don't wait for all queries if some have errors
+    const canProceedWithErrors = !isLoadingMetricSet && !isLoadingExistingValues && !isLoadingSiteVisitRatings;
+    const hasMinimumData = metricSet || (!isLoadingMetricSet && !metricSetError);
+    
+    if (!canProceedWithErrors && !hasMinimumData) {
+      console.log('[InputMetricValuesStep] Still loading required data, waiting...');
+      return;
+    }
+
+    if (formInitialized) {
+      console.log('[InputMetricValuesStep] Form already initialized, skipping');
       return;
     }
 
     try {
+      console.log('[InputMetricValuesStep] Starting form initialization');
       const savedFormData = loadSavedFormData();
       const allMetricsToSet: any[] = [];
       const currentImageOnlyIndices: Record<string, number> = {};
 
-      // Process regular metrics from metricSet
+      // Process regular metrics from metricSet (with fallback handling)
       if (metricSet?.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0) {
-        console.log('[InputMetricValuesStep] Processing metrics from metric set:', metricSet.user_custom_metrics_settings);
+        console.log('[InputMetricValuesStep] Processing metrics from metric set:', metricSet.user_custom_metrics_settings.length);
         
         metricSet.user_custom_metrics_settings.forEach(metric => {
           const existingValue = existingMetricValuesData?.find(ev => ev.metric_identifier === metric.metric_identifier);
@@ -271,10 +407,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           let defaultValue: number | null;
           if (savedMetricData?.entered_value !== undefined && savedMetricData?.entered_value !== null) {
             defaultValue = savedMetricData.entered_value;
-            console.log(`Using saved form data for ${metric.metric_identifier}:`, defaultValue);
           } else if (existingValue?.entered_value !== undefined && existingValue?.entered_value !== null) {
             defaultValue = existingValue.entered_value;
-            console.log(`Using database value for ${metric.metric_identifier}:`, defaultValue);
           } else if (specificDropdownMetrics.includes(metric.metric_identifier)) {
             defaultValue = 50;
           } else {
@@ -315,7 +449,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           });
         });
       } else {
-        console.log('[InputMetricValuesStep] No custom metrics found in metric set');
+        console.log('[InputMetricValuesStep] No custom metrics found in metric set or metric set not loaded');
       }
 
       // Process Site Visit section image
@@ -337,6 +471,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       replaceMetrics(allMetricsToSet);
       setImageOnlyMetricIndices(currentImageOnlyIndices);
 
+      // Initialize site visit ratings (with fallback)
       if (siteVisitCriteria) {
         const initialSiteVisitRatingsData = siteVisitCriteria.map(criterion => {
           const existingRating = existingSiteVisitRatingsData?.find(r => r.criterion_key === criterion.key);
@@ -357,17 +492,31 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       // Mark form as ready and initialized after all setup is complete
       setFormInitialized(true);
       setIsFormReady(true);
-      console.log('[InputMetricValuesStep] Form initialization complete');
+      console.log('[InputMetricValuesStep] Form initialization complete successfully');
     } catch (error) {
       console.error('[InputMetricValuesStep] Error during form initialization:', error);
       toast({
         title: "Form Initialization Error",
-        description: "There was an error setting up the form. Please refresh the page.",
+        description: "There was an error setting up the form. Please try refreshing the page.",
         variant: "destructive"
       });
+      // Still set as initialized to prevent infinite loop
+      setFormInitialized(true);
     }
 
-  }, [metricSet, existingMetricValuesData, existingSiteVisitRatingsData, replaceMetrics, replaceSiteVisitRatings, safeSetValue, currentAssessment?.site_status, isLoadingMetricSet, isLoadingExistingValues, isLoadingSiteVisitRatings]);
+  }, [
+    metricSet, 
+    existingMetricValuesData, 
+    existingSiteVisitRatingsData, 
+    replaceMetrics, 
+    replaceSiteVisitRatings, 
+    safeSetValue, 
+    currentAssessment?.site_status, 
+    isLoadingMetricSet, 
+    isLoadingExistingValues, 
+    isLoadingSiteVisitRatings,
+    formInitialized
+  ]);
 
   const metricsMutation = useMutation({
     mutationFn: (data: AssessmentMetricValueInsert[]) => {
@@ -443,7 +592,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   };
 
   const onSubmitCombinedData: SubmitHandler<MetricValuesFormData> = async (formData) => {
-    console.log("Form data submitted:", formData);
+    console.log("[InputMetricValuesStep] Form data submitted:", formData);
     const metricsToSave: AssessmentMetricValueInsert[] = [];
 
     for (const m of formData.metrics) {
@@ -545,6 +694,43 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       }
     }
   };
+  
+  // Show progressive loading with detailed feedback
+  const anyLoading = isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings;
+  const anyError = metricSetError || existingValuesError || siteVisitRatingsError;
+  
+  if (anyLoading || !formInitialized || !isFormReady) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        <LoadingStateDisplay
+          isLoadingMetricSet={isLoadingMetricSet}
+          isLoadingExistingValues={isLoadingExistingValues}
+          isLoadingSiteVisitRatings={isLoadingSiteVisitRatings}
+          metricSetError={metricSetError}
+          existingValuesError={existingValuesError}
+          siteVisitRatingsError={siteVisitRatingsError}
+        />
+      </div>
+    );
+  }
+
+  // Handle critical errors that prevent form rendering
+  if (metricSetError && !metricSet) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load the metric set configuration: {metricSetError.message}
+            <br />
+            <Button variant="outline" size="sm" className="mt-2" onClick={onBack}>
+              Go Back
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
   
   const metricsByCategory = metricFields.reduce((acc, field, index) => {
     const typedField = field as unknown as { 
@@ -668,14 +854,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       </TooltipProvider>
     );
   }
-
-  if (isLoadingMetricSet || isLoadingExistingValues || isLoadingSiteVisitRatings || !formInitialized || !isFormReady) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading data...</p></div>;
-  }
-
-  if (metricSetError) {
-    return <p className="text-destructive text-center p-4">Error loading metric set: {metricSetError.message}</p>;
-  }
   
   console.log('[InputMetricValuesStep] Rendering full assessment view with categories:', sortedCategories);
   
@@ -689,6 +867,14 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             <br />
             <span className="text-xs text-muted-foreground">Your progress is automatically saved as you type and will be restored if you navigate away.</span>
           </CardDescription>
+          {anyError && (
+            <Alert variant="default" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Some data couldn't be loaded completely, but you can still proceed. Missing data will use default values.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardHeader>
         
         <form onSubmit={handleSubmit(onSubmitCombinedData)}>
