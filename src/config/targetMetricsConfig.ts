@@ -151,7 +151,7 @@ export const getSectionDisplayName = (category: string): string => {
 };
 
 export const getDefaultEnabledOptionalSections = (): string[] => {
-  return [...OPTIONAL_METRIC_CATEGORIES];
+  return []; // Start with all optional sections disabled by default
 };
 
 // Filter categories based on enabled sections
