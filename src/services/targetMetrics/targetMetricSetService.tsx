@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { TargetMetricSet, CreateTargetMetricSetData, TargetMetricsFormData } from '@/types/targetMetrics';
+import { TargetMetricSet, CreateTargetMetricSetData, TargetMetricsFormData, OPTIONAL_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import { getAccountForUser } from './accountHelpers';
 
 const saveUserCustomMetricSettings = async (userId: string, metricSetId: string, formData: TargetMetricsFormData) => {
@@ -150,6 +150,27 @@ const getEnabledOptionalSections = async (metricSetId: string): Promise<string[]
   return data?.map(row => row.section_name) || [];
 };
 
+// Helper function to infer enabled sections from metrics (for legacy metric sets)
+const inferEnabledSectionsFromMetrics = (metrics: any[]): string[] => {
+  const categoriesInMetrics = [...new Set(metrics.map(metric => metric.category))];
+  const enabledSections: string[] = [];
+  
+  // Check which optional categories have metrics
+  OPTIONAL_METRIC_CATEGORIES.forEach(category => {
+    if (categoriesInMetrics.includes(category)) {
+      enabledSections.push(category);
+    }
+  });
+  
+  // Always include visitor profile if there are visitor profile metrics
+  if (categoriesInMetrics.includes(VISITOR_PROFILE_CATEGORY)) {
+    enabledSections.push(VISITOR_PROFILE_CATEGORY);
+  }
+  
+  console.log('[inferEnabledSectionsFromMetrics] Inferred sections:', enabledSections);
+  return enabledSections;
+};
+
 export const getTargetMetricSetById = async (id: string, userId: string): Promise<TargetMetricSet | null> => {
   console.log('[getTargetMetricSetById] Fetching metric set:', id, 'for user:', userId);
   
@@ -172,7 +193,8 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
     metricSetName: data?.name,
     settingsCount: data?.user_custom_metrics_settings?.length || 0,
     hasSettings: !!data?.user_custom_metrics_settings,
-    settings: data?.user_custom_metrics_settings
+    settings: data?.user_custom_metrics_settings,
+    hasEnabledSectionsData: data?.has_enabled_sections_data
   });
 
   // If no settings found and we have a user ID, this might be a data integrity issue
@@ -182,7 +204,14 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
   }
 
   // Get enabled optional sections
-  const enabledSections = await getEnabledOptionalSections(data.id);
+  let enabledSections = await getEnabledOptionalSections(data.id);
+  
+  // For legacy metric sets (has_enabled_sections_data = false), infer sections from metrics if no explicit sections are stored
+  if (!data.has_enabled_sections_data && enabledSections.length === 0 && data.user_custom_metrics_settings?.length > 0) {
+    console.log('[getTargetMetricSetById] Legacy metric set - inferring enabled sections from metrics');
+    const inferredSections = inferEnabledSectionsFromMetrics(data.user_custom_metrics_settings);
+    enabledSections = inferredSections;
+  }
   
   return {
     id: data.id,
@@ -190,6 +219,7 @@ export const getTargetMetricSetById = async (id: string, userId: string): Promis
     name: data.name,
     created_at: data.created_at,
     updated_at: data.updated_at,
+    has_enabled_sections_data: data.has_enabled_sections_data,
     user_custom_metrics_settings: data.user_custom_metrics_settings || [],
     enabled_optional_sections: enabledSections
   };
@@ -213,7 +243,12 @@ export const getTargetMetricSets = async (accountId: string): Promise<TargetMetr
   }
 
   console.log('[getTargetMetricSets] Found target metric sets:', data?.length || 0);
-  return data || [];
+  
+  // Process each metric set to include the has_enabled_sections_data field
+  return (data || []).map(metricSet => ({
+    ...metricSet,
+    has_enabled_sections_data: metricSet.has_enabled_sections_data ?? false, // Default to false for backward compatibility
+  }));
 };
 
 export const deleteTargetMetricSet = async (id: string, accountId: string) => {
@@ -254,6 +289,7 @@ export const createTargetMetricSet = async (data: TargetMetricsFormData, userId:
     .insert({
       name: data.metric_set_name,
       account_id: accountId,
+      has_enabled_sections_data: true, // New metric sets have explicit section data
     })
     .select()
     .single();

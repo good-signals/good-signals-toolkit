@@ -309,6 +309,7 @@ export const copyStandardMetricSetToAccount = async (
     .insert({
       name: newName || `${standardSet.name} (Copy)`,
       account_id: accountId,
+      has_enabled_sections_data: true, // Copied sets have explicit section data
     })
     .select()
     .single();

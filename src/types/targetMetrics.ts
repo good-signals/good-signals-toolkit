@@ -87,6 +87,7 @@ export const TargetMetricSetSchema = z.object({
   name: z.string().min(1, "Set name is required."),
   created_at: z.string(),
   updated_at: z.string(),
+  has_enabled_sections_data: z.boolean(),
   user_custom_metrics_settings: z.array(UserCustomMetricSettingSchema).optional(),
   enabled_optional_sections: z.array(z.string()).optional(),
 });
