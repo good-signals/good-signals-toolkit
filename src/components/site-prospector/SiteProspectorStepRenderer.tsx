@@ -96,8 +96,8 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   }, [validationError, setCurrentStep]);
 
   // Handle authentication errors in details loading
-  const isAuthError = detailsError?.message.includes('Authentication required') || 
-                      detailsError?.message.includes('not found or you do not have access');
+  const isAuthError = detailsError?.message.includes('Authentication required');
+  const isNotFoundError = detailsError?.message.includes('not found or you do not have access');
   
   if (authLoading) {
     return (
@@ -186,8 +186,10 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
                 <Alert variant="destructive">
                   {isAuthError ? <Shield className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                   <AlertDescription>
-                    {isAuthError 
+                     {isAuthError 
                       ? 'Authentication required to view assessment details. Returning to start.' 
+                      : isNotFoundError
+                      ? 'Assessment not found. Returning to start.'
                       : `Error loading assessment details: ${detailsError.message}`}
                   </AlertDescription>
                 </Alert>
