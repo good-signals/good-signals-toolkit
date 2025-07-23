@@ -9,8 +9,6 @@ import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import CategorySection from './metric-input/CategorySection';
-import SiteVisitSection from './metric-input/SiteVisitSection';
 import { getEnabledCategories } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
 import { saveAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
@@ -43,7 +41,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   const form = useForm<MetricFormData>({
     defaultValues: {}
@@ -51,12 +48,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   useEffect(() => {
     const fetchMetricSet = async () => {
-      console.log('=== PHASE 1: DEBUGGING DATA FLOW ===');
-      console.log('[InputMetricValuesStep] Starting comprehensive fetch with:', {
-        targetMetricSetId,
-        userId: user?.id,
-        assessmentId
-      });
+      console.log('[InputMetricValuesStep] Fetching metric set:', targetMetricSetId, 'for user:', user?.id);
       
       if (!user?.id) {
         console.error('[InputMetricValuesStep] No user ID available');
@@ -66,27 +58,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       }
 
       try {
-        // Add detailed debugging for the service call
-        console.log('[InputMetricValuesStep] Calling getTargetMetricSetById...');
         const fetchedMetricSet = await getTargetMetricSetById(targetMetricSetId, user.id);
         
-        // Comprehensive debug information
-        const debugData = {
-          fetchedMetricSet,
-          hasMetricSet: !!fetchedMetricSet,
-          metricSetName: fetchedMetricSet?.name,
-          userCustomMetricsSettings: fetchedMetricSet?.user_custom_metrics_settings,
-          settingsCount: fetchedMetricSet?.user_custom_metrics_settings?.length || 0,
-          settingsIsArray: Array.isArray(fetchedMetricSet?.user_custom_metrics_settings),
-          enabledSectionsCount: fetchedMetricSet?.enabled_optional_sections?.length || 0,
-          enabledSections: fetchedMetricSet?.enabled_optional_sections,
-          hasEnabledSectionsData: fetchedMetricSet?.has_enabled_sections_data,
-          rawResponse: fetchedMetricSet
-        };
-
-        console.log('[InputMetricValuesStep] COMPREHENSIVE DEBUG INFO:', debugData);
-        setDebugInfo(debugData);
-
         if (!fetchedMetricSet) {
           console.error('[InputMetricValuesStep] No metric set found');
           setError('Target metric set not found');
@@ -94,29 +67,10 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           return;
         }
 
-        // Detailed analysis of the user_custom_metrics_settings
-        if (fetchedMetricSet.user_custom_metrics_settings) {
-          console.log('[InputMetricValuesStep] Analyzing user_custom_metrics_settings:');
-          console.log('- Type:', typeof fetchedMetricSet.user_custom_metrics_settings);
-          console.log('- Is Array:', Array.isArray(fetchedMetricSet.user_custom_metrics_settings));
-          console.log('- Length:', fetchedMetricSet.user_custom_metrics_settings.length);
-          console.log('- First 3 items:', fetchedMetricSet.user_custom_metrics_settings.slice(0, 3));
-          
-          // Check each metric setting
-          fetchedMetricSet.user_custom_metrics_settings.forEach((setting: any, index: number) => {
-            console.log(`[InputMetricValuesStep] Metric ${index + 1}:`, {
-              id: setting.id,
-              metric_identifier: setting.metric_identifier,
-              label: setting.label,
-              category: setting.category,
-              target_value: setting.target_value,
-              user_id: setting.user_id,
-              metric_set_id: setting.metric_set_id
-            });
-          });
-        } else {
-          console.warn('[InputMetricValuesStep] user_custom_metrics_settings is null/undefined');
-        }
+        console.log('[InputMetricValuesStep] Successfully fetched metric set:', {
+          name: fetchedMetricSet.name,
+          settingsCount: fetchedMetricSet.user_custom_metrics_settings?.length || 0
+        });
 
         setMetricSet(fetchedMetricSet);
         setError(null);
@@ -136,7 +90,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       } catch (err) {
         console.error('[InputMetricValuesStep] Error fetching metric set:', err);
         setError('Failed to load metric set');
-        setDebugInfo({ error: err });
       } finally {
         setIsLoading(false);
       }
@@ -187,14 +140,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     }
   };
 
-  const handleRefresh = () => {
-    setIsLoading(true);
-    setError(null);
-    setDebugInfo(null);
-    // Trigger useEffect to re-fetch data
-    window.location.reload();
-  };
-
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -225,21 +170,12 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
             
-            {debugInfo && (
-              <div className="bg-muted p-4 rounded-md">
-                <h4 className="font-medium mb-2">Debug Information:</h4>
-                <pre className="text-xs overflow-auto max-h-40">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </div>
-            )}
-            
             <div className="flex space-x-2">
               <Button variant="outline" onClick={onBack}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
-              <Button variant="outline" onClick={handleRefresh}>
+              <Button variant="outline" onClick={() => window.location.reload()}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
@@ -261,22 +197,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     );
   }
 
-  console.log('[InputMetricValuesStep] About to render with metric set:', {
-    metricSetName: metricSet.name,
-    hasUserCustomMetricsSettings: !!metricSet.user_custom_metrics_settings,
-    userCustomMetricsSettingsLength: metricSet.user_custom_metrics_settings?.length || 0,
-    enabledOptionalSections: metricSet.enabled_optional_sections
-  });
-
   // Check if we have any custom metrics configured
   const hasCustomMetrics = metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0;
-
-  console.log('[InputMetricValuesStep] hasCustomMetrics check:', {
-    hasCustomMetrics,
-    settingsExists: !!metricSet.user_custom_metrics_settings,
-    settingsIsArray: Array.isArray(metricSet.user_custom_metrics_settings),
-    settingsLength: metricSet.user_custom_metrics_settings?.length
-  });
 
   if (!hasCustomMetrics) {
     return (
@@ -296,23 +218,10 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
               </AlertDescription>
             </Alert>
             
-            {debugInfo && (
-              <div className="bg-muted p-4 rounded-md">
-                <h4 className="font-medium mb-2">Debug Information:</h4>
-                <pre className="text-xs overflow-auto max-h-60">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </div>
-            )}
-            
             <div className="mt-4 space-x-2">
               <Button variant="outline" onClick={onBack}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Metric Set Selection
-              </Button>
-              <Button variant="outline" onClick={handleRefresh}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Data
               </Button>
             </div>
           </CardContent>
@@ -323,8 +232,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   // Get enabled categories for organizing metrics
   const enabledCategories = getEnabledCategories(metricSet.enabled_optional_sections || []);
-
-  console.log('[InputMetricValuesStep] Enabled categories:', enabledCategories);
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -338,19 +245,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-              {/* Debug information panel */}
-              {debugInfo && (
-                <div className="bg-muted p-4 rounded-md">
-                  <h4 className="font-medium mb-2">Debug Information:</h4>
-                  <div className="text-xs space-y-1">
-                    <p>Metric Set: {debugInfo.metricSetName}</p>
-                    <p>Settings Count: {debugInfo.settingsCount}</p>
-                    <p>Enabled Sections: {debugInfo.enabledSectionsCount}</p>
-                    <p>Has Enabled Sections Data: {String(debugInfo.hasEnabledSectionsData)}</p>
-                  </div>
-                </div>
-              )}
-
               {/* Metric input sections organized by category */}
               {enabledCategories.map((category) => {
                 const categoryMetrics = metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category);

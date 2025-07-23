@@ -175,162 +175,91 @@ const inferEnabledSectionsFromMetrics = (metrics: any[]): string[] => {
 };
 
 export const getTargetMetricSetById = async (id: string, userId: string): Promise<TargetMetricSet | null> => {
-  console.log('=== ENHANCED DEBUG: getTargetMetricSetById ===');
-  console.log('[getTargetMetricSetById] Starting enhanced fetch - ID:', id, 'User ID:', userId);
+  console.log('[getTargetMetricSetById] Starting fetch - ID:', id, 'User ID:', userId);
   
-  // First get the target metric set
-  const { data: metricSetData, error: metricSetError } = await supabase
-    .from('target_metric_sets')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (metricSetError) {
-    console.error('[getTargetMetricSetById] Error fetching target metric set:', metricSetError);
-    console.error('[getTargetMetricSetById] Error details:', {
-      message: metricSetError.message,
-      details: metricSetError.details,
-      hint: metricSetError.hint,
-      code: metricSetError.code
-    });
+  if (!id || !userId) {
+    console.error('[getTargetMetricSetById] Missing required parameters:', { id, userId });
     return null;
   }
 
-  if (!metricSetData) {
-    console.error('[getTargetMetricSetById] No metric set found with id:', id);
-    return null;
-  }
+  try {
+    // First get the target metric set
+    const { data: metricSetData, error: metricSetError } = await supabase
+      .from('target_metric_sets')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-  console.log('[getTargetMetricSetById] Retrieved metric set:', {
-    metricSetId: metricSetData.id,
-    metricSetName: metricSetData.name,
-    accountId: metricSetData.account_id,
-    hasEnabledSectionsData: metricSetData.has_enabled_sections_data,
-    createdAt: metricSetData.created_at,
-    updatedAt: metricSetData.updated_at
-  });
+    if (metricSetError) {
+      console.error('[getTargetMetricSetById] Error fetching target metric set:', metricSetError);
+      return null;
+    }
 
-  // Now get the user's custom metrics settings for this metric set
-  console.log('[getTargetMetricSetById] Querying user_custom_metrics_settings with:', {
-    metric_set_id: id,
-    user_id: userId
-  });
+    if (!metricSetData) {
+      console.error('[getTargetMetricSetById] No metric set found with id:', id);
+      return null;
+    }
 
-  const { data: userMetrics, error: userMetricsError } = await supabase
-    .from('user_custom_metrics_settings')
-    .select('*')
-    .eq('metric_set_id', id)
-    .eq('user_id', userId);
-
-  if (userMetricsError) {
-    console.error('[getTargetMetricSetById] Error fetching user custom metrics settings:', userMetricsError);
-    console.error('[getTargetMetricSetById] Error details:', {
-      message: userMetricsError.message,
-      details: userMetricsError.details,
-      hint: userMetricsError.hint,
-      code: userMetricsError.code
+    console.log('[getTargetMetricSetById] Retrieved metric set:', {
+      metricSetId: metricSetData.id,
+      metricSetName: metricSetData.name,
+      accountId: metricSetData.account_id,
+      hasEnabledSectionsData: metricSetData.has_enabled_sections_data
     });
-    // Continue with empty array rather than failing completely
-  }
 
-  const userCustomMetricsSettings = userMetrics || [];
-
-  console.log('[getTargetMetricSetById] User metrics query result:', {
-    settingsCount: userCustomMetricsSettings.length,
-    hasSettings: userCustomMetricsSettings.length > 0,
-    queryParams: { metric_set_id: id, user_id: userId }
-  });
-
-  // Log detailed information about each metric setting
-  if (userCustomMetricsSettings.length > 0) {
-    console.log('[getTargetMetricSetById] Detailed metrics analysis:');
-    userCustomMetricsSettings.forEach((setting, index) => {
-      console.log(`  Metric ${index + 1}:`, {
-        id: setting.id,
-        metric_identifier: setting.metric_identifier,
-        label: setting.label,
-        category: setting.category,
-        target_value: setting.target_value,
-        higher_is_better: setting.higher_is_better,
-        measurement_type: setting.measurement_type,
-        user_id: setting.user_id,
-        account_id: setting.account_id,
-        metric_set_id: setting.metric_set_id,
-        created_at: setting.created_at,
-        updated_at: setting.updated_at
-      });
-    });
-  } else {
-    console.warn('[getTargetMetricSetById] No user_custom_metrics_settings found for metric set and user combination.');
-    console.warn('[getTargetMetricSetById] This may indicate:');
-    console.warn('  1. The metric set needs to be repaired');
-    console.warn('  2. The user needs to be assigned metrics');
-    console.warn('  3. There\'s a data integrity issue');
-    
-    // Let's also check if there are ANY metrics for this metric set with any user
-    const { data: anyMetrics, error: anyMetricsError } = await supabase
+    // Now get the user's custom metrics settings for this metric set
+    const { data: userMetrics, error: userMetricsError } = await supabase
       .from('user_custom_metrics_settings')
-      .select('user_id, metric_identifier, label, category')
+      .select('*')
       .eq('metric_set_id', id)
-      .limit(10);
-    
-    console.log('[getTargetMetricSetById] Any metrics for this metric set:', {
-      found: anyMetrics?.length || 0,
-      data: anyMetrics,
-      error: anyMetricsError
+      .eq('user_id', userId);
+
+    if (userMetricsError) {
+      console.error('[getTargetMetricSetById] Error fetching user custom metrics settings:', userMetricsError);
+      // Continue with empty array rather than failing completely
+    }
+
+    const userCustomMetricsSettings = userMetrics || [];
+
+    console.log('[getTargetMetricSetById] User metrics query result:', {
+      settingsCount: userCustomMetricsSettings.length,
+      hasSettings: userCustomMetricsSettings.length > 0
     });
 
-    // Check if there are metrics for this user but different metric set
-    const { data: userMetricsOtherSets, error: userMetricsOtherSetsError } = await supabase
-      .from('user_custom_metrics_settings')
-      .select('metric_set_id, metric_identifier, label, category')
-      .eq('user_id', userId)
-      .limit(10);
+    // Get enabled optional sections
+    let enabledSections = await getEnabledOptionalSections(metricSetData.id);
     
-    console.log('[getTargetMetricSetById] User metrics in other sets:', {
-      found: userMetricsOtherSets?.length || 0,
-      data: userMetricsOtherSets,
-      error: userMetricsOtherSetsError
+    // For legacy metric sets or when no explicit sections are stored, infer from metrics
+    if (enabledSections.length === 0 && userCustomMetricsSettings.length > 0) {
+      console.log('[getTargetMetricSetById] No explicit enabled sections found, inferring from metrics');
+      enabledSections = inferEnabledSectionsFromMetrics(userCustomMetricsSettings);
+    }
+
+    const result = {
+      id: metricSetData.id,
+      account_id: metricSetData.account_id,
+      name: metricSetData.name,
+      created_at: metricSetData.created_at,
+      updated_at: metricSetData.updated_at,
+      has_enabled_sections_data: metricSetData.has_enabled_sections_data,
+      user_custom_metrics_settings: userCustomMetricsSettings,
+      enabled_optional_sections: enabledSections
+    };
+
+    console.log('[getTargetMetricSetById] Final result:', {
+      id: result.id,
+      name: result.name,
+      settingsCount: result.user_custom_metrics_settings.length,
+      enabledSectionsCount: result.enabled_optional_sections.length,
+      enabledSections: result.enabled_optional_sections
     });
+    
+    return result;
+
+  } catch (error) {
+    console.error('[getTargetMetricSetById] Unexpected error:', error);
+    return null;
   }
-
-  // Get enabled optional sections
-  let enabledSections = await getEnabledOptionalSections(metricSetData.id);
-  
-  // For legacy metric sets (has_enabled_sections_data = false), infer sections from metrics if no explicit sections are stored
-  if (!metricSetData.has_enabled_sections_data && enabledSections.length === 0 && userCustomMetricsSettings.length > 0) {
-    console.log('[getTargetMetricSetById] Legacy metric set - inferring enabled sections from metrics');
-    const inferredSections = inferEnabledSectionsFromMetrics(userCustomMetricsSettings);
-    enabledSections = inferredSections;
-  }
-
-  const finalResult = {
-    id: metricSetData.id,
-    account_id: metricSetData.account_id,
-    name: metricSetData.name,
-    created_at: metricSetData.created_at,
-    updated_at: metricSetData.updated_at,
-    has_enabled_sections_data: metricSetData.has_enabled_sections_data,
-    user_custom_metrics_settings: userCustomMetricsSettings,
-    enabled_optional_sections: enabledSections
-  };
-
-  console.log('[getTargetMetricSetById] Final result being returned:', {
-    id: finalResult.id,
-    name: finalResult.name,
-    settingsCount: finalResult.user_custom_metrics_settings.length,
-    enabledSectionsCount: finalResult.enabled_optional_sections.length,
-    enabledSections: finalResult.enabled_optional_sections,
-    hasEnabledSectionsData: finalResult.has_enabled_sections_data,
-    firstFewSettings: finalResult.user_custom_metrics_settings.slice(0, 3).map(s => ({
-      id: s.id,
-      metric_identifier: s.metric_identifier,
-      label: s.label,
-      category: s.category
-    }))
-  });
-  
-  return finalResult;
 };
 
 export const getTargetMetricSets = async (accountId: string): Promise<TargetMetricSet[]> => {
