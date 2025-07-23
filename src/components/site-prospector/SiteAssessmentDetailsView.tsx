@@ -20,6 +20,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getUserAccount } from '@/services/userAccountService';
 import ExportButton from '@/components/export/ExportButton';
 import { ExportData } from '@/services/exportService';
+import { recalculateAssessmentScoresForMetricSet } from '@/services/assessmentRecalculationService';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -33,8 +35,10 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   onBackToList,
 }) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [currentStatus, setCurrentStatus] = useState(assessment.site_status || 'Prospect');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const [targetMetricsMap, setTargetMetricsMap] = useState<Record<string, {
     target_value: number;
     higher_is_better: boolean;
@@ -106,6 +110,21 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     loadTargetMetrics();
   }, [assessment.target_metric_set_id, user?.id]);
 
+  // Auto-calculate scores if they're missing and we have metric values
+  React.useEffect(() => {
+    const shouldAutoCalculateScores = () => {
+      // Only auto-calculate if we have metric values but no scores
+      const hasMetricValues = assessment.assessment_metric_values && assessment.assessment_metric_values.length > 0;
+      const hasNoScores = assessment.site_signal_score === null || assessment.completion_percentage === null;
+      return hasMetricValues && hasNoScores && assessment.target_metric_set_id && user?.id;
+    };
+
+    if (shouldAutoCalculateScores()) {
+      console.log('Auto-calculating scores for assessment with missing scores');
+      handleRecalculateScores();
+    }
+  }, [assessment.site_signal_score, assessment.completion_percentage, assessment.assessment_metric_values, assessment.target_metric_set_id, user?.id]);
+
   const handleEdit = () => {
     onEditGoToInputMetrics();
   };
@@ -121,6 +140,35 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
       toast.error('Failed to update site status');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleRecalculateScores = async () => {
+    if (!assessment.target_metric_set_id || !user?.id) {
+      toast.error('Unable to recalculate scores - missing data');
+      return;
+    }
+
+    setIsRecalculating(true);
+    try {
+      console.log('Recalculating scores for assessment:', assessment.id);
+      const result = await recalculateAssessmentScoresForMetricSet(assessment.target_metric_set_id, user.id);
+      
+      if (result.errors.length > 0) {
+        console.error('Recalculation errors:', result.errors);
+        toast.error(`Recalculation completed with ${result.errors.length} errors`);
+      } else {
+        toast.success(`Successfully recalculated scores for ${result.updated} assessment(s)`);
+      }
+
+      // Refresh the assessment data
+      queryClient.invalidateQueries({ queryKey: ['assessment-details', assessment.id] });
+      queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
+    } catch (error) {
+      console.error('Error recalculating scores:', error);
+      toast.error('Failed to recalculate scores');
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -264,9 +312,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
           </div>
           
           <div className="flex gap-2">
-            <Button variant="outline">
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              Recalculate Scores
+            <Button 
+              variant="outline" 
+              onClick={handleRecalculateScores}
+              disabled={isRecalculating}
+            >
+              <RefreshCcw className={`mr-2 h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
+              {isRecalculating ? 'Recalculating...' : 'Recalculate Scores'}
             </Button>
             <ExportButton exportData={prepareExportData()} />
             <Button onClick={handleEdit} className="bg-foreground text-background hover:bg-foreground/90">
