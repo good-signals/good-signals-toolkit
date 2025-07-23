@@ -76,6 +76,14 @@ const validateAndCleanSessionStorage = (userId: string | null, authInitialized: 
       return 'idle';
     }
 
+    // If we have an assessment ID stored, it likely references a stale/invalid assessment
+    // Clear the session to force a fresh start
+    if (activeAssessmentId) {
+      console.log('[useSiteProspectorSession] Found stale assessment ID, clearing session for fresh start');
+      clearAllSessionStorage();
+      return 'idle';
+    }
+
     return storedStep;
   } catch (error) {
     console.error('[useSiteProspectorSession] Error validating session storage:', error);
