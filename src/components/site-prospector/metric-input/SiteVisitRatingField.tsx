@@ -40,7 +40,7 @@ const SiteVisitRatingField: React.FC<SiteVisitRatingFieldProps> = ({
             control={control}
             render={({ field: controllerField }) => (
               <Select
-                value={controllerField.value || ''} 
+                value={controllerField.value || 'none'} 
                 onValueChange={(value) => {
                   controllerField.onChange(value === 'none' ? '' : value);
                 }}

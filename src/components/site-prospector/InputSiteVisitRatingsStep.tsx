@@ -80,22 +80,22 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     const ratingsToSave: AssessmentSiteVisitRatingInsert[] = siteVisitCriteria
       .map(criterion => {
         const ratingData = formData[criterion.key];
-        if (ratingData && ratingData.grade) {
+        // Only save if there's a grade and it's not 'none'
+        if (ratingData && ratingData.grade && ratingData.grade !== 'none') {
           const gradeDetail = criterion.grades.find(g => g.grade === ratingData.grade);
           return {
             assessment_id: assessmentId,
             criterion_key: criterion.key,
-            rating_grade: ratingData.grade as SiteVisitRatingGrade, // Ensure grade is not ''
+            rating_grade: ratingData.grade as SiteVisitRatingGrade,
             rating_description: gradeDetail?.description || '',
-            notes: ratingData.notes || null, // Ensure notes is null if empty string
+            notes: ratingData.notes || null,
           };
         }
         return null;
       })
       .filter(Boolean) as AssessmentSiteVisitRatingInsert[];
 
-    if (ratingsToSave.length === 0 && !Object.values(formData).some(fd => fd.grade || fd.notes)) {
-        // If nothing was entered and nothing to save, consider it a "skip" or successful empty submission.
+    if (ratingsToSave.length === 0 && !Object.values(formData).some(fd => fd.grade && fd.grade !== 'none' || fd.notes)) {
         toast({ title: 'No Ratings Entered', description: 'Proceeding without new site visit ratings.' });
         onSiteVisitRatingsSubmitted(assessmentId);
         return;
@@ -114,7 +114,6 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
       setFormData(initialData);
     }
   }, [isLoadingExistingRatings, formData]);
-
 
   if (isLoadingExistingRatings) {
     return (
@@ -143,14 +142,14 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
                 <div className="md:col-span-1">
                   <Label htmlFor={`grade-${criterion.key}`}>Grade</Label>
                   <Select
-                    value={formData[criterion.key]?.grade || ''}
-                    onValueChange={(value) => handleInputChange(criterion.key, 'grade', value)}
+                    value={formData[criterion.key]?.grade || 'none'}
+                    onValueChange={(value) => handleInputChange(criterion.key, 'grade', value === 'none' ? '' : value)}
                   >
                     <SelectTrigger id={`grade-${criterion.key}`}>
                       <SelectValue placeholder="Select grade" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value=""><em>No Grade</em></SelectItem>
+                      <SelectItem value="none"><em>No Grade</em></SelectItem>
                       {criterion.grades.map(grade => (
                         <SelectItem key={grade.grade} value={grade.grade}>
                           {grade.grade} - {grade.description}
