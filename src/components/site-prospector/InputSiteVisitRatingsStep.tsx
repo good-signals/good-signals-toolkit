@@ -27,6 +27,7 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<SiteVisitRatingsFormData>({});
+  const [isFormReady, setIsFormReady] = useState(false);
   
   const { data: existingRatings, isLoading: isLoadingExistingRatings } = useQuery<AssessmentSiteVisitRatingInsert[], Error>({
     queryKey: ['siteVisitRatings', assessmentId],
@@ -34,20 +35,55 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     enabled: !!assessmentId,
   });
 
-  // Initialize form data with existing ratings when they load
+  // Single useEffect to handle all form initialization - both existing and new ratings
   useEffect(() => {
-    if (existingRatings) {
+    console.log('[InputSiteVisitRatingsStep] Initializing form data...');
+    console.log('[InputSiteVisitRatingsStep] Loading state:', isLoadingExistingRatings);
+    console.log('[InputSiteVisitRatingsStep] Existing ratings:', existingRatings);
+
+    if (!isLoadingExistingRatings) {
       const initialData: SiteVisitRatingsFormData = {};
+      
+      // Initialize all criteria with defaults first
       siteVisitCriteria.forEach(criterion => {
-        const existing = existingRatings.find(r => r.criterion_key === criterion.key);
-        initialData[criterion.key] = {
-          grade: existing?.rating_grade || '',
-          notes: existing?.notes || '',
-        };
+        initialData[criterion.key] = { grade: '', notes: '' };
       });
+
+      // If there are existing ratings, merge them in
+      if (existingRatings && existingRatings.length > 0) {
+        console.log('[InputSiteVisitRatingsStep] Found existing ratings, merging with defaults');
+        existingRatings.forEach(rating => {
+          if (initialData[rating.criterion_key]) {
+            initialData[rating.criterion_key] = {
+              grade: rating.rating_grade || '',
+              notes: rating.notes || '',
+            };
+            console.log('[InputSiteVisitRatingsStep] Loaded rating for', rating.criterion_key, ':', {
+              grade: rating.rating_grade,
+              notes: rating.notes
+            });
+          }
+        });
+      } else {
+        console.log('[InputSiteVisitRatingsStep] No existing ratings found, using empty defaults');
+      }
+
+      console.log('[InputSiteVisitRatingsStep] Setting form data:', initialData);
       setFormData(initialData);
+      setIsFormReady(true);
     }
-  }, [existingRatings]);
+  }, [existingRatings, isLoadingExistingRatings]);
+
+  // Debug form data changes
+  useEffect(() => {
+    if (isFormReady) {
+      console.log('[InputSiteVisitRatingsStep] Form ready with data:', {
+        criteriaCount: Object.keys(formData).length,
+        sampleData: formData.visibility,
+        formReady: isFormReady
+      });
+    }
+  }, [formData, isFormReady]);
 
   const mutation = useMutation({
     mutationFn: (ratingsToSave: AssessmentSiteVisitRatingInsert[]) => saveSiteVisitRatings(assessmentId, ratingsToSave),
@@ -66,6 +102,7 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     field: 'grade' | 'notes',
     value: string
   ) => {
+    console.log('[InputSiteVisitRatingsStep] Input change:', criterionKey, field, value);
     setFormData(prev => ({
       ...prev,
       [criterionKey]: {
@@ -103,23 +140,22 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     
     mutation.mutate(ratingsToSave);
   };
-  
-  // Initialize form data if not already populated by existing ratings
-  useEffect(() => {
-    if (!isLoadingExistingRatings && Object.keys(formData).length === 0) {
-      const initialData: SiteVisitRatingsFormData = {};
-      siteVisitCriteria.forEach(criterion => {
-        initialData[criterion.key] = { grade: '', notes: '' };
-      });
-      setFormData(initialData);
-    }
-  }, [isLoadingExistingRatings, formData]);
 
   if (isLoadingExistingRatings) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-lg text-muted-foreground">Loading site visit ratings form...</p>
+      </div>
+    );
+  }
+
+  // Don't render form until it's ready with data
+  if (!isFormReady) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Preparing site visit ratings form...</p>
       </div>
     );
   }
