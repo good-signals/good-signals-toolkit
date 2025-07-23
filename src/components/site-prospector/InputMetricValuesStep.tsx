@@ -9,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { getEnabledCategories } from '@/config/targetMetricsConfig';
+import { getEnabledCategories, sortCategoriesByOrder } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
 import { saveAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
 import { useAuth } from '@/contexts/AuthContext';
@@ -230,8 +230,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     );
   }
 
-  // Get enabled categories for organizing metrics
-  const enabledCategories = getEnabledCategories(metricSet.enabled_optional_sections || []);
+  // Get enabled categories for organizing metrics and sort them in the correct order
+  const enabledCategories = sortCategoriesByOrder(getEnabledCategories(metricSet.enabled_optional_sections || []));
 
   return (
     <div className="container mx-auto py-8 px-4">
