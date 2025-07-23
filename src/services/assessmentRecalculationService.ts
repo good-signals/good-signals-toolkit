@@ -61,6 +61,8 @@ export const recalculateAssessmentScoresForMetricSet = async (
     // Recalculate scores for each assessment
     for (const assessment of assessments) {
       try {
+        console.log(`\n--- Processing assessment ${assessment.id} (${assessment.assessment_name}) ---`);
+        
         const metricScores: (number | null)[] = [];
         let metricsWithValues = 0;
         let siteVisitRatingsWithValues = 0;
@@ -74,8 +76,14 @@ export const recalculateAssessmentScoresForMetricSet = async (
         // Calculate total completable items
         const totalCompletableItems = totalMetrics + totalSiteVisitCriteria;
 
+        console.log(`📊 Completion Calculation Setup:`);
+        console.log(`  - Total metrics in set: ${totalMetrics}`);
+        console.log(`  - Total site visit criteria: ${totalSiteVisitCriteria}`);
+        console.log(`  - Total completable items: ${totalCompletableItems}`);
+
         // Process regular metrics
         if (metricSet.user_custom_metrics_settings) {
+          console.log(`🔢 Processing ${metricSet.user_custom_metrics_settings.length} metrics...`);
           for (const metricSetting of metricSet.user_custom_metrics_settings) {
             // Find the entered value for this metric in the assessment
             const metricValue = assessment.assessment_metric_values?.find(
@@ -85,6 +93,7 @@ export const recalculateAssessmentScoresForMetricSet = async (
             // Only count as complete if there's a non-null entered value
             if (metricValue && metricValue.entered_value !== null) {
               metricsWithValues++;
+              console.log(`    ✓ Metric ${metricSetting.metric_identifier}: ${metricValue.entered_value}`);
               
               const scoreData: MetricScoreData = {
                 enteredValue: metricValue.entered_value,
@@ -95,42 +104,55 @@ export const recalculateAssessmentScoresForMetricSet = async (
               const score = calculateMetricSignalScore(scoreData, metricSetting.metric_identifier);
               metricScores.push(score);
             } else {
+              console.log(`    ✗ Metric ${metricSetting.metric_identifier}: no value`);
               metricScores.push(null);
             }
           }
         }
 
         // Process site visit ratings
-        if (assessment.site_visit_ratings) {
+        console.log(`🏠 Processing site visit ratings...`);
+        console.log(`  - Site visit ratings in assessment:`, assessment.site_visit_ratings?.length || 0);
+        
+        if (assessment.site_visit_ratings && assessment.site_visit_ratings.length > 0) {
+          console.log(`  - Found ${assessment.site_visit_ratings.length} site visit ratings`);
+          
           for (const rating of assessment.site_visit_ratings) {
+            console.log(`    - Rating for ${rating.criterion_key}: grade="${rating.rating_grade}", notes="${rating.notes}"`);
+            
             // Only count ratings that have a grade (not null or empty)
-            if (rating.rating_grade) {
+            if (rating.rating_grade && rating.rating_grade.trim() !== '') {
               siteVisitRatingsWithValues++;
+              console.log(`      ✓ Counted as complete (grade: ${rating.rating_grade})`);
+            } else {
+              console.log(`      ✗ Not counted (no grade)`);
             }
           }
+        } else {
+          console.log(`  - No site visit ratings found for this assessment`);
         }
 
         // Calculate total completed items
         const totalCompletedItems = metricsWithValues + siteVisitRatingsWithValues;
 
+        console.log(`📈 Completion Summary:`);
+        console.log(`  - Metrics with values: ${metricsWithValues}/${totalMetrics}`);
+        console.log(`  - Site visit ratings with values: ${siteVisitRatingsWithValues}/${totalSiteVisitCriteria}`);
+        console.log(`  - Total completed items: ${totalCompletedItems}/${totalCompletableItems}`);
+
         // Calculate overall scores
         const overallScore = calculateOverallSiteSignalScore(metricScores);
         const completionPercentage = calculateCompletionPercentage(totalCompletableItems, totalCompletedItems);
+
+        console.log(`🎯 Final Results:`);
+        console.log(`  - Overall score: ${overallScore}`);
+        console.log(`  - Completion percentage: ${completionPercentage}%`);
+        console.log(`  - Calculation: (${totalCompletedItems}/${totalCompletableItems}) * 100 = ${completionPercentage}%`);
 
         // Update the assessment scores
         await updateAssessmentScores(assessment.id, overallScore, completionPercentage);
         updatedCount++;
         
-        console.log(`Updated assessment ${assessment.id}:`, {
-          score: overallScore,
-          completion: completionPercentage,
-          metricsWithValues,
-          siteVisitRatingsWithValues,
-          totalMetrics,
-          totalSiteVisitCriteria,
-          totalCompletableItems,
-          totalCompletedItems
-        });
       } catch (error) {
         console.error(`Error updating assessment ${assessment.id}:`, error);
         errors.push(`Failed to update assessment ${assessment.assessment_name || assessment.id}: ${error}`);
