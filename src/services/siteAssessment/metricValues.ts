@@ -67,8 +67,8 @@ export const saveAssessmentMetricValues = async (
   const valuesToSave = metricValues.map(mv => ({
     ...mv,
     assessment_id: assessmentId,
-    // Keep null values as null - don't convert to zero
-    entered_value: mv.entered_value,
+    // Preserve null values - don't convert empty values to zero
+    entered_value: mv.entered_value === undefined ? null : mv.entered_value,
   }));
 
   console.log('[saveAssessmentMetricValues] Data prepared for save:', {
@@ -94,6 +94,14 @@ export const saveAssessmentMetricValues = async (
     // Provide more specific error messages
     if (error.message.includes('row-level security policy')) {
       throw new Error('Authentication error: Unable to save assessment data. Please try logging out and back in.');
+    }
+    
+    if (error.message.includes('null value') && error.message.includes('not-null constraint')) {
+      throw new Error('Data validation error: Please ensure all required fields are filled properly.');
+    }
+    
+    if (error.code === '23505') {
+      throw new Error('A metric with this identifier already exists for this assessment.');
     }
     
     throw new Error(`Failed to save assessment data: ${error.message}`);

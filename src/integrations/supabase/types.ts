@@ -205,7 +205,7 @@ export type Database = {
           assessment_id: string
           category: string
           created_at: string
-          entered_value: number
+          entered_value: number | null
           id: string
           image_url: string | null
           label: string
@@ -218,7 +218,7 @@ export type Database = {
           assessment_id: string
           category: string
           created_at?: string
-          entered_value: number
+          entered_value?: number | null
           id?: string
           image_url?: string | null
           label: string
@@ -231,7 +231,7 @@ export type Database = {
           assessment_id?: string
           category?: string
           created_at?: string
-          entered_value?: number
+          entered_value?: number | null
           id?: string
           image_url?: string | null
           label?: string

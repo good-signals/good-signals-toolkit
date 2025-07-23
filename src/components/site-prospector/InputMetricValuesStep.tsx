@@ -101,7 +101,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             if (metricIndex !== -1) {
               initialMetrics[metricIndex] = {
                 ...initialMetrics[metricIndex],
-                entered_value: metricValue.entered_value || null,
+                entered_value: metricValue.entered_value,
                 notes: metricValue.notes || null,
               };
             }
@@ -159,9 +159,10 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       onMetricsSubmitted();
     } catch (error) {
       console.error('Error saving metric values:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to save metric values";
       toast({
         title: "Error",
-        description: "Failed to save metric values",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

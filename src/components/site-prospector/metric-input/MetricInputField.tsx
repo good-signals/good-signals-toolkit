@@ -91,7 +91,15 @@ const MetricInputField: React.FC<MetricInputFieldProps> = ({
                   placeholder={`Enter value for ${metricField.label}`}
                   className="mt-1"
                   value={controllerField.value === null || controllerField.value === undefined ? '' : String(controllerField.value)}
-                  onChange={e => controllerField.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                  onChange={e => {
+                    const value = e.target.value.trim();
+                    if (value === "") {
+                      controllerField.onChange(null);
+                    } else {
+                      const numValue = parseFloat(value);
+                      controllerField.onChange(isNaN(numValue) ? null : numValue);
+                    }
+                  }}
                   disabled={disabled}
                 />
               )}
