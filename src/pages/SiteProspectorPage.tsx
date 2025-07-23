@@ -21,6 +21,7 @@ const SiteProspectorPage = () => {
     selectedMetricSetId,
     setSelectedMetricSetId,
     clearSessionStorage,
+    authInitialized,
   } = useSiteProspectorSession();
 
   const {
@@ -52,14 +53,18 @@ const SiteProspectorPage = () => {
     assessments,
   });
 
-  // Clear session storage when user is not authenticated
+  // Clear session storage when user authentication changes
   useEffect(() => {
-    if (!authLoading && !user) {
-      console.log('User not authenticated, clearing session storage');
-      clearSessionStorage();
-      setCurrentStep('idle');
+    if (authInitialized) {
+      if (!user) {
+        console.log('[SiteProspectorPage] User not authenticated, clearing session storage');
+        clearSessionStorage();
+        if (currentStep !== 'idle') {
+          setCurrentStep('idle');
+        }
+      }
     }
-  }, [user, authLoading, clearSessionStorage, setCurrentStep]);
+  }, [user, authInitialized, clearSessionStorage, currentStep, setCurrentStep]);
 
   const handleDeleteCommit = (idsToDelete: string[]) => {
     console.log('handleDeleteCommit called with:', idsToDelete);
@@ -89,11 +94,12 @@ const SiteProspectorPage = () => {
     assessmentsCount: assessments.length,
     clearSelectionsKey,
     authLoading,
+    authInitialized,
     user: !!user
   });
 
   // Show loading state while auth is initializing
-  if (authLoading) {
+  if (!authInitialized) {
     return (
       <div className="container mx-auto py-10 px-4">
         <div className="flex justify-center items-center h-64">

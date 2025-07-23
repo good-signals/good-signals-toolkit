@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { safeStorage } from '@/utils/safeStorage';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type SiteProspectorStep = 'idle' | 'address' | 'metric-set-selection' | 'metric-input' | 'site-visit-ratings' | 'view-details';
 
@@ -9,6 +10,7 @@ const SESSION_STORAGE_KEYS = {
   ACTIVE_ASSESSMENT_ID: 'siteProspector_activeAssessmentId',
   SELECTED_METRIC_SET_ID: 'siteProspector_selectedMetricSetId',
   SESSION_VERSION: 'siteProspector_sessionVersion',
+  AUTH_USER_ID: 'siteProspector_authUserId',
 } as const;
 
 const CURRENT_SESSION_VERSION = '1.0.0';
@@ -18,8 +20,29 @@ const isValidStep = (step: string): step is SiteProspectorStep => {
   return VALID_STEPS.includes(step as SiteProspectorStep);
 };
 
-const validateAndCleanSessionStorage = (): SiteProspectorStep => {
+const validateAndCleanSessionStorage = (userId: string | null, authInitialized: boolean): SiteProspectorStep => {
   try {
+    // Don't validate session storage until auth is initialized
+    if (!authInitialized) {
+      console.log('[useSiteProspectorSession] Auth not initialized, returning idle');
+      return 'idle';
+    }
+
+    // Check if user is authenticated
+    if (!userId) {
+      console.log('[useSiteProspectorSession] User not authenticated, clearing session');
+      clearAllSessionStorage();
+      return 'idle';
+    }
+
+    // Check if session user matches current user
+    const storedUserId = safeStorage.sessionGetItem(SESSION_STORAGE_KEYS.AUTH_USER_ID);
+    if (storedUserId && storedUserId !== userId) {
+      console.log('[useSiteProspectorSession] User ID mismatch, clearing session');
+      clearAllSessionStorage();
+      return 'idle';
+    }
+
     // Check session version for compatibility
     const sessionVersion = safeStorage.sessionGetItem(SESSION_STORAGE_KEYS.SESSION_VERSION);
     if (sessionVersion !== CURRENT_SESSION_VERSION) {
@@ -66,25 +89,42 @@ const clearAllSessionStorage = () => {
 };
 
 export const useSiteProspectorSession = () => {
+  const { user, authLoading } = useAuth();
+  const authInitialized = !authLoading;
+  
   const [currentStep, setCurrentStep] = useState<SiteProspectorStep>(() => {
-    return validateAndCleanSessionStorage();
+    return validateAndCleanSessionStorage(user?.id || null, authInitialized);
   });
   
   const [activeAssessmentId, setActiveAssessmentId] = useState<string | null>(() => {
-    if (currentStep === 'idle') return null;
+    if (!authInitialized || !user) return null;
     return safeStorage.sessionGetItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID) || null;
   });
   
   const [selectedMetricSetId, setSelectedMetricSetId] = useState<string | null>(() => {
-    if (currentStep === 'idle') return null;
+    if (!authInitialized || !user) return null;
     return safeStorage.sessionGetItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID) || null;
   });
 
+  // Clear session storage when user changes or becomes unauthenticated
+  useEffect(() => {
+    if (authInitialized) {
+      const newStep = validateAndCleanSessionStorage(user?.id || null, authInitialized);
+      if (newStep !== currentStep) {
+        console.log('[useSiteProspectorSession] Step changed due to auth state:', newStep);
+        setCurrentStep(newStep);
+        setActiveAssessmentId(null);
+        setSelectedMetricSetId(null);
+      }
+    }
+  }, [user?.id, authInitialized]);
+
   useEffect(() => {
     try {
-      if (currentStep !== 'idle') {
+      if (authInitialized && user && currentStep !== 'idle') {
         safeStorage.sessionSetItem(SESSION_STORAGE_KEYS.SESSION_VERSION, CURRENT_SESSION_VERSION);
         safeStorage.sessionSetItem(SESSION_STORAGE_KEYS.CURRENT_STEP, currentStep);
+        safeStorage.sessionSetItem(SESSION_STORAGE_KEYS.AUTH_USER_ID, user.id);
         
         if (activeAssessmentId) {
           safeStorage.sessionSetItem(SESSION_STORAGE_KEYS.ACTIVE_ASSESSMENT_ID, activeAssessmentId);
@@ -97,19 +137,30 @@ export const useSiteProspectorSession = () => {
         } else {
           safeStorage.sessionRemoveItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID);
         }
-      } else {
+      } else if (authInitialized && (!user || currentStep === 'idle')) {
         clearAllSessionStorage();
       }
     } catch (error) {
       console.error('[useSiteProspectorSession] Error saving to session storage:', error);
     }
-  }, [currentStep, activeAssessmentId, selectedMetricSetId]);
+  }, [currentStep, activeAssessmentId, selectedMetricSetId, user?.id, authInitialized]);
 
   const clearSessionStorage = () => {
     clearAllSessionStorage();
   };
 
   const safeSetCurrentStep = (step: SiteProspectorStep) => {
+    if (!authInitialized) {
+      console.log('[useSiteProspectorSession] Cannot set step while auth is loading');
+      return;
+    }
+    
+    if (!user && step !== 'idle') {
+      console.log('[useSiteProspectorSession] Cannot set step without authentication');
+      setCurrentStep('idle');
+      return;
+    }
+    
     if (isValidStep(step)) {
       setCurrentStep(step);
     } else {
@@ -126,5 +177,6 @@ export const useSiteProspectorSession = () => {
     selectedMetricSetId,
     setSelectedMetricSetId,
     clearSessionStorage,
+    authInitialized,
   };
 };

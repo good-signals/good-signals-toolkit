@@ -43,6 +43,7 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
 }) => {
   
   const { user, authLoading } = useAuth();
+  const authInitialized = !authLoading;
   
   // Fetch assessment details when viewing details
   const { 
@@ -53,6 +54,10 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   
   // Validation helpers
   const validateStepRequirements = (step: SiteProspectorStep): string | null => {
+    if (!authInitialized) {
+      return 'Authentication initializing';
+    }
+    
     if (!user) {
       return 'Authentication required';
     }
@@ -89,17 +94,21 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   
   // Handle automatic redirect on validation error
   useEffect(() => {
-    if (validationError) {
-      const timer = setTimeout(() => setCurrentStep('idle'), 2000);
+    if (validationError && authInitialized) {
+      console.log('[SiteProspectorStepRenderer] Validation error:', validationError);
+      const timer = setTimeout(() => {
+        console.log('[SiteProspectorStepRenderer] Redirecting to idle due to validation error');
+        setCurrentStep('idle');
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [validationError, setCurrentStep]);
+  }, [validationError, setCurrentStep, authInitialized]);
 
   // Handle authentication errors in details loading
   const isAuthError = detailsError?.message.includes('Authentication required');
   const isNotFoundError = detailsError?.message.includes('not found or you do not have access');
   
-  if (authLoading) {
+  if (!authInitialized) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="flex items-center justify-center">
