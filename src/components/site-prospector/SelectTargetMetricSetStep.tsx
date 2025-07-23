@@ -15,7 +15,7 @@ import { Loader2 } from 'lucide-react';
 
 interface SelectTargetMetricSetStepProps {
   assessmentId: string;
-  onMetricSetSelected: (assessmentId: string, metricSetId: string) => void;
+  onMetricSetSelected: (metricSetId: string) => void;
   onBack: () => void; // To go back to the address step or cancel
 }
 
@@ -57,7 +57,7 @@ const SelectTargetMetricSetStep: React.FC<SelectTargetMetricSetStepProps> = ({
     },
     onSuccess: (data) => {
       toast({ title: "Success", description: "Target metric set has been selected successfully." });
-      onMetricSetSelected(assessmentId, data.target_metric_set_id!);
+      onMetricSetSelected(data.target_metric_set_id!);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: `Failed to update assessment: ${error.message}`, variant: "destructive" });
