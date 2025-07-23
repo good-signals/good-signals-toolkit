@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Signal, PlusCircle, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,15 @@ const SiteProspectorPage = () => {
     assessments,
   });
 
+  // Clear session storage when user is not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log('User not authenticated, clearing session storage');
+      clearSessionStorage();
+      setCurrentStep('idle');
+    }
+  }, [user, authLoading, clearSessionStorage, setCurrentStep]);
+
   const handleDeleteCommit = (idsToDelete: string[]) => {
     console.log('handleDeleteCommit called with:', idsToDelete);
     
@@ -101,11 +110,25 @@ const SiteProspectorPage = () => {
   if (!user) {
     return (
       <div className="container mx-auto py-10 px-4">
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <Button variant="ghost" asChild>
+              <Link to="/toolkit-hub" className="flex items-center gap-2">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Link>
+            </Button>
+          </div>
+        </div>
+        
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
             <Signal size={48} className="text-destructive mx-auto mb-4" />
-            <p className="text-lg text-destructive">Authentication required</p>
-            <p className="text-sm text-muted-foreground">Please sign in to access the Site Prospector</p>
+            <p className="text-lg text-destructive">Authentication Required</p>
+            <p className="text-sm text-muted-foreground mb-4">Please sign in to access the Site Prospector</p>
+            <Button asChild>
+              <Link to="/auth">Sign In</Link>
+            </Button>
           </div>
         </div>
       </div>

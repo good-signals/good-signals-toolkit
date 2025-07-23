@@ -134,15 +134,27 @@ export const deleteSiteAssessmentFromDb = async (
 export const getSiteAssessmentFromDb = async (assessmentId: string): Promise<SiteAssessment> => {
   console.log('Fetching site assessment:', assessmentId);
 
+  // Check if user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.error('User not authenticated when fetching site assessment');
+    throw new Error('Authentication required to fetch site assessment');
+  }
+
   const { data, error } = await supabase
     .from('site_assessments')
     .select('*')
     .eq('id', assessmentId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching site assessment:', error);
     throw new Error(`Failed to fetch site assessment: ${error.message}`);
+  }
+
+  if (!data) {
+    console.error('Site assessment not found or user does not have access:', assessmentId);
+    throw new Error('Site assessment not found or you do not have access to it');
   }
 
   return data;

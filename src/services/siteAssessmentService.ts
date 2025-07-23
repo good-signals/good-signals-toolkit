@@ -20,6 +20,7 @@ import { saveAssessmentMetricValues, getAssessmentMetricValues } from './siteAss
 import { saveSiteVisitRatings, getSiteVisitRatings } from './siteAssessment/siteVisitRatings';
 import { updateAssessmentScores as updateScores } from './siteAssessment/scoring';
 import { generateExecutiveSummaryForAssessment, updateSiteAssessmentSummary } from './siteAssessment/summary';
+import { supabase } from '@/integrations/supabase/client';
 
 export const createSiteAssessment = async (
   assessmentData: Omit<SiteAssessmentInsert, 'user_id' | 'account_id' | 'target_metric_set_id'>,
@@ -69,6 +70,12 @@ export const getSiteAssessmentsForUser = async (userId: string): Promise<SiteAss
 
 export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAssessment> => {
   try {
+    // Check authentication first
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Authentication required to fetch assessment details');
+    }
+
     const assessment = await getSiteAssessmentFromDb(assessmentId);
     
     const [metricValues, siteVisitRatings] = await Promise.all([

@@ -8,8 +8,9 @@ import SiteAssessmentDetailsView from './SiteAssessmentDetailsView';
 import SiteProspectorErrorBoundary from './SiteProspectorErrorBoundary';
 import { SiteProspectorStep } from '@/hooks/useSiteProspectorSession';
 import { useSiteAssessmentDetails } from '@/hooks/useSiteAssessmentDetails';
+import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Shield } from 'lucide-react';
 
 interface SiteProspectorStepRendererProps {
   currentStep: SiteProspectorStep;
@@ -41,6 +42,8 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   setCurrentStep,
 }) => {
   
+  const { user, authLoading } = useAuth();
+  
   // Fetch assessment details when viewing details
   const { 
     data: assessmentDetails, 
@@ -50,6 +53,10 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   
   // Validation helpers
   const validateStepRequirements = (step: SiteProspectorStep): string | null => {
+    if (!user) {
+      return 'Authentication required';
+    }
+    
     switch (step) {
       case 'metric-set-selection':
         if (!activeAssessmentId) {
@@ -87,14 +94,30 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
       return () => clearTimeout(timer);
     }
   }, [validationError, setCurrentStep]);
+
+  // Handle authentication errors in details loading
+  const isAuthError = detailsError?.message.includes('Authentication required') || 
+                      detailsError?.message.includes('not found or you do not have access');
+  
+  if (authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="flex items-center justify-center">
+          <div className="animate-pulse">Loading...</div>
+        </div>
+      </div>
+    );
+  }
   
   if (validationError) {
     console.error('[SiteProspectorStepRenderer] Validation error:', validationError);
     
+    const isAuthValidationError = validationError.includes('Authentication required');
+    
     return (
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          {isAuthValidationError ? <Shield className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
           <AlertDescription>
             {validationError}. Returning to start.
           </AlertDescription>
@@ -159,12 +182,16 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
             )}
             
             {detailsError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Error loading assessment details: {detailsError instanceof Error ? detailsError.message : 'Unknown error'}
-                </AlertDescription>
-              </Alert>
+              <div className="container mx-auto px-4 py-8 max-w-2xl">
+                <Alert variant="destructive">
+                  {isAuthError ? <Shield className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  <AlertDescription>
+                    {isAuthError 
+                      ? 'Authentication required to view assessment details. Returning to start.' 
+                      : `Error loading assessment details: ${detailsError.message}`}
+                  </AlertDescription>
+                </Alert>
+              </div>
             )}
             
             {!isLoadingDetails && !detailsError && assessmentDetails && (
