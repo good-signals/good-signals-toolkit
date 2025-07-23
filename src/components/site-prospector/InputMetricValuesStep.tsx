@@ -123,9 +123,13 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       console.log('[InputMetricValuesStep] Saving metrics:', metricValuesList);
       await saveAssessmentMetricValues(assessmentId, metricValuesList);
 
+      // Recalculate scores after saving metric values
+      console.log('[InputMetricValuesStep] Recalculating scores for metric set:', targetMetricSetId);
+      await recalculateAssessmentScoresForMetricSet(targetMetricSetId, user.id);
+
       toast({
         title: "Success",
-        description: "Metric values saved successfully",
+        description: "Metric values saved and scores calculated successfully",
       });
 
       onMetricsSubmitted();
