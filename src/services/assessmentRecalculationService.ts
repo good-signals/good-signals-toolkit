@@ -4,6 +4,7 @@ import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { TargetMetricSet } from '@/types/targetMetrics';
 import { calculateMetricSignalScore, calculateOverallSiteSignalScore, calculateCompletionPercentage } from '@/lib/signalScoreUtils';
 import { updateAssessmentScores } from './siteAssessmentService';
+import { siteVisitCriteria } from '@/types/siteAssessmentTypes';
 
 interface MetricScoreData {
   enteredValue: number | null;
@@ -18,12 +19,13 @@ export const recalculateAssessmentScoresForMetricSet = async (
   console.log('Starting recalculation for metric set:', metricSetId);
   
   try {
-    // Get all assessments using this metric set
+    // Get all assessments using this metric set, including site visit ratings
     const { data: assessments, error: assessmentsError } = await supabase
       .from('site_assessments')
       .select(`
         *,
-        assessment_metric_values(*)
+        assessment_metric_values(*),
+        site_visit_ratings:assessment_site_visit_ratings(*)
       `)
       .eq('target_metric_set_id', metricSetId)
       .eq('user_id', userId);
@@ -61,8 +63,18 @@ export const recalculateAssessmentScoresForMetricSet = async (
       try {
         const metricScores: (number | null)[] = [];
         let metricsWithValues = 0;
+        let siteVisitRatingsWithValues = 0;
+        
+        // Count metrics from target metric set
         const totalMetrics = metricSet.user_custom_metrics_settings?.length || 0;
+        
+        // Count site visit criteria (always 10)
+        const totalSiteVisitCriteria = siteVisitCriteria.length;
+        
+        // Calculate total completable items
+        const totalCompletableItems = totalMetrics + totalSiteVisitCriteria;
 
+        // Process regular metrics
         if (metricSet.user_custom_metrics_settings) {
           for (const metricSetting of metricSet.user_custom_metrics_settings) {
             // Find the entered value for this metric in the assessment
@@ -70,6 +82,7 @@ export const recalculateAssessmentScoresForMetricSet = async (
               mv => mv.metric_identifier === metricSetting.metric_identifier
             );
 
+            // Only count as complete if there's a non-null entered value
             if (metricValue && metricValue.entered_value !== null) {
               metricsWithValues++;
               
@@ -87,15 +100,37 @@ export const recalculateAssessmentScoresForMetricSet = async (
           }
         }
 
+        // Process site visit ratings
+        if (assessment.site_visit_ratings) {
+          for (const rating of assessment.site_visit_ratings) {
+            // Only count ratings that have a grade (not null or empty)
+            if (rating.rating_grade) {
+              siteVisitRatingsWithValues++;
+            }
+          }
+        }
+
+        // Calculate total completed items
+        const totalCompletedItems = metricsWithValues + siteVisitRatingsWithValues;
+
         // Calculate overall scores
         const overallScore = calculateOverallSiteSignalScore(metricScores);
-        const completionPercentage = calculateCompletionPercentage(totalMetrics, metricsWithValues);
+        const completionPercentage = calculateCompletionPercentage(totalCompletableItems, totalCompletedItems);
 
         // Update the assessment scores
         await updateAssessmentScores(assessment.id, overallScore, completionPercentage);
         updatedCount++;
         
-        console.log(`Updated assessment ${assessment.id}: score=${overallScore}, completion=${completionPercentage}`);
+        console.log(`Updated assessment ${assessment.id}:`, {
+          score: overallScore,
+          completion: completionPercentage,
+          metricsWithValues,
+          siteVisitRatingsWithValues,
+          totalMetrics,
+          totalSiteVisitCriteria,
+          totalCompletableItems,
+          totalCompletedItems
+        });
       } catch (error) {
         console.error(`Error updating assessment ${assessment.id}:`, error);
         errors.push(`Failed to update assessment ${assessment.assessment_name || assessment.id}: ${error}`);

@@ -11,8 +11,9 @@ export const calculateMetricSignalScore = ({
   higherIsBetter,
 }: MetricScoreInput, metricIdentifier?: string): number | null => {
   try {
-    if (typeof enteredValue !== 'number') {
-      return null; // Not enough data or invalid data
+    // Return null for truly missing data (null or undefined)
+    if (enteredValue === null || enteredValue === undefined) {
+      return null;
     }
 
     // Check if this is a dropdown metric by hardcoding the list to avoid import issues
@@ -27,8 +28,9 @@ export const calculateMetricSignalScore = ({
       return Math.max(0, Math.min(enteredValue, 100));
     }
 
-    if (typeof targetValue !== 'number') {
-      return null; // Not enough data for regular metrics
+    // For regular metrics, we need a target value
+    if (targetValue === null || targetValue === undefined) {
+      return null;
     }
 
     // Handle targetValue === 0
