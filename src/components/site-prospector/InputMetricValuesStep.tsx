@@ -9,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { getEnabledCategories, sortCategoriesByOrder } from '@/config/targetMetricsConfig';
+import { getEnabledCategories, sortCategoriesByOrder, predefinedMetricsConfig } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
 import { saveAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
 import { useAuth } from '@/contexts/AuthContext';
@@ -230,6 +230,26 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     );
   }
 
+  // Helper function to sort metrics within a category based on predefined order
+  const sortMetricsWithinCategory = (metrics: any[]) => {
+    return metrics.sort((a, b) => {
+      const indexA = predefinedMetricsConfig.findIndex(config => config.metric_identifier === a.metric_identifier);
+      const indexB = predefinedMetricsConfig.findIndex(config => config.metric_identifier === b.metric_identifier);
+      
+      // If both metrics are in the predefined config, sort by their position
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      
+      // If only one is in the predefined config, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      
+      // If neither is in the predefined config, sort alphabetically by label
+      return a.label.localeCompare(b.label);
+    });
+  };
+
   // Get enabled categories for organizing metrics and sort them in the correct order
   const enabledCategories = sortCategoriesByOrder(getEnabledCategories(metricSet.enabled_optional_sections || []));
 
@@ -247,7 +267,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               {/* Metric input sections organized by category */}
               {enabledCategories.map((category) => {
-                const categoryMetrics = metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category);
+                const categoryMetrics = sortMetricsWithinCategory(
+                  metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category)
+                );
                 
                 if (categoryMetrics.length === 0) return null;
                 
