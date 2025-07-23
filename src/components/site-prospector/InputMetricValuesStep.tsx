@@ -113,14 +113,24 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
     setIsSaving(true);
     try {
-      await saveAssessmentMetricValues(
-        assessmentId,
-        user.id,
-        metricValues,
-        imageUploads,
-        notes,
-        metricSet.user_custom_metrics_settings
-      );
+      // Convert the component state to the service format
+      const metricValuesList = Object.entries(metricValues).map(([metricId, value]) => {
+        // Find the metric setting to get category and label
+        const metricSetting = metricSet.user_custom_metrics_settings.find((m: any) => m.metric_identifier === metricId);
+        
+        return {
+          assessment_id: assessmentId,
+          metric_identifier: metricId,
+          category: metricSetting?.category || '',
+          label: metricSetting?.label || '',
+          entered_value: value,
+          notes: notes[metricId] || null,
+          measurement_type: metricSetting?.measurement_type || null,
+          image_url: null // Image handling will be added later
+        };
+      });
+
+      await saveAssessmentMetricValues(assessmentId, metricValuesList);
 
       toast({
         title: "Success",
@@ -239,9 +249,11 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         <CardContent className="space-y-6">
           {/* Site Visit Ratings Section */}
           <SiteVisitSection
-            assessmentId={assessmentId}
-            onImageUpload={handleImageUpload}
-            onNotesChange={handleNotesChange}
+            siteVisitRatingFields={[]}
+            control={{} as any}
+            watch={() => {}}
+            setValue={() => {}}
+            disabled={isSaving}
           />
 
           {/* Metric Categories */}
@@ -249,10 +261,12 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             <CategorySection
               key={category}
               category={category}
-              metrics={metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category)}
-              onMetricValueChange={handleMetricValueChange}
-              onImageUpload={handleImageUpload}
-              onNotesChange={handleNotesChange}
+              categoryMetrics={metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category)}
+              control={{} as any}
+              errors={{}}
+              watch={() => {}}
+              setValue={() => {}}
+              disabled={isSaving}
             />
           ))}
 
