@@ -14,7 +14,7 @@ export interface CBSAData {
   // Add other properties as needed
 }
 
-export type CBSAStatus = 'Active' | 'Pipeline' | 'Priority' | 'Hold' | 'Avoid';
+export type CBSAStatus = 'Active' | 'Priority' | 'Avoid' | 'Blocked';
 
 export interface CBSATableRowData {
   id: string;
