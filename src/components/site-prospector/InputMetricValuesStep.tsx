@@ -98,10 +98,18 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         try {
           const existingValues = await getAssessmentMetricValues(assessmentId);
           console.log('[InputMetricValuesStep] Found existing metric values:', existingValues.length);
+          console.log('[InputMetricValuesStep] Existing values data:', existingValues);
           
           // Populate form with existing values
           existingValues.forEach((metricValue) => {
             const metricIndex = initialMetrics.findIndex(m => m.metric_identifier === metricValue.metric_identifier);
+            console.log('[InputMetricValuesStep] Mapping existing value:', {
+              metric_identifier: metricValue.metric_identifier,
+              entered_value: metricValue.entered_value,
+              notes: metricValue.notes,
+              metricIndex
+            });
+            
             if (metricIndex !== -1) {
               initialMetrics[metricIndex] = {
                 ...initialMetrics[metricIndex],
@@ -110,6 +118,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
               };
             }
           });
+          
+          console.log('[InputMetricValuesStep] Final initial metrics with existing values:', initialMetrics);
         } catch (err) {
           console.log('[InputMetricValuesStep] No existing values found or error loading them:', err);
         }

@@ -59,24 +59,32 @@ const MetricInputField: React.FC<MetricInputFieldProps> = ({
             <Controller
               name={`metrics.${metricField.originalIndex}.entered_value`}
               control={control}
-              render={({ field: controllerField }) => (
-                <Select
-                  value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
-                  onValueChange={(value) => controllerField.onChange(parseFloat(value))}
-                  disabled={disabled}
-                >
-                  <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
-                    <SelectValue placeholder={`Select value for ${metricField.label}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {metricDropdownOptions[metricField.metric_identifier].map(option => (
-                      <SelectItem key={option.value} value={String(option.value)}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              render={({ field: controllerField }) => {
+                console.log('[MetricInputField] Dropdown field value:', {
+                  metric: metricField.metric_identifier,
+                  value: controllerField.value,
+                  enteredValue: metricField.entered_value
+                });
+                
+                return (
+                  <Select
+                    value={controllerField.value !== null && controllerField.value !== undefined ? String(controllerField.value) : ""}
+                    onValueChange={(value) => controllerField.onChange(parseFloat(value))}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger id={`metrics.${metricField.originalIndex}.entered_value`} className="mt-1">
+                      <SelectValue placeholder={`Select value for ${metricField.label}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {metricDropdownOptions[metricField.metric_identifier].map(option => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              }}
             />
           ) : (
             <Controller
