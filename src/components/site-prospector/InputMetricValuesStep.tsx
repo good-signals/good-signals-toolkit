@@ -45,8 +45,12 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<MetricFormData>({
-    defaultValues: { metrics: [] }
+    defaultValues: { metrics: [] },
+    mode: 'onChange'
   });
+
+  // Watch form changes to ensure UI updates when data loads
+  const watchedMetrics = form.watch('metrics');
 
   useEffect(() => {
     const fetchMetricSet = async () => {
@@ -111,6 +115,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         }
 
         form.reset({ metrics: initialMetrics });
+        console.log('[InputMetricValuesStep] Form reset with metrics:', initialMetrics);
 
       } catch (err) {
         console.error('[InputMetricValuesStep] Error fetching metric set:', err);
@@ -282,15 +287,16 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
 
   // Transform metrics for MetricInputField component
   const transformMetricForInput = (setting: any, formIndex: number) => {
-    const formData = form.getValues().metrics[formIndex];
+    // Use watched metrics to ensure UI updates when form data changes
+    const formData = watchedMetrics[formIndex];
     return {
       id: setting.id || `temp-${formIndex}`,
       originalIndex: formIndex,
       metric_identifier: setting.metric_identifier,
       label: setting.label,
       category: setting.category,
-      entered_value: formData?.entered_value || null,
-      notes: formData?.notes || null,
+      entered_value: formData?.entered_value ?? null,
+      notes: formData?.notes ?? null,
       target_value: setting.target_value,
       higher_is_better: setting.higher_is_better,
       measurement_type: setting.measurement_type,
@@ -323,7 +329,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                       <h3 className="text-lg font-semibold text-primary">{category}</h3>
                       <div className="space-y-4">
                         {categoryMetrics.map((metric: any) => {
-                          const formIndex = form.getValues().metrics.findIndex(m => m.metric_identifier === metric.metric_identifier);
+                          const formIndex = watchedMetrics.findIndex(m => m.metric_identifier === metric.metric_identifier);
                           
                           if (formIndex === -1) return null;
                           
