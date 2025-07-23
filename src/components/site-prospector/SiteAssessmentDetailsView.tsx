@@ -1,8 +1,7 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2, TrendingUp, RefreshCcw, Download } from 'lucide-react';
+import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2, TrendingUp, RefreshCcw, Download, Loader2 } from 'lucide-react';
 import { SiteAssessment } from '@/types/siteAssessmentTypes';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +21,7 @@ import ExportButton from '@/components/export/ExportButton';
 import { ExportData } from '@/services/exportService';
 import { recalculateAssessmentScoresForMetricSet } from '@/services/assessmentRecalculationService';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSiteAssessmentSummaryGeneration } from '@/hooks/useSiteAssessmentSummaryGeneration';
 
 interface SiteAssessmentDetailsProps {
   assessment: SiteAssessment;
@@ -48,6 +48,17 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   const [targetMetricSet, setTargetMetricSet] = useState<any>(null);
   const [targetMetricSetName, setTargetMetricSetName] = useState<string>('Loading...');
   const [totalMetricsCount, setTotalMetricsCount] = useState<number>(0);
+
+  // Initialize summary generation hook
+  const { generateSummary, isGenerating, canGenerateSummary, shouldAutoGenerate } = useSiteAssessmentSummaryGeneration(assessment);
+
+  // Auto-generate summary if conditions are met
+  useEffect(() => {
+    if (shouldAutoGenerate && !isGenerating) {
+      console.log('[SiteAssessmentDetailsView] Auto-generating summary for assessment:', assessment.id);
+      generateSummary();
+    }
+  }, [shouldAutoGenerate, isGenerating, generateSummary, assessment.id]);
 
   // Fetch target metrics when component mounts
   React.useEffect(() => {
@@ -181,6 +192,12 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
       toast.error('Failed to recalculate scores');
     } finally {
       setIsRecalculating(false);
+    }
+  };
+
+  const handleGenerateSummary = () => {
+    if (canGenerateSummary) {
+      generateSummary();
     }
   };
 
@@ -402,20 +419,57 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
       </div>
 
       {/* Executive Summary Section */}
-      {assessment.executive_summary && (
-        <div className="mb-8">
+      <div className="mb-8">
+        {assessment.executive_summary ? (
           <EditableExecutiveSummary
             assessmentId={assessment.id}
             executiveSummary={assessment.executive_summary}
             lastSummaryGeneratedAt={assessment.last_summary_generated_at}
-            onRegenerateClick={() => {
-              console.log('Regenerate summary clicked');
-              // This would need to be implemented based on your regeneration logic
-            }}
-            isRegenerating={false}
+            onRegenerateClick={handleGenerateSummary}
+            isRegenerating={isGenerating}
           />
-        </div>
-      )}
+        ) : (
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold flex items-center">
+                <FileText className="h-6 w-6 mr-2 text-primary" />
+                Executive Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <div className="mb-4">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">
+                    {canGenerateSummary 
+                      ? "Generate an AI-powered executive summary of your site assessment." 
+                      : "Complete your assessment with metrics or site visit ratings to generate a summary."}
+                  </p>
+                </div>
+                {canGenerateSummary && (
+                  <Button 
+                    onClick={handleGenerateSummary}
+                    disabled={isGenerating}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating Summary...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Generate AI Summary
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Address Map Display */}
       {assessment.latitude && assessment.longitude && (

@@ -38,30 +38,11 @@ const EditableExecutiveSummary: React.FC<EditableExecutiveSummaryProps> = ({
     onSuccess: () => {
       toast({ title: "Summary Updated", description: "Your changes have been saved successfully." });
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
+      queryClient.invalidateQueries({ queryKey: ['assessment-details', assessmentId] });
       queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
     },
     onError: (error: Error) => {
       toast({ title: "Save Failed", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const clearAndRegenerateMutation = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error("User not authenticated");
-      // First clear the existing summary
-      await updateSiteAssessmentSummary(assessmentId, '', user.id);
-      return true;
-    },
-    onSuccess: () => {
-      // Invalidate queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['assessmentDetails', assessmentId] });
-      queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
-      // Then trigger the regeneration
-      onRegenerateClick();
-    },
-    onError: (error: Error) => {
-      toast({ title: "Clear Failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -84,7 +65,7 @@ const EditableExecutiveSummary: React.FC<EditableExecutiveSummaryProps> = ({
   };
 
   const handleRegenerate = () => {
-    clearAndRegenerateMutation.mutate();
+    onRegenerateClick();
   };
 
   return (
@@ -113,14 +94,14 @@ const EditableExecutiveSummary: React.FC<EditableExecutiveSummaryProps> = ({
                   variant="outline" 
                   size="sm"
                   onClick={handleRegenerate} 
-                  disabled={isRegenerating || clearAndRegenerateMutation.isPending}
+                  disabled={isRegenerating}
                 >
-                  {isRegenerating || clearAndRegenerateMutation.isPending ? (
+                  {isRegenerating ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <FileText className="mr-2 h-4 w-4" />
                   )}
-                  Regenerate Summary
+                  {isRegenerating ? 'Regenerating...' : 'Regenerate Summary'}
                 </Button>
               </>
             )}
