@@ -9,10 +9,26 @@ export const calculateMetricSignalScore = ({
   enteredValue,
   targetValue,
   higherIsBetter,
-}: MetricScoreInput): number | null => {
+}: MetricScoreInput, metricIdentifier?: string): number | null => {
   try {
-    if (typeof enteredValue !== 'number' || typeof targetValue !== 'number') {
+    if (typeof enteredValue !== 'number') {
       return null; // Not enough data or invalid data
+    }
+
+    // Check if this is a dropdown metric by hardcoding the list to avoid import issues
+    const dropdownMetrics = [
+      'market_saturation_trade_area_overlap',
+      'market_saturation_heat_map_intersection', 
+      'demand_supply_balance'
+    ];
+    
+    // For dropdown metrics, the entered value IS the signal score
+    if (metricIdentifier && dropdownMetrics.includes(metricIdentifier)) {
+      return Math.max(0, Math.min(enteredValue, 100));
+    }
+
+    if (typeof targetValue !== 'number') {
+      return null; // Not enough data for regular metrics
     }
 
     // Handle targetValue === 0

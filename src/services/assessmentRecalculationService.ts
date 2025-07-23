@@ -79,7 +79,7 @@ export const recalculateAssessmentScoresForMetricSet = async (
                 higherIsBetter: metricSetting.higher_is_better
               };
 
-              const score = calculateMetricSignalScore(scoreData);
+              const score = calculateMetricSignalScore(scoreData, metricSetting.metric_identifier);
               metricScores.push(score);
             } else {
               metricScores.push(null);

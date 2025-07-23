@@ -145,7 +145,7 @@ const MetricDisplayField: React.FC<MetricDisplayFieldProps> = ({
       enteredValue: metricField.entered_value,
       targetValue: metricField.target_value,
       higherIsBetter: metricField.higher_is_better ?? true,
-    });
+    }, metricField.metric_identifier);
 
     console.log('[MetricDisplayField] Signal score calculated:', {
       metric_identifier: metricField.metric_identifier,
