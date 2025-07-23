@@ -15,7 +15,7 @@ import MetricDisplaySection from './display/MetricDisplaySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
 import { useSiteAssessmentDetails } from '@/hooks/useSiteAssessmentDetails';
-import { getUserCustomMetricSettings } from '@/services/targetMetricsService';
+import { getUserCustomMetricSettings, getTargetMetricSetById } from '@/services/targetMetricsService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserAccount } from '@/services/userAccountService';
 import ExportButton from '@/components/export/ExportButton';
@@ -46,6 +46,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   }>>({});
   const [isLoadingTargetMetrics, setIsLoadingTargetMetrics] = useState(true);
   const [targetMetricSet, setTargetMetricSet] = useState<any>(null);
+  const [targetMetricSetName, setTargetMetricSetName] = useState<string>('Loading...');
+  const [totalMetricsCount, setTotalMetricsCount] = useState<number>(0);
 
   // Fetch target metrics when component mounts
   React.useEffect(() => {
@@ -63,12 +65,21 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
       try {
         console.log('[DEBUG] Starting target metrics load for set:', assessment.target_metric_set_id);
-        const targetSettings = await getUserCustomMetricSettings(assessment.target_metric_set_id);
+        
+        // Fetch both the target metric set details and the user settings
+        const [targetMetricSetDetails, targetSettings] = await Promise.all([
+          getTargetMetricSetById(assessment.target_metric_set_id, user.id).catch(() => null),
+          getUserCustomMetricSettings(assessment.target_metric_set_id)
+        ]);
         
         console.log('[DEBUG] Raw target settings fetched:', {
           settingsCount: targetSettings.length,
           settings: targetSettings
         });
+        
+        // Set the metric set name and count
+        setTargetMetricSetName(targetMetricSetDetails?.name || `Metric Set ${assessment.target_metric_set_id.slice(0, 8)}`);
+        setTotalMetricsCount(targetSettings.length);
         
         // Create a lookup map for target values
         const metricsMap: Record<string, {
@@ -98,6 +109,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
         // Set target metric set for export
         setTargetMetricSet({
           id: assessment.target_metric_set_id,
+          name: targetMetricSetName,
           user_custom_metrics_settings: targetSettings
         });
       } catch (error) {
@@ -305,8 +317,8 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
               
               <div className="flex items-center gap-2">
                 <span className="font-medium text-muted-foreground">Target Metric Set:</span>
-                <span className="text-foreground">Test Targets 1</span>
-                <span className="text-muted-foreground">(20 metrics)</span>
+                <span className="text-foreground">{targetMetricSetName}</span>
+                <span className="text-muted-foreground">({totalMetricsCount} metrics)</span>
               </div>
             </div>
           </div>

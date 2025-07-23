@@ -80,8 +80,8 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
     const ratingsToSave: AssessmentSiteVisitRatingInsert[] = siteVisitCriteria
       .map(criterion => {
         const ratingData = formData[criterion.key];
-        // Only save if there's a grade and it's not 'none'
-        if (ratingData && ratingData.grade && ratingData.grade !== 'none') {
+        // Only save if there's a grade (empty string means no grade selected)
+        if (ratingData && ratingData.grade) {
           const gradeDetail = criterion.grades.find(g => g.grade === ratingData.grade);
           return {
             assessment_id: assessmentId,
@@ -95,7 +95,7 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
       })
       .filter(Boolean) as AssessmentSiteVisitRatingInsert[];
 
-    if (ratingsToSave.length === 0 && !Object.values(formData).some(fd => fd.grade && fd.grade !== 'none' || fd.notes)) {
+    if (ratingsToSave.length === 0 && !Object.values(formData).some(fd => fd.grade || fd.notes)) {
         toast({ title: 'No Ratings Entered', description: 'Proceeding without new site visit ratings.' });
         onSiteVisitRatingsSubmitted(assessmentId);
         return;
