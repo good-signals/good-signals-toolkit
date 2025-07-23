@@ -247,28 +247,34 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Site Visit Ratings Section */}
-          <SiteVisitSection
-            siteVisitRatingFields={[]}
-            control={{} as any}
-            watch={() => {}}
-            setValue={() => {}}
-            disabled={isSaving}
-          />
-
-          {/* Metric Categories */}
-          {enabledCategories.map((category) => (
-            <CategorySection
-              key={category}
-              category={category}
-              categoryMetrics={metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category)}
-              control={{} as any}
-              errors={{}}
-              watch={() => {}}
-              setValue={() => {}}
-              disabled={isSaving}
-            />
-          ))}
+          {/* Simple metric input form - no complex sub-components for now */}
+          {metricSet.user_custom_metrics_settings && metricSet.user_custom_metrics_settings.length > 0 ? (
+            enabledCategories.map((category) => {
+              const categoryMetrics = metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category);
+              
+              if (categoryMetrics.length === 0) return null;
+              
+              return (
+                <div key={category} className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0">
+                  <h3 className="text-lg font-semibold text-primary">{category}</h3>
+                  {categoryMetrics.map((metric: any) => (
+                    <div key={metric.metric_identifier} className="space-y-2">
+                      <label className="text-sm font-medium">{metric.label}</label>
+                      <input
+                        type="number"
+                        className="w-full px-3 py-2 border rounded-md"
+                        value={metricValues[metric.metric_identifier] || ''}
+                        onChange={(e) => handleMetricValueChange(metric.metric_identifier, parseFloat(e.target.value) || 0)}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-muted-foreground">No metrics configured for this metric set.</div>
+          )}
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={onBack}>
