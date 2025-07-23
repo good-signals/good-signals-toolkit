@@ -33,6 +33,9 @@ const MetricInputField: React.FC<MetricInputFieldProps> = ({
   errors,
   disabled
 }) => {
+  // Debug: Log metric identifier and check if it should be a dropdown
+  console.log('[MetricInputField] Metric:', metricField.metric_identifier, 'Should be dropdown:', specificDropdownMetrics.includes(metricField.metric_identifier));
+  console.log('[MetricInputField] Available dropdown metrics:', specificDropdownMetrics);
   return (
     <div className="p-4 border rounded-md shadow-sm bg-card">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
