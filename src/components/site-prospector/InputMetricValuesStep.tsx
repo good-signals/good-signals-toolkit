@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +42,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFormReady, setIsFormReady] = useState(false);
 
   const form = useForm<MetricFormData>({
     defaultValues: { metrics: [] },
@@ -53,8 +53,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const watchedMetrics = form.watch('metrics');
 
   useEffect(() => {
-    const fetchMetricSet = async () => {
-      console.log('[InputMetricValuesStep] Fetching metric set:', targetMetricSetId, 'for user:', user?.id);
+    const fetchMetricSetAndLoadData = async () => {
+      console.log('[InputMetricValuesStep] Starting data fetch for metric set:', targetMetricSetId, 'assessment:', assessmentId);
       
       if (!user?.id) {
         console.error('[InputMetricValuesStep] No user ID available');
@@ -64,6 +64,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       }
 
       try {
+        // Step 1: Fetch the metric set
         const fetchedMetricSet = await getTargetMetricSetById(targetMetricSetId, user.id);
         
         if (!fetchedMetricSet) {
@@ -79,9 +80,8 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         });
 
         setMetricSet(fetchedMetricSet);
-        setError(null);
 
-        // Initialize form with metrics array structure
+        // Step 2: Initialize form structure with metric set data
         const initialMetrics: MetricFormData['metrics'] = [];
         if (fetchedMetricSet.user_custom_metrics_settings) {
           fetchedMetricSet.user_custom_metrics_settings.forEach((setting: any, index: number) => {
@@ -94,7 +94,9 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           });
         }
 
-        // Try to load existing metric values for this assessment
+        console.log('[InputMetricValuesStep] Initial metrics structure created:', initialMetrics.length, 'metrics');
+
+        // Step 3: Load existing values and merge with initial structure
         try {
           const existingValues = await getAssessmentMetricValues(assessmentId);
           console.log('[InputMetricValuesStep] Found existing metric values:', existingValues.length);
@@ -124,8 +126,15 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           console.log('[InputMetricValuesStep] No existing values found or error loading them:', err);
         }
 
+        // Step 4: Reset form with complete data (metrics + existing values)
+        console.log('[InputMetricValuesStep] Resetting form with complete data');
         form.reset({ metrics: initialMetrics });
-        console.log('[InputMetricValuesStep] Form reset with metrics:', initialMetrics);
+        
+        // Step 5: Mark form as ready
+        setIsFormReady(true);
+        setError(null);
+        
+        console.log('[InputMetricValuesStep] Form reset complete, data loading finished');
 
       } catch (err) {
         console.error('[InputMetricValuesStep] Error fetching metric set:', err);
@@ -135,8 +144,19 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       }
     };
 
-    fetchMetricSet();
-  }, [targetMetricSetId, user?.id, form, assessmentId]);
+    fetchMetricSetAndLoadData();
+  }, [targetMetricSetId, user?.id, assessmentId, form]);
+
+  // Debug form state changes
+  useEffect(() => {
+    if (isFormReady && watchedMetrics.length > 0) {
+      console.log('[InputMetricValuesStep] Form state after reset:', {
+        metricsCount: watchedMetrics.length,
+        sampleMetric: watchedMetrics[0],
+        formReady: isFormReady
+      });
+    }
+  }, [watchedMetrics, isFormReady]);
 
   const handleSubmit = async (data: MetricFormData) => {
     if (!metricSet || !user?.id) return;
@@ -268,6 +288,22 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Metric Set Selection
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Don't render form until it's ready with data
+  if (!isFormReady) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center space-x-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Loading assessment data...</span>
             </div>
           </CardContent>
         </Card>
