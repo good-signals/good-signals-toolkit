@@ -106,18 +106,18 @@ export const useSiteProspectorStepHandlers = ({
   };
 
   const handleMetricValuesSubmitted = () => {
-    console.log('Metric values submitted');
-    setActiveAssessmentId(null);
-    setSelectedMetricSetId(null); 
-    setCurrentStep('idle');
-    clearSessionStorage();
+    console.log('Metric values submitted, redirecting to view details');
     
-    queryClient.removeQueries({ queryKey: ['siteAssessments'] });
-    queryClient.removeQueries({ queryKey: ['assessmentDetails'] });
+    // Don't clear the IDs - we want to show the completed assessment
+    setCurrentStep('view-details');
+    
+    // Invalidate queries to refresh data
+    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['assessmentDetails'] });
     
     toast({
-      title: "Assessment Updated",
-      description: "Your site assessment has been successfully updated.",
+      title: "Assessment Complete",
+      description: "Your site assessment has been completed successfully.",
     });
   };
 

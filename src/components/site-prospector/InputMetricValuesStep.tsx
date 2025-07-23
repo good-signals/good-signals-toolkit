@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getEnabledCategories, sortCategoriesByOrder, predefinedMetricsConfig } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
 import { saveAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
+import { recalculateAssessmentScoresForMetricSet } from '@/services/assessmentRecalculationService';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface InputMetricValuesStepProps {
