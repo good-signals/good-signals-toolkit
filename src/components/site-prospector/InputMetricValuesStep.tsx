@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getEnabledCategories, sortCategoriesByOrder, predefinedMetricsConfig } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
-import { saveAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
+import { saveAssessmentMetricValues, getAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
 import { recalculateAssessmentScoresForMetricSet } from '@/services/assessmentRecalculationService';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -76,7 +76,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         setMetricSet(fetchedMetricSet);
         setError(null);
 
-        // Initialize form with default values
+        // Initialize form with default values and load existing values if available
         const initialValues: MetricFormData = {};
         if (fetchedMetricSet.user_custom_metrics_settings) {
           fetchedMetricSet.user_custom_metrics_settings.forEach((setting: any) => {
@@ -86,6 +86,26 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
             };
           });
         }
+
+        // Try to load existing metric values for this assessment
+        try {
+          const existingValues = await getAssessmentMetricValues(assessmentId);
+          console.log('[InputMetricValuesStep] Found existing metric values:', existingValues.length);
+          
+          // Populate form with existing values
+          existingValues.forEach((metricValue) => {
+            if (initialValues[metricValue.metric_identifier]) {
+              initialValues[metricValue.metric_identifier] = {
+                value: metricValue.entered_value || 0,
+                notes: metricValue.notes || '',
+              };
+            }
+          });
+        } catch (err) {
+          console.log('[InputMetricValuesStep] No existing values found or error loading them:', err);
+          // Continue with default values if we can't load existing ones
+        }
+
         form.reset(initialValues);
 
       } catch (err) {
