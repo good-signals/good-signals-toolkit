@@ -6,14 +6,14 @@ import { ArrowLeft, Save, AlertCircle, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Form } from '@/components/ui/form';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { getEnabledCategories, sortCategoriesByOrder, predefinedMetricsConfig } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
 import { saveAssessmentMetricValues, getAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
 import { recalculateAssessmentScoresForMetricSet } from '@/services/assessmentRecalculationService';
 import { useAuth } from '@/contexts/AuthContext';
+import MetricInputField from './metric-input/MetricInputField';
 
 interface InputMetricValuesStepProps {
   assessmentId: string;
@@ -23,11 +23,12 @@ interface InputMetricValuesStepProps {
 }
 
 interface MetricFormData {
-  [key: string]: {
-    value: number;
-    notes?: string;
-    image?: File;
-  };
+  metrics: Array<{
+    id: string;
+    metric_identifier: string;
+    entered_value: number | null;
+    notes: string | null;
+  }>;
 }
 
 const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
@@ -44,7 +45,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<MetricFormData>({
-    defaultValues: {}
+    defaultValues: { metrics: [] }
   });
 
   useEffect(() => {
@@ -76,14 +77,16 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
         setMetricSet(fetchedMetricSet);
         setError(null);
 
-        // Initialize form with default values and load existing values if available
-        const initialValues: MetricFormData = {};
+        // Initialize form with metrics array structure
+        const initialMetrics: MetricFormData['metrics'] = [];
         if (fetchedMetricSet.user_custom_metrics_settings) {
-          fetchedMetricSet.user_custom_metrics_settings.forEach((setting: any) => {
-            initialValues[setting.metric_identifier] = {
-              value: 0,
-              notes: '',
-            };
+          fetchedMetricSet.user_custom_metrics_settings.forEach((setting: any, index: number) => {
+            initialMetrics.push({
+              id: setting.id || `temp-${index}`,
+              metric_identifier: setting.metric_identifier,
+              entered_value: null,
+              notes: null,
+            });
           });
         }
 
@@ -94,19 +97,20 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           
           // Populate form with existing values
           existingValues.forEach((metricValue) => {
-            if (initialValues[metricValue.metric_identifier]) {
-              initialValues[metricValue.metric_identifier] = {
-                value: metricValue.entered_value || 0,
-                notes: metricValue.notes || '',
+            const metricIndex = initialMetrics.findIndex(m => m.metric_identifier === metricValue.metric_identifier);
+            if (metricIndex !== -1) {
+              initialMetrics[metricIndex] = {
+                ...initialMetrics[metricIndex],
+                entered_value: metricValue.entered_value || null,
+                notes: metricValue.notes || null,
               };
             }
           });
         } catch (err) {
           console.log('[InputMetricValuesStep] No existing values found or error loading them:', err);
-          // Continue with default values if we can't load existing ones
         }
 
-        form.reset(initialValues);
+        form.reset({ metrics: initialMetrics });
 
       } catch (err) {
         console.error('[InputMetricValuesStep] Error fetching metric set:', err);
@@ -117,7 +121,7 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     };
 
     fetchMetricSet();
-  }, [targetMetricSetId, user?.id, form]);
+  }, [targetMetricSetId, user?.id, form, assessmentId]);
 
   const handleSubmit = async (data: MetricFormData) => {
     if (!metricSet || !user?.id) return;
@@ -125,18 +129,18 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     setIsSaving(true);
     try {
       // Convert form data to the service format
-      const metricValuesList = Object.entries(data).map(([metricId, metricData]) => {
-        const metricSetting = metricSet.user_custom_metrics_settings.find((m: any) => m.metric_identifier === metricId);
+      const metricValuesList = data.metrics.map((metric) => {
+        const metricSetting = metricSet.user_custom_metrics_settings.find((m: any) => m.metric_identifier === metric.metric_identifier);
         
         return {
           assessment_id: assessmentId,
-          metric_identifier: metricId,
+          metric_identifier: metric.metric_identifier,
           category: metricSetting?.category || '',
           label: metricSetting?.label || '',
-          entered_value: metricData.value,
-          notes: metricData.notes || null,
+          entered_value: metric.entered_value,
+          notes: metric.notes || null,
           measurement_type: metricSetting?.measurement_type || null,
-          image_url: null // Image handling will be added later
+          image_url: null
         };
       });
 
@@ -261,22 +265,36 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
       const indexA = predefinedMetricsConfig.findIndex(config => config.metric_identifier === a.metric_identifier);
       const indexB = predefinedMetricsConfig.findIndex(config => config.metric_identifier === b.metric_identifier);
       
-      // If both metrics are in the predefined config, sort by their position
       if (indexA !== -1 && indexB !== -1) {
         return indexA - indexB;
       }
       
-      // If only one is in the predefined config, prioritize it
       if (indexA !== -1) return -1;
       if (indexB !== -1) return 1;
       
-      // If neither is in the predefined config, sort alphabetically by label
       return a.label.localeCompare(b.label);
     });
   };
 
   // Get enabled categories for organizing metrics and sort them in the correct order
   const enabledCategories = sortCategoriesByOrder(getEnabledCategories(metricSet.enabled_optional_sections || []));
+
+  // Transform metrics for MetricInputField component
+  const transformMetricForInput = (setting: any, formIndex: number) => {
+    const formData = form.getValues().metrics[formIndex];
+    return {
+      id: setting.id || `temp-${formIndex}`,
+      originalIndex: formIndex,
+      metric_identifier: setting.metric_identifier,
+      label: setting.label,
+      category: setting.category,
+      entered_value: formData?.entered_value || null,
+      notes: formData?.notes || null,
+      target_value: setting.target_value,
+      higher_is_better: setting.higher_is_better,
+      measurement_type: setting.measurement_type,
+    };
+  };
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -288,91 +306,60 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-              {/* Metric input sections organized by category */}
-              {enabledCategories.map((category) => {
-                const categoryMetrics = sortMetricsWithinCategory(
-                  metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category)
-                );
-                
-                if (categoryMetrics.length === 0) return null;
-                
-                return (
-                  <div key={category} className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0">
-                    <h3 className="text-lg font-semibold text-primary">{category}</h3>
-                    {categoryMetrics.map((metric: any) => (
-                      <div key={metric.metric_identifier} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{metric.label}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {metric.higher_is_better ? "Higher is better" : "Lower is better"}
-                            {metric.measurement_type && ` • ${metric.measurement_type}`}
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <FormField
-                            control={form.control}
-                            name={`${metric.metric_identifier}.value`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Value</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    placeholder="Enter value"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                    disabled={isSaving}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+          <TooltipProvider>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                {/* Metric input sections organized by category */}
+                {enabledCategories.map((category) => {
+                  const categoryMetrics = sortMetricsWithinCategory(
+                    metricSet.user_custom_metrics_settings.filter((m: any) => m.category === category)
+                  );
+                  
+                  if (categoryMetrics.length === 0) return null;
+                  
+                  return (
+                    <div key={category} className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0">
+                      <h3 className="text-lg font-semibold text-primary">{category}</h3>
+                      <div className="space-y-4">
+                        {categoryMetrics.map((metric: any) => {
+                          const formIndex = form.getValues().metrics.findIndex(m => m.metric_identifier === metric.metric_identifier);
                           
-                          <FormField
-                            control={form.control}
-                            name={`${metric.metric_identifier}.notes`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Notes (Optional)</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Add notes..."
-                                    {...field}
-                                    disabled={isSaving}
-                                    rows={2}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+                          if (formIndex === -1) return null;
+                          
+                          const transformedMetric = transformMetricForInput(metric, formIndex);
+                          
+                          return (
+                            <MetricInputField
+                              key={metric.metric_identifier}
+                              metricField={transformedMetric}
+                              control={form.control}
+                              errors={form.formState.errors}
+                              disabled={isSaving}
+                            />
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
 
-              <div className="flex justify-between pt-6">
-                <Button type="button" variant="outline" onClick={onBack}>
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSaving}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save Metrics'}
-                </Button>
-              </div>
-            </form>
-          </Form>
+                <div className="flex justify-between pt-6">
+                  <Button type="button" variant="outline" onClick={onBack}>
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? 'Saving...' : 'Save Metrics'}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </TooltipProvider>
         </CardContent>
       </Card>
     </div>
