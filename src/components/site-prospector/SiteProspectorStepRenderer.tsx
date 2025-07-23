@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import NewAssessmentForm from './NewAssessmentForm';
 import SelectTargetMetricSetStep from './SelectTargetMetricSetStep';
 import InputMetricValuesStep from './InputMetricValuesStep';
+import InputSiteVisitRatingsStep from './InputSiteVisitRatingsStep';
 import SiteAssessmentDetailsView from './SiteAssessmentDetailsView';
 import SiteProspectorErrorBoundary from './SiteProspectorErrorBoundary';
 import { SiteProspectorStep } from '@/hooks/useSiteProspectorSession';
@@ -17,9 +18,11 @@ interface SiteProspectorStepRendererProps {
   onAddressStepCompleted: (assessmentId: string) => void;
   onMetricSetSelected: (metricSetId: string) => void;
   onMetricValuesSubmitted: () => void;
+  onSiteVisitRatingsSubmitted: () => void;
   onCancelAssessmentProcess: () => void;
   onBackFromMetricSelection: () => void;
   onBackFromMetricInput: () => void;
+  onBackFromSiteVisitRatings: () => void;
   setCurrentStep: (step: SiteProspectorStep) => void;
 }
 
@@ -30,9 +33,11 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
   onAddressStepCompleted,
   onMetricSetSelected,
   onMetricValuesSubmitted,
+  onSiteVisitRatingsSubmitted,
   onCancelAssessmentProcess,
   onBackFromMetricSelection,
   onBackFromMetricInput,
+  onBackFromSiteVisitRatings,
   setCurrentStep,
 }) => {
   
@@ -57,6 +62,11 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
         }
         if (!selectedMetricSetId) {
           return 'Metric set ID is required for metric input';
+        }
+        break;
+      case 'site-visit-ratings':
+        if (!activeAssessmentId) {
+          return 'Assessment ID is required for site visit ratings';
         }
         break;
       case 'view-details':
@@ -124,6 +134,17 @@ const SiteProspectorStepRenderer: React.FC<SiteProspectorStepRendererProps> = ({
               targetMetricSetId={selectedMetricSetId!}
               onMetricsSubmitted={onMetricValuesSubmitted}
               onBack={onBackFromMetricInput}
+            />
+          </SiteProspectorErrorBoundary>
+        );
+
+      case 'site-visit-ratings':
+        return (
+          <SiteProspectorErrorBoundary onReset={() => setCurrentStep('metric-input')}>
+            <InputSiteVisitRatingsStep
+              assessmentId={activeAssessmentId!}
+              onSiteVisitRatingsSubmitted={onSiteVisitRatingsSubmitted}
+              onBack={onBackFromSiteVisitRatings}
             />
           </SiteProspectorErrorBoundary>
         );

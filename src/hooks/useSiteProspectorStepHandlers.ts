@@ -106,9 +106,24 @@ export const useSiteProspectorStepHandlers = ({
   };
 
   const handleMetricValuesSubmitted = () => {
-    console.log('Metric values submitted, redirecting to view details');
+    console.log('Metric values submitted, moving to site visit ratings');
     
-    // Don't clear the IDs - we want to show the completed assessment
+    // Move to site visit ratings step instead of directly to view details
+    setCurrentStep('site-visit-ratings');
+    
+    // Invalidate queries to refresh data
+    queryClient.invalidateQueries({ queryKey: ['siteAssessments', user?.id] });
+    
+    toast({
+      title: "Metrics Saved",
+      description: "Your metric values have been saved. Please complete the site visit ratings.",
+    });
+  };
+
+  const handleSiteVisitRatingsSubmitted = () => {
+    console.log('Site visit ratings submitted, redirecting to view details');
+    
+    // Now go to view details after site visit ratings are completed
     setCurrentStep('view-details');
     
     // Invalidate queries to refresh data
@@ -139,6 +154,11 @@ export const useSiteProspectorStepHandlers = ({
   const handleBackFromMetricInput = () => {
     console.log('Going back from metric input');
     setCurrentStep('metric-set-selection');
+  };
+
+  const handleBackFromSiteVisitRatings = () => {
+    console.log('Going back from site visit ratings');
+    setCurrentStep('metric-input');
   };
   
   const handleViewAssessment = async (assessment: SiteAssessment) => {
@@ -253,9 +273,11 @@ export const useSiteProspectorStepHandlers = ({
     handleAddressStepCompleted,
     handleMetricSetSelected,
     handleMetricValuesSubmitted,
+    handleSiteVisitRatingsSubmitted,
     handleCancelAssessmentProcess,
     handleBackFromMetricSelection,
     handleBackFromMetricInput,
+    handleBackFromSiteVisitRatings,
     handleViewAssessment,
     handleEditAssessment,
   };

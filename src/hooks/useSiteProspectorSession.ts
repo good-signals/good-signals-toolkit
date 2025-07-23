@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { safeStorage } from '@/utils/safeStorage';
 
-export type SiteProspectorStep = 'idle' | 'address' | 'metric-set-selection' | 'metric-input' | 'view-details';
+export type SiteProspectorStep = 'idle' | 'address' | 'metric-set-selection' | 'metric-input' | 'site-visit-ratings' | 'view-details';
 
 const SESSION_STORAGE_KEYS = {
   CURRENT_STEP: 'siteProspector_currentStep',
@@ -12,7 +12,7 @@ const SESSION_STORAGE_KEYS = {
 } as const;
 
 const CURRENT_SESSION_VERSION = '1.0.0';
-const VALID_STEPS: SiteProspectorStep[] = ['idle', 'address', 'metric-set-selection', 'metric-input', 'view-details'];
+const VALID_STEPS: SiteProspectorStep[] = ['idle', 'address', 'metric-set-selection', 'metric-input', 'site-visit-ratings', 'view-details'];
 
 const isValidStep = (step: string): step is SiteProspectorStep => {
   return VALID_STEPS.includes(step as SiteProspectorStep);
@@ -41,8 +41,8 @@ const validateAndCleanSessionStorage = (): SiteProspectorStep => {
     const selectedMetricSetId = safeStorage.sessionGetItem(SESSION_STORAGE_KEYS.SELECTED_METRIC_SET_ID);
 
     // Check for invalid state combinations
-    if (storedStep === 'metric-input' && (!activeAssessmentId || !selectedMetricSetId)) {
-      console.log('[useSiteProspectorSession] Inconsistent state for metric-input step, resetting');
+    if ((storedStep === 'metric-input' || storedStep === 'site-visit-ratings') && (!activeAssessmentId || !selectedMetricSetId)) {
+      console.log('[useSiteProspectorSession] Inconsistent state for metric input or site visit step, resetting');
       clearAllSessionStorage();
       return 'idle';
     }

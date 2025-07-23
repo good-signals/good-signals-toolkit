@@ -37,9 +37,11 @@ const SiteProspectorPage = () => {
     handleAddressStepCompleted,
     handleMetricSetSelected,
     handleMetricValuesSubmitted,
+    handleSiteVisitRatingsSubmitted,
     handleCancelAssessmentProcess,
     handleBackFromMetricSelection,
     handleBackFromMetricInput,
+    handleBackFromSiteVisitRatings,
     handleViewAssessment,
     handleEditAssessment,
   } = useSiteProspectorStepHandlers({
@@ -121,9 +123,11 @@ const SiteProspectorPage = () => {
           onAddressStepCompleted={handleAddressStepCompleted}
           onMetricSetSelected={handleMetricSetSelected}
           onMetricValuesSubmitted={handleMetricValuesSubmitted}
+          onSiteVisitRatingsSubmitted={handleSiteVisitRatingsSubmitted}
           onCancelAssessmentProcess={handleCancelAssessmentProcess}
           onBackFromMetricSelection={handleBackFromMetricSelection}
           onBackFromMetricInput={handleBackFromMetricInput}
+          onBackFromSiteVisitRatings={handleBackFromSiteVisitRatings}
           setCurrentStep={setCurrentStep}
         />
       </SiteProspectorErrorBoundary>
