@@ -54,6 +54,8 @@ const MetricInputField: React.FC<MetricInputFieldProps> = ({
           </Label>
           
           {specificDropdownMetrics.includes(metricField.metric_identifier) ? (
+            // DEBUG: This metric should use a dropdown
+            // Metric identifier: {metricField.metric_identifier}
             <Controller
               name={`metrics.${metricField.originalIndex}.entered_value`}
               control={control}
