@@ -67,6 +67,12 @@ export const getAssessmentDetailsEnhanced = async (assessmentId: string): Promis
       const { getUserCustomMetricSettings } = await import('@/services/targetMetricsService');
       const targetSettings = await getUserCustomMetricSettings(assessment.target_metric_set_id);
       
+      console.log('[getAssessmentDetailsEnhanced] Target settings fetched:', {
+        metricSetId: assessment.target_metric_set_id,
+        targetSettingsCount: targetSettings.length,
+        sampleTargetSetting: targetSettings[0]
+      });
+      
       // Create map of target data
       const targetMap = new Map();
       targetSettings.forEach(setting => {
