@@ -98,7 +98,10 @@ const PredefinedMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string(),
   category: z.string(),
-  target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
+  target_value: z.coerce.number({ 
+    invalid_type_error: "Target value must be a number.",
+    required_error: "Target value is required."
+  }).positive("Target value must be greater than 0"),
   higher_is_better: z.boolean(),
   id: z.string().optional(), // Add optional id for database records
 });
@@ -107,7 +110,10 @@ const CustomMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string(),
   category: z.string(),
-  target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
+  target_value: z.coerce.number({ 
+    invalid_type_error: "Target value must be a number.",
+    required_error: "Target value is required."
+  }).positive("Target value must be greater than 0"),
   higher_is_better: z.boolean(),
   units: z.string().optional(),
   is_custom: z.literal(true),
@@ -118,7 +124,10 @@ const VisitorProfileMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string().min(1, "Attribute name is required."),
   category: z.literal(VISITOR_PROFILE_CATEGORY),
-  target_value: z.coerce.number({ invalid_type_error: "Target value must be a number." }),
+  target_value: z.coerce.number({ 
+    invalid_type_error: "Target value must be a number.",
+    required_error: "Target value is required."
+  }).positive("Target value must be greater than 0"),
   measurement_type: z.enum(MEASUREMENT_TYPES, { required_error: "Measurement type is required."}),
   higher_is_better: z.boolean(),
   id: z.string().optional(), // Add optional id for database records

@@ -66,7 +66,25 @@ export const useTargetMetricsDraft = (
           (data.custom_metrics && data.custom_metrics.length > 0) ||
           (data.visitor_profile_metrics && data.visitor_profile_metrics.length > 0) ||
           (data.predefined_metrics && data.predefined_metrics.length > 0)) {
-        saveDraft(data as TargetMetricsFormData);
+        
+        // Ensure target values are properly preserved in draft
+        const draftData = {
+          ...data,
+          predefined_metrics: data.predefined_metrics?.map(m => ({
+            ...m,
+            target_value: m.target_value || 0 // Preserve the existing value even if it's 0
+          })) || [],
+          custom_metrics: data.custom_metrics?.map(m => ({
+            ...m,
+            target_value: m.target_value || 0
+          })) || [],
+          visitor_profile_metrics: data.visitor_profile_metrics?.map(m => ({
+            ...m,
+            target_value: m.target_value || 0
+          })) || []
+        };
+        
+        saveDraft(draftData as TargetMetricsFormData);
       }
     });
 

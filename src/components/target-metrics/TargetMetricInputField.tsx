@@ -25,15 +25,22 @@ const TargetMetricInputField: React.FC<TargetMetricInputFieldProps> = ({
   const isDropdownMetric = specificDropdownMetrics.includes(metricSetting.metric_identifier);
   const dropdownOptions = metricDropdownOptions[metricSetting.metric_identifier] || [];
 
+  const hasError = errors?.predefined_metrics?.[fieldIndex]?.target_value;
+  const isEmpty = !metricSetting.target_value || metricSetting.target_value === 0;
+
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg bg-card">
+    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg bg-card ${hasError ? 'border-destructive' : isEmpty ? 'border-warning' : ''}`}>
       <div className="sm:w-2/3 mb-2 sm:mb-0">
-        <FormLabel className="text-base font-medium">{metricSetting.label}</FormLabel>
+        <FormLabel className="text-base font-medium">
+          {metricSetting.label}
+          {isEmpty && !disabled && <span className="text-warning ml-1">*</span>}
+        </FormLabel>
         <div className="text-sm text-muted-foreground mt-1">
           Category: {metricSetting.category}
           {metricSetting.measurement_type && ` • Type: ${metricSetting.measurement_type}`}
           <br />
           {metricSetting.higher_is_better ? "(Higher is better)" : "(Lower is better)"}
+          {isEmpty && !disabled && <span className="block text-warning text-xs mt-1">Target value required</span>}
         </div>
       </div>
       
@@ -66,8 +73,13 @@ const TargetMetricInputField: React.FC<TargetMetricInputFieldProps> = ({
                     type="number"
                     placeholder="Enter target value"
                     {...field}
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                    onChange={e => {
+                      const value = e.target.value;
+                      // Only update if value is not empty, otherwise set to undefined
+                      field.onChange(value === '' ? undefined : parseFloat(value) || 0);
+                    }}
                     disabled={disabled}
+                    className={!field.value ? "border-warning" : ""}
                   />
                 )}
               </FormControl>

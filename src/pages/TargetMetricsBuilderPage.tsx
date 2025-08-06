@@ -324,6 +324,27 @@ const TargetMetricsBuilderPage = () => {
 
   const onSubmit = (data: TargetMetricsFormData) => {
     console.log('[TargetMetricsBuilderPage] Submitting form data:', data);
+    
+    // Validate that all metrics have target values
+    const predefinedMetricsWithoutTargets = data.predefined_metrics?.filter(m => !m.target_value || m.target_value === 0) || [];
+    const customMetricsWithoutTargets = data.custom_metrics?.filter(m => !m.target_value || m.target_value === 0) || [];
+    const visitorProfileMetricsWithoutTargets = data.visitor_profile_metrics?.filter(m => !m.target_value || m.target_value === 0) || [];
+    
+    const allMissingTargets = [
+      ...predefinedMetricsWithoutTargets,
+      ...customMetricsWithoutTargets, 
+      ...visitorProfileMetricsWithoutTargets
+    ];
+    
+    if (allMissingTargets.length > 0) {
+      toast({
+        title: "Missing Target Values", 
+        description: `Please enter target values for all metrics. ${allMissingTargets.length} metric(s) are missing target values.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     saveMutation.mutate(data);
   };
 
