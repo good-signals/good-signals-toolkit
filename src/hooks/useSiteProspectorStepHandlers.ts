@@ -105,8 +105,22 @@ export const useSiteProspectorStepHandlers = ({
     setCurrentStep('metric-input');
   };
 
-  const handleMetricValuesSubmitted = () => {
+  const handleMetricValuesSubmitted = async () => {
     console.log('Metric values submitted, moving to site visit ratings');
+    
+    // Ensure assessment data integrity after metric submission
+    if (user?.id && setActiveAssessmentId) {
+      try {
+        const { repairAssessmentDataIntegrity } = await import('@/services/siteAssessment/validationAndPopulation');
+        const currentAssessmentId = typeof setActiveAssessmentId === 'function' ? null : assessments.find(a => a.id)?.id;
+        if (currentAssessmentId) {
+          await repairAssessmentDataIntegrity(currentAssessmentId, user.id);
+          console.log('[handleMetricValuesSubmitted] Assessment data integrity repaired');
+        }
+      } catch (error) {
+        console.warn('[handleMetricValuesSubmitted] Failed to repair assessment integrity:', error);
+      }
+    }
     
     // Move to site visit ratings step instead of directly to view details
     setCurrentStep('site-visit-ratings');

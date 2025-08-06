@@ -146,3 +146,63 @@ export const getAssessmentMetricValues = async (assessmentId: string): Promise<A
 
   return data || [];
 };
+
+// New function to get metric values merged with target metric set configuration
+export const getAssessmentMetricValuesWithTargets = async (
+  assessmentId: string, 
+  targetMetricSetId: string,
+  userId: string
+): Promise<AssessmentMetricValue[]> => {
+  console.log('[getAssessmentMetricValuesWithTargets] Fetching values with targets for assessment:', assessmentId);
+
+  // Get existing assessment metric values
+  const existingValues = await getAssessmentMetricValues(assessmentId);
+  
+  // Get target metric set configuration
+  const { getUserCustomMetricSettings } = await import('@/services/targetMetricsService');
+  const targetSettings = await getUserCustomMetricSettings(targetMetricSetId);
+
+  console.log('[getAssessmentMetricValuesWithTargets] Found:', {
+    existingValuesCount: existingValues.length,
+    targetSettingsCount: targetSettings.length
+  });
+
+  // Create a map of existing values by metric identifier
+  const existingValuesMap = new Map<string, AssessmentMetricValue>();
+  existingValues.forEach(value => {
+    existingValuesMap.set(value.metric_identifier, value);
+  });
+
+  // Create complete metric values array with all target metrics
+  const completeMetricValues: AssessmentMetricValue[] = [];
+
+  targetSettings.forEach(setting => {
+    const existingValue = existingValuesMap.get(setting.metric_identifier);
+    
+    if (existingValue) {
+      // Use existing value
+      completeMetricValues.push(existingValue);
+    } else {
+      // Create placeholder metric value for missing metrics
+      completeMetricValues.push({
+        id: `placeholder-${setting.metric_identifier}`,
+        assessment_id: assessmentId,
+        metric_identifier: setting.metric_identifier,
+        category: setting.category,
+        label: setting.label,
+        entered_value: null,
+        notes: null,
+        measurement_type: setting.measurement_type || null,
+        image_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+  });
+
+  console.log('[getAssessmentMetricValuesWithTargets] Complete metric values created:', {
+    completeCount: completeMetricValues.length
+  });
+
+  return completeMetricValues;
+};

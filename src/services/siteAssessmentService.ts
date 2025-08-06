@@ -78,10 +78,26 @@ export const getAssessmentDetails = async (assessmentId: string): Promise<SiteAs
 
     const assessment = await getSiteAssessmentFromDb(assessmentId);
     
-    const [metricValues, siteVisitRatings] = await Promise.all([
-      getAssessmentMetricValues(assessmentId),
-      getSiteVisitRatings(assessmentId)
-    ]);
+    // Get metric values with targets if target metric set is available
+    let metricValues;
+    if (assessment.target_metric_set_id) {
+      try {
+        const { getAssessmentMetricValuesWithTargets } = await import('./siteAssessment/metricValues');
+        metricValues = await getAssessmentMetricValuesWithTargets(
+          assessmentId, 
+          assessment.target_metric_set_id, 
+          user.id
+        );
+        console.log('[getAssessmentDetails] Using enhanced metric values with targets');
+      } catch (error) {
+        console.warn('[getAssessmentDetails] Failed to get enhanced metric values, falling back to basic:', error);
+        metricValues = await getAssessmentMetricValues(assessmentId);
+      }
+    } else {
+      metricValues = await getAssessmentMetricValues(assessmentId);
+    }
+    
+    const siteVisitRatings = await getSiteVisitRatings(assessmentId);
 
     return {
       ...assessment,

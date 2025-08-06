@@ -80,7 +80,10 @@ const InputSiteVisitRatingsStep: React.FC<InputSiteVisitRatingsStepProps> = ({
       console.log('[InputSiteVisitRatingsStep] Form ready with data:', {
         criteriaCount: Object.keys(formData).length,
         sampleData: formData.visibility,
-        formReady: isFormReady
+        formReady: isFormReady,
+        allCriteriaKeys: Object.keys(formData),
+        totalSiteVisitCriteria: siteVisitCriteria.length,
+        siteVisitCriteriaKeys: siteVisitCriteria.map(c => c.key)
       });
     }
   }, [formData, isFormReady]);

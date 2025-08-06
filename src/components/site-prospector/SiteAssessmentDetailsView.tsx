@@ -505,7 +505,7 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
                 const metrics = metricsByCategory[category];
                 console.log('[DEBUG] Rendering category:', category, 'with metrics:', metrics);
                 
-                const processedMetrics = metrics.map(metric => {
+                 const processedMetrics = metrics.map(metric => {
                   const targetData = targetMetricsMap[metric.metric_identifier];
                   
                   console.log('[DEBUG] Processing metric for display:', {
@@ -523,9 +523,9 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
                     category: metric.category,
                     entered_value: metric.entered_value,
                     notes: metric.notes,
-                    target_value: targetData?.target_value,
-                    higher_is_better: targetData?.higher_is_better,
-                    measurement_type: targetData?.measurement_type,
+                    target_value: targetData?.target_value || 0, // Default to 0 instead of undefined
+                    higher_is_better: targetData?.higher_is_better ?? true, // Default to true instead of undefined
+                    measurement_type: targetData?.measurement_type || 'Amount', // Default measurement type
                   };
                 });
                 
