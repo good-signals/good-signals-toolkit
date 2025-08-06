@@ -83,9 +83,20 @@ export const getAssessmentDetailsEnhanced = async (assessmentId: string): Promis
         });
       });
       
+      console.log('[getAssessmentDetailsEnhanced] Target map created:', {
+        targetMapSize: targetMap.size,
+        targetMapKeys: Array.from(targetMap.keys()).slice(0, 5),
+        sampleTargetMapEntry: Array.from(targetMap.entries())[0]
+      });
+      
       // Merge existing values with target data
       enhancedMetricValues = existingValues.map(value => {
         const targetData = targetMap.get(value.metric_identifier);
+        console.log('[getAssessmentDetailsEnhanced] Merging metric:', {
+          metric_identifier: value.metric_identifier,
+          foundTargetData: !!targetData,
+          targetData: targetData
+        });
         return {
           ...value,
           target_value: targetData?.target_value,
