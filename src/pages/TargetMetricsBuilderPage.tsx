@@ -256,12 +256,10 @@ const TargetMetricsBuilderPage = () => {
         throw new Error('User not authenticated or account not found');
       }
 
-      // For existing metric sets, we only need to save the metric set name and predefined metrics
-      // since visitor profile and custom metrics are saved individually
+      // Pass all form data for both creation and update
+      // The service layer will handle the logic appropriately
       const formDataToSave = {
         ...data,
-        visitor_profile_metrics: metricSetId ? [] : data.visitor_profile_metrics,
-        custom_metrics: metricSetId ? [] : data.custom_metrics,
       };
 
       let result;
