@@ -114,6 +114,8 @@ export const recalculateAssessmentScoresForMetricSet = async (
         console.log(`🏠 Processing site visit ratings...`);
         console.log(`  - Site visit ratings in assessment:`, assessment.site_visit_ratings?.length || 0);
         
+        const siteVisitGrades: string[] = [];
+        
         if (assessment.site_visit_ratings && assessment.site_visit_ratings.length > 0) {
           console.log(`  - Found ${assessment.site_visit_ratings.length} site visit ratings`);
           
@@ -123,6 +125,7 @@ export const recalculateAssessmentScoresForMetricSet = async (
             // Only count ratings that have a grade (not null or empty)
             if (rating.rating_grade && rating.rating_grade.trim() !== '') {
               siteVisitRatingsWithValues++;
+              siteVisitGrades.push(rating.rating_grade);
               console.log(`      ✓ Counted as complete (grade: ${rating.rating_grade})`);
             } else {
               console.log(`      ✗ Not counted (no grade)`);
@@ -140,8 +143,8 @@ export const recalculateAssessmentScoresForMetricSet = async (
         console.log(`  - Site visit ratings with values: ${siteVisitRatingsWithValues}/${totalSiteVisitCriteria}`);
         console.log(`  - Total completed items: ${totalCompletedItems}/${totalCompletableItems}`);
 
-        // Calculate overall scores
-        const overallScore = calculateOverallSiteSignalScore(metricScores);
+        // Calculate overall scores including both metrics and site visit ratings
+        const overallScore = calculateOverallSiteSignalScore(metricScores, siteVisitGrades);
         const completionPercentage = calculateCompletionPercentage(totalCompletableItems, totalCompletedItems);
 
         console.log(`🎯 Final Results:`);

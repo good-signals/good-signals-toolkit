@@ -86,14 +86,47 @@ export const calculateMetricSignalScore = ({
   }
 };
 
-export const calculateOverallSiteSignalScore = (metricScores: (number | null)[]): number | null => {
+export const convertGradeToScore = (grade: string | null | undefined): number | null => {
+  if (!grade) return null;
+  
+  switch (grade.toUpperCase()) {
+    case 'A': return 100;
+    case 'B': return 80;
+    case 'C': return 60;
+    case 'D': return 40;
+    case 'F': return 0;
+    default: return null;
+  }
+};
+
+export const calculateOverallSiteSignalScore = (metricScores: (number | null)[], siteVisitGrades?: string[]): number | null => {
   try {
-    const validScores = metricScores.filter(score => typeof score === 'number') as number[];
-    if (validScores.length === 0) {
+    // Convert metric scores to valid numbers
+    const validMetricScores = metricScores.filter(score => typeof score === 'number') as number[];
+    
+    // Convert site visit grades to scores
+    const siteVisitScores = (siteVisitGrades || [])
+      .map(grade => convertGradeToScore(grade))
+      .filter(score => typeof score === 'number') as number[];
+    
+    // Combine all scores
+    const allScores = [...validMetricScores, ...siteVisitScores];
+    
+    if (allScores.length === 0) {
       return null;
     }
-    const sum = validScores.reduce((acc, curr) => acc + curr, 0);
-    const average = sum / validScores.length;
+    
+    const sum = allScores.reduce((acc, curr) => acc + curr, 0);
+    const average = sum / allScores.length;
+    
+    console.log('[calculateOverallSiteSignalScore] Score calculation:', {
+      metricScoresCount: validMetricScores.length,
+      siteVisitScoresCount: siteVisitScores.length,
+      totalScores: allScores.length,
+      average: average,
+      roundedAverage: Math.round(average)
+    });
+    
     return Math.round(average);
   } catch (error) {
     console.error('Error calculating overall signal score:', error);
