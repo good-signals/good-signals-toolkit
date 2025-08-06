@@ -98,7 +98,8 @@ export const getAssessmentDetailsEnhanced = async (assessmentId: string): Promis
         existingCount: existingValues.length,
         targetCount: targetSettings.length,
         enhancedCount: enhancedMetricValues.length,
-        hasTargetValues: enhancedMetricValues.some(m => m.target_value !== undefined)
+        hasTargetValues: enhancedMetricValues.some(m => m.target_value !== undefined),
+        sampleEnhancedMetric: enhancedMetricValues[0]
       });
     } else {
       // Just get regular metric values if no target set
