@@ -28,6 +28,18 @@ export type AssessmentMetricValue = Database["public"]["Tables"]["assessment_met
 export type AssessmentMetricValueInsert = Database["public"]["Tables"]["assessment_metric_values"]["Insert"] & { image_url?: string | null };
 export type AssessmentMetricValueUpdate = Database["public"]["Tables"]["assessment_metric_values"]["Update"] & { image_url?: string | null };
 
+// Enhanced Assessment Metric Value with target properties
+export type AssessmentMetricValueWithTargets = AssessmentMetricValue & {
+  target_value?: number;
+  higher_is_better?: boolean;
+  measurement_type?: string | null;
+};
+
+// Enhanced Site Assessment with merged target values
+export type SiteAssessmentWithTargets = SiteAssessment & {
+  assessment_metric_values?: AssessmentMetricValueWithTargets[];
+};
+
 export type SiteVisitCriterionKey = Database["public"]["Enums"]["site_visit_criterion_key"];
 export type SiteVisitRatingGrade = Database["public"]["Enums"]["site_visit_rating_grade"];
 

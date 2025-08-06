@@ -7,7 +7,7 @@ export * from './summary';
 export * from './types';
 export * from './validationAndPopulation';
 
-import { SiteAssessment, SiteAssessmentInsert, AssessmentMetricValueInsert, AssessmentSiteVisitRatingInsert } from '@/types/siteAssessmentTypes';
+import { SiteAssessment, SiteAssessmentInsert, AssessmentMetricValueInsert, AssessmentSiteVisitRatingInsert, SiteAssessmentWithTargets, AssessmentMetricValueWithTargets } from '@/types/siteAssessmentTypes';
 import { 
   createSiteAssessmentInDb, 
   updateSiteAssessmentInDb, 
@@ -44,7 +44,7 @@ export const createSiteAssessmentEnhanced = async (
   }
 };
 
-export const getAssessmentDetailsEnhanced = async (assessmentId: string): Promise<SiteAssessment> => {
+export const getAssessmentDetailsEnhanced = async (assessmentId: string): Promise<SiteAssessmentWithTargets> => {
   try {
     // Check authentication first
     const { data: { user } } = await supabase.auth.getUser();
@@ -54,31 +54,72 @@ export const getAssessmentDetailsEnhanced = async (assessmentId: string): Promis
 
     const assessment = await getSiteAssessmentFromDb(assessmentId);
     
-    // Get metric values with targets if target metric set is available
-    let metricValues;
+    // Get enhanced metric values with targets merged
+    let enhancedMetricValues: AssessmentMetricValueWithTargets[] = [];
+    
     if (assessment.target_metric_set_id) {
-      try {
-        metricValues = await getAssessmentMetricValuesWithTargets(
-          assessmentId, 
-          assessment.target_metric_set_id, 
-          user.id
-        );
-        console.log('[getAssessmentDetailsEnhanced] Using enhanced metric values with targets');
-      } catch (error) {
-        console.warn('[getAssessmentDetailsEnhanced] Failed to get enhanced metric values, falling back to basic:', error);
-        metricValues = await getAssessmentMetricValues(assessmentId);
-      }
+      console.log('[getAssessmentDetailsEnhanced] Merging target values for metric set:', assessment.target_metric_set_id);
+      
+      // Get existing metric values
+      const existingValues = await getAssessmentMetricValues(assessmentId);
+      
+      // Get target settings
+      const { getUserCustomMetricSettings } = await import('@/services/targetMetricsService');
+      const targetSettings = await getUserCustomMetricSettings(assessment.target_metric_set_id);
+      
+      // Create map of target data
+      const targetMap = new Map();
+      targetSettings.forEach(setting => {
+        targetMap.set(setting.metric_identifier, {
+          target_value: setting.target_value,
+          higher_is_better: setting.higher_is_better,
+          measurement_type: setting.measurement_type
+        });
+      });
+      
+      // Merge existing values with target data
+      enhancedMetricValues = existingValues.map(value => {
+        const targetData = targetMap.get(value.metric_identifier);
+        return {
+          ...value,
+          target_value: targetData?.target_value,
+          higher_is_better: targetData?.higher_is_better,
+          measurement_type: targetData?.measurement_type || value.measurement_type
+        };
+      });
+      
+      console.log('[getAssessmentDetailsEnhanced] Enhanced metric values with targets:', {
+        existingCount: existingValues.length,
+        targetCount: targetSettings.length,
+        enhancedCount: enhancedMetricValues.length,
+        hasTargetValues: enhancedMetricValues.some(m => m.target_value !== undefined)
+      });
     } else {
-      metricValues = await getAssessmentMetricValues(assessmentId);
+      // Just get regular metric values if no target set
+      const regularValues = await getAssessmentMetricValues(assessmentId);
+      enhancedMetricValues = regularValues.map(value => ({
+        ...value,
+        target_value: undefined,
+        higher_is_better: undefined
+      }));
     }
     
     const siteVisitRatings = await getSiteVisitRatings(assessmentId);
 
-    return {
+    const result: SiteAssessmentWithTargets = {
       ...assessment,
-      assessment_metric_values: metricValues,
+      assessment_metric_values: enhancedMetricValues,
       site_visit_ratings: siteVisitRatings,
     };
+
+    console.log('[getAssessmentDetailsEnhanced] Enhanced assessment prepared:', {
+      assessmentId,
+      metricValuesCount: enhancedMetricValues.length,
+      siteVisitRatingsCount: siteVisitRatings.length,
+      hasTargetValues: enhancedMetricValues.some(m => m.target_value !== undefined)
+    });
+
+    return result;
   } catch (error) {
     console.error('Error getting enhanced assessment details:', error);
     throw error;

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getAssessmentDetails } from '@/services/siteAssessmentService';
+import { getAssessmentDetailsEnhanced } from '@/services/siteAssessment';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const useSiteAssessmentDetailsEnhanced = (assessmentId: string | undefined) => {
@@ -18,7 +18,7 @@ export const useSiteAssessmentDetailsEnhanced = (assessmentId: string | undefine
         throw new Error('Authentication required to fetch assessment details');
       }
       
-      return getAssessmentDetails(assessmentId);
+      return getAssessmentDetailsEnhanced(assessmentId);
     },
     enabled: !!assessmentId && !!user && authInitialized,
     retry: (failureCount, error) => {

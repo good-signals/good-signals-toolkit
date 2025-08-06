@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit, FileText, MapPin, Calendar, CheckCircle, BarChart2, TrendingUp, RefreshCcw, Download, Loader2 } from 'lucide-react';
-import { SiteAssessment } from '@/types/siteAssessmentTypes';
+import { SiteAssessment, SiteAssessmentWithTargets } from '@/types/siteAssessmentTypes';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import SiteStatusSelector from './SiteStatusSelector';
@@ -13,8 +13,8 @@ import EditableExecutiveSummary from './EditableExecutiveSummary';
 import MetricDisplaySection from './display/MetricDisplaySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
 import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
-import { useSiteAssessmentDetails } from '@/hooks/useSiteAssessmentDetails';
-import { getUserCustomMetricSettings, getTargetMetricSetById } from '@/services/targetMetricsService';
+import { useSiteAssessmentDetailsEnhanced } from '@/hooks/useSiteAssessmentDetailsEnhanced';
+import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserAccount } from '@/services/userAccountService';
 import ExportButton from '@/components/export/ExportButton';
@@ -49,6 +49,13 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
   const [targetMetricSetName, setTargetMetricSetName] = useState<string>('Loading...');
   const [totalMetricsCount, setTotalMetricsCount] = useState<number>(0);
 
+  // Use enhanced hook to get assessment details with properly merged metrics
+  const { data: enhancedAssessment, isLoading: isLoadingEnhanced, error: enhancedError } = useSiteAssessmentDetailsEnhanced(assessment.id) as {
+    data: SiteAssessmentWithTargets | undefined;
+    isLoading: boolean;
+    error: any;
+  };
+  
   // Initialize summary generation hook
   const { generateSummary, isGenerating, canGenerateSummary, shouldAutoGenerate } = useSiteAssessmentSummaryGeneration(assessment);
 
@@ -60,78 +67,39 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     }
   }, [shouldAutoGenerate, isGenerating, generateSummary, assessment.id]);
 
-  // Fetch target metrics when component mounts
+  // Fetch target metric set details for display and export
   React.useEffect(() => {
-    const loadTargetMetrics = async () => {
+    const loadTargetMetricSetDetails = async () => {
       if (!assessment.target_metric_set_id || !user?.id) {
-        console.log('[DEBUG] Skipping target metrics load:', {
-          hasTargetMetricSetId: !!assessment.target_metric_set_id,
-          hasUserId: !!user?.id,
-          targetMetricSetId: assessment.target_metric_set_id,
-          userId: user?.id
-        });
         setIsLoadingTargetMetrics(false);
         return;
       }
 
       try {
-        console.log('[DEBUG] Starting target metrics load for set:', assessment.target_metric_set_id);
-        
-        // Fetch both the target metric set details and the user settings
-        const [targetMetricSetDetails, targetSettings] = await Promise.all([
-          getTargetMetricSetById(assessment.target_metric_set_id, user.id).catch(() => null),
-          getUserCustomMetricSettings(assessment.target_metric_set_id)
-        ]);
-        
-        console.log('[DEBUG] Raw target settings fetched:', {
-          settingsCount: targetSettings.length,
-          settings: targetSettings
-        });
-        
-        // Set the metric set name and count
+        const targetMetricSetDetails = await getTargetMetricSetById(assessment.target_metric_set_id, user.id).catch(() => null);
         setTargetMetricSetName(targetMetricSetDetails?.name || `Metric Set ${assessment.target_metric_set_id.slice(0, 8)}`);
-        setTotalMetricsCount(targetSettings.length);
         
-        // Create a lookup map for target values
-        const metricsMap: Record<string, {
-          target_value: number;
-          higher_is_better: boolean;
-          measurement_type?: string;
-        }> = {};
-        
-        targetSettings.forEach(setting => {
-          metricsMap[setting.metric_identifier] = {
-            target_value: setting.target_value,
-            higher_is_better: setting.higher_is_better,
-            measurement_type: setting.measurement_type || undefined,
-          };
-          console.log('[DEBUG] Added to metrics map:', {
-            identifier: setting.metric_identifier,
-            targetValue: setting.target_value,
-            higherIsBetter: setting.higher_is_better,
-            measurementType: setting.measurement_type
-          });
-        });
-        
-        console.log('[DEBUG] Final target metrics map:', metricsMap);
-        console.log('[DEBUG] Map keys:', Object.keys(metricsMap));
-        setTargetMetricsMap(metricsMap);
+        if (enhancedAssessment?.assessment_metric_values) {
+          setTotalMetricsCount(enhancedAssessment.assessment_metric_values.length);
+        }
         
         // Set target metric set for export
         setTargetMetricSet({
           id: assessment.target_metric_set_id,
-          name: targetMetricSetName,
-          user_custom_metrics_settings: targetSettings
+          name: targetMetricSetDetails?.name || `Metric Set ${assessment.target_metric_set_id.slice(0, 8)}`,
+          user_custom_metrics_settings: enhancedAssessment?.assessment_metric_values || []
         });
       } catch (error) {
-        console.error('[DEBUG] Error loading target metrics:', error);
+        console.error('[SiteAssessmentDetailsView] Error loading target metric set details:', error);
       } finally {
         setIsLoadingTargetMetrics(false);
       }
     };
 
-    loadTargetMetrics();
-  }, [assessment.target_metric_set_id, user?.id]);
+    if (enhancedAssessment) {
+      loadTargetMetricSetDetails();
+    }
+  }, [assessment.target_metric_set_id, user?.id, enhancedAssessment]);
 
   // Auto-calculate scores if they're missing and we have metric values
   React.useEffect(() => {
@@ -201,22 +169,41 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     }
   };
 
+  // Use enhanced assessment data if available, fallback to original
+  const currentAssessment: SiteAssessmentWithTargets = enhancedAssessment || (assessment as SiteAssessmentWithTargets);
+  
+  // Log enhanced assessment loading status
+  React.useEffect(() => {
+    if (enhancedError) {
+      console.error('[SiteAssessmentDetailsView] Enhanced assessment loading error:', enhancedError);
+    }
+    if (enhancedAssessment) {
+      console.log('[SiteAssessmentDetailsView] Enhanced assessment loaded successfully:', {
+        metricValuesCount: enhancedAssessment.assessment_metric_values?.length || 0,
+        hasTargetValues: enhancedAssessment.assessment_metric_values?.some(m => (m as any).target_value !== undefined) || false
+      });
+    }
+  }, [enhancedAssessment, enhancedError]);
+
   // Organize metric values by category if they exist, but exclude SiteVisitSectionImages
-  const metricsByCategory: Record<string, typeof assessment.assessment_metric_values> = {};
+  const metricsByCategory: Record<string, any[]> = {};
   let siteVisitSectionImage: string | null = null;
   
-  console.log('[DEBUG] Assessment metric values:', {
-    count: assessment.assessment_metric_values?.length || 0,
-    values: assessment.assessment_metric_values
+  console.log('[SiteAssessmentDetailsView] Current assessment metric values:', {
+    count: currentAssessment.assessment_metric_values?.length || 0,
+    values: currentAssessment.assessment_metric_values,
+    isEnhanced: !!enhancedAssessment
   });
   
-  if (assessment.assessment_metric_values && assessment.assessment_metric_values.length > 0) {
-    assessment.assessment_metric_values.forEach((metric) => {
-      console.log('[DEBUG] Processing metric:', {
+  if (currentAssessment.assessment_metric_values && currentAssessment.assessment_metric_values.length > 0) {
+    currentAssessment.assessment_metric_values.forEach((metric) => {
+      console.log('[SiteAssessmentDetailsView] Processing metric:', {
         identifier: metric.metric_identifier,
         label: metric.label,
         category: metric.category,
-        enteredValue: metric.entered_value
+        enteredValue: metric.entered_value,
+        targetValue: (metric as any).target_value,
+        higherIsBetter: (metric as any).higher_is_better
       });
 
       // Extract the Site Visit section image but don't display it as a metric category
@@ -234,33 +221,33 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
     });
   }
 
-  console.log('[DEBUG] Metrics organized by category:', {
+  console.log('[SiteAssessmentDetailsView] Metrics organized by category:', {
     categoryCount: Object.keys(metricsByCategory).length,
     categories: Object.keys(metricsByCategory),
-    metricsByCategory
+    metricsByCategory,
+    isEnhanced: !!enhancedAssessment
   });
 
   // Sort categories according to the predefined order
   const sortedCategories = sortCategoriesByOrder(Object.keys(metricsByCategory));
 
-  console.log('[DEBUG] Sorted categories:', sortedCategories);
+  console.log('[SiteAssessmentDetailsView] Sorted categories:', sortedCategories);
 
   // Prepare export data
   const prepareExportData = (): ExportData => {
     // Create detailed metric scores map
     const detailedMetricScores = new Map();
     
-    if (assessment.assessment_metric_values) {
-      assessment.assessment_metric_values.forEach(metric => {
+    if (currentAssessment.assessment_metric_values) {
+      currentAssessment.assessment_metric_values.forEach(metric => {
         if (metric.category !== 'SiteVisitSectionImages') {
-          const targetData = targetMetricsMap[metric.metric_identifier];
           detailedMetricScores.set(metric.metric_identifier, {
             category: metric.category,
             label: metric.label,
             enteredValue: metric.entered_value,
-            targetValue: targetData?.target_value,
-            higherIsBetter: targetData?.higher_is_better,
-            measurementType: targetData?.measurement_type,
+            targetValue: (metric as any).target_value,
+            higherIsBetter: (metric as any).higher_is_better,
+            measurementType: (metric as any).measurement_type,
             notes: metric.notes,
             imageUrl: metric.image_url,
             score: null // You may want to calculate this based on your scoring logic
@@ -271,15 +258,15 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
 
     return {
       assessment: {
-        ...assessment,
-        site_visit_ratings: assessment.site_visit_ratings || [],
+        ...currentAssessment,
+        site_visit_ratings: currentAssessment.site_visit_ratings || [],
         siteVisitSectionImage
       },
       targetMetricSet,
       accountSettings: null, // You may want to fetch this if needed
       detailedMetricScores,
-      overallSiteSignalScore: assessment.site_signal_score,
-      completionPercentage: assessment.completion_percentage
+      overallSiteSignalScore: currentAssessment.site_signal_score,
+      completionPercentage: currentAssessment.completion_percentage
     };
   };
 
