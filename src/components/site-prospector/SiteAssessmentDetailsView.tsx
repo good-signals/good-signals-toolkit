@@ -482,48 +482,30 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
       {sortedCategories.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-6">Assessment Metrics</h2>
-          {isLoadingTargetMetrics ? (
+          {isLoadingEnhanced ? (
             <div className="text-center p-6">
-              <div className="text-lg">Loading target metrics...</div>
+              <div className="text-lg">Loading assessment data...</div>
+            </div>
+          ) : enhancedError ? (
+            <div className="text-center p-6 text-destructive">
+              <div className="text-lg">Error loading assessment data</div>
             </div>
           ) : (
             <div className="space-y-6">
               {sortedCategories.map((category) => {
-                const metrics = metricsByCategory[category];
-                console.log('[DEBUG] Rendering category:', category, 'with metrics:', metrics);
+                // Use enhanced assessment data which already has target values merged
+                const enhancedMetrics = enhancedAssessment?.assessment_metric_values?.filter(
+                  metric => metric.category === category
+                ) || [];
                 
-                 const processedMetrics = metrics.map(metric => {
-                  const targetData = targetMetricsMap[metric.metric_identifier];
-                  
-                  console.log('[DEBUG] Processing metric for display:', {
-                    metricIdentifier: metric.metric_identifier,
-                    label: metric.label,
-                    enteredValue: metric.entered_value,
-                    foundTargetData: !!targetData,
-                    targetData: targetData
-                  });
-                  
-                  return {
-                    id: metric.id || `${metric.category}-${metric.label}`,
-                    metric_identifier: metric.metric_identifier || metric.label,
-                    label: metric.label,
-                    category: metric.category,
-                    entered_value: metric.entered_value,
-                    notes: metric.notes,
-                    target_value: targetData?.target_value || 0, // Default to 0 instead of undefined
-                    higher_is_better: targetData?.higher_is_better ?? true, // Default to true instead of undefined
-                    measurement_type: targetData?.measurement_type || 'Amount', // Default measurement type
-                  };
-                });
-                
-                console.log('[DEBUG] Processed metrics for category', category, ':', processedMetrics);
+                console.log('[DEBUG] Using enhanced metrics for category:', category, enhancedMetrics);
                 
                 return (
                   <MetricDisplaySection
                     key={category}
                     categoryName={category}
-                    categoryDescription={`${metrics.length} metric${metrics.length !== 1 ? 's' : ''}`}
-                    categoryMetrics={processedMetrics}
+                    categoryDescription={`${enhancedMetrics.length} metric${enhancedMetrics.length !== 1 ? 's' : ''}`}
+                    categoryMetrics={enhancedMetrics}
                   />
                 );
               })}
