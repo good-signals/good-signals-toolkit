@@ -55,24 +55,53 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
     signalStatus
   });
   
-  // Combine all reasoning into one text (only if we have criteria columns)
-  const combinedReasoning = criteriaColumns.length > 0 ? criteriaColumns
-    .map((column, index) => {
+  // Build reasoning with clickable sources
+  const combinedReasoningItems = criteriaColumns.length > 0 ? criteriaColumns
+    .map((column) => {
       const scoreData = row.criteriaScores[column.id];
       if (!scoreData?.reasoning) return null;
-      
-      let reasoning = `${column.title}: ${scoreData.reasoning}`;
-      
-      // Add sources if available
-      if (scoreData.sources && scoreData.sources.length > 0) {
-        reasoning += ` (Sources: ${scoreData.sources.join(', ')})`;
-      }
-      
-      return reasoning;
-    })
-    .filter(Boolean)
-    .join(' | ') : '';
 
+      const sources = Array.isArray(scoreData.sources) ? scoreData.sources.filter(Boolean) : [];
+
+      const isLikelyUrl = (s: string) => /^(https?:\/\/)/i.test(s) || /^[\w.-]+\.[a-z]{2,}/i.test(s);
+      const toUrl = (s: string) => (s && /^(https?:\/\/)/i.test(s)) ? s : (isLikelyUrl(s) ? `https://${s}` : s);
+      const displayForSource = (s: string) => {
+        try {
+          const u = new URL(toUrl(s));
+          return u.hostname.replace(/^www\./, '');
+        } catch {
+          return s;
+        }
+      };
+
+      return (
+        <div key={column.id} className="mb-2">
+          <div className="font-medium inline">{column.title}:</div>{' '}
+          <span className="text-foreground/90">{scoreData.reasoning}</span>
+          {sources.length > 0 && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              Sources:{' '}
+              {sources.map((src, idx) => (
+                <a
+                  key={`${column.id}-src-${idx}`}
+                  href={toUrl(src)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline hover:opacity-80"
+                >
+                  {displayForSource(src)}
+                </a>
+              )).reduce<React.ReactNode[]>((acc, el, idx) => (
+                idx === 0 ? [el] : [...acc, ', ', el]
+              ), [])}
+            </div>
+          )}
+        </div>
+      );
+    })
+    .filter(Boolean) as React.ReactNode[] : [];
+
+  const hasReasoning = combinedReasoningItems.length > 0;
   const showMarketSignalScore = criteriaColumns.length > 1;
   const hasScores = criteriaColumns.length > 0;
 
@@ -145,7 +174,7 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
       )}
       {hasScores && (
         <TableCell className="text-sm">
-          {combinedReasoning || 'No reasoning available'}
+          {hasReasoning ? combinedReasoningItems : 'No reasoning available'}
         </TableCell>
       )}
     </TableRow>
