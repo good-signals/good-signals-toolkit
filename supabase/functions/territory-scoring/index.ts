@@ -197,6 +197,111 @@ function normalizeParsedResponse(data: any, fallbackTitle: string, fallbackSumma
   return { suggested_title: title || 'Analysis Results', prompt_summary: summary || '', scores };
 }
 
+// ---- Source diversification helpers ----
+function normalizeUrl(raw: string): string | null {
+  try {
+    const str = (raw || '').trim();
+    if (!str) return null;
+    const url = new URL(/^https?:\/\//i.test(str) ? str : `https://${str}`);
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+    url.hash = '';
+    const params = Array.from(url.searchParams.entries())
+      .filter(([k]) => {
+        const key = k.toLowerCase();
+        return !(key.startsWith('utm_') || key === 'ref' || key === 'source' || key === 'fbclid' || key === 'gclid');
+      })
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    url.search = '';
+    if (params.length) url.search = `?${new URLSearchParams(params).toString()}`;
+    url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function registrableDomain(raw: string): string | null {
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    const parts = host.split('.');
+    if (parts.length <= 2) return host;
+    const tld = parts[parts.length - 1];
+    const sld = parts[parts.length - 2];
+    return `${sld}.${tld}`;
+  } catch {
+    return null;
+  }
+}
+
+function diversifySources(scores: any[], maxPerMarket = 3, maxGlobalShare = 0.3) {
+  const perMarket = scores.map((item) => {
+    const sources: string[] = Array.isArray(item.sources) ? item.sources.filter(Boolean) : [];
+    const uniqueByUrl = Array.from(
+      new Map(
+        sources
+          .map((s) => [normalizeUrl(s) || s.trim(), s.trim()])
+          .filter(([k]) => !!k)
+      ).values()
+    );
+    const seen = new Set<string>();
+    const uniqByDomain: string[] = [];
+    for (const src of uniqueByUrl) {
+      const d = registrableDomain(src) || src;
+      if (seen.has(d)) continue;
+      seen.add(d);
+      uniqByDomain.push(src);
+      if (uniqByDomain.length >= maxPerMarket) break;
+    }
+    return { ...item, sources: uniqByDomain };
+  });
+
+  const domainCounts = new Map<string, number>();
+  for (const item of perMarket) {
+    const domains = new Set<string>();
+    for (const src of item.sources || []) {
+      const d = registrableDomain(src) || src;
+      domains.add(d);
+    }
+    for (const d of domains) domainCounts.set(d, (domainCounts.get(d) || 0) + 1);
+  }
+
+  const total = perMarket.length || 1;
+  const overRep = new Set<string>();
+  for (const [d, cnt] of domainCounts.entries()) {
+    if (cnt / total > maxGlobalShare) overRep.add(d);
+  }
+  if (overRep.size) {
+    console.log('[territory-scoring] Overrepresented domains:', Array.from(overRep));
+  }
+
+  const balanced = perMarket.map((item) => {
+    if ((item.sources?.length || 0) <= 1) return item;
+    const kept: string[] = [];
+    for (const src of item.sources || []) {
+      const d = registrableDomain(src) || src;
+      if (overRep.has(d)) {
+        if (item.sources.length - kept.length > 1) continue; // keep at least one
+      }
+      kept.push(src);
+    }
+    return { ...item, sources: kept.length ? kept.slice(0, maxPerMarket) : item.sources?.slice(0, 1) };
+  });
+
+  const finalCounts = new Map<string, number>();
+  for (const item of balanced) {
+    const domains = new Set<string>();
+    for (const src of item.sources || []) {
+      const d = registrableDomain(src) || src;
+      domains.add(d);
+    }
+    for (const d of domains) finalCounts.set(d, (finalCounts.get(d) || 0) + 1);
+  }
+  console.log('[territory-scoring] Domain distribution after balancing:', Array.from(finalCounts.entries()));
+
+  return balanced;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -264,7 +369,7 @@ Return EXACTLY this JSON structure with NO additional text or formatting:
 Guidelines:
 - Keep the suggested_title short, memorable, and relevant to the criteria (2-4 words max)
 - ${mode === 'fast' ? 'Prioritize speed, but still cite sources' : 'Use comprehensive research and multiple data sources'}
-- Include specific sources in the sources array for each market (1–3 authoritative URLs)
+- Include specific sources in the sources array for each market (1–3 authoritative URLs). Use distinct domains per market; include at least one local/market-specific source when possible (city/metro government, economic development, chamber, transit, or reputable local report/news). Use deep links (not homepages). Avoid repeating the same domain across many markets unless linking to a market-specific page.
 - If data is missing, give a conservative score and explain.
 - Do not make specific business recommendations—only assess signal strength.
 - Stay consistent in your scoring logic${isChunked ? ' across all chunks' : ''}.
@@ -402,14 +507,15 @@ try {
   }
 }
 
-console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
+console.log('Applying source diversification safeguards');
+const diversifiedData = { ...parsedResponse, scores: diversifySources(parsedResponse.scores) };
 
-    return new Response(JSON.stringify({
-      success: true,
-      data: parsedResponse
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+return new Response(JSON.stringify({
+  success: true,
+  data: diversifiedData
+}), {
+  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+});
 
   } catch (error) {
     console.error('Error in territory-scoring function:', error);

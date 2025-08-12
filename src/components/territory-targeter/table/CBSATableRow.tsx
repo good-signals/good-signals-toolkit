@@ -65,6 +65,41 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
 
       const isLikelyUrl = (s: string) => /^(https?:\/\/)/i.test(s) || /^[\w.-]+\.[a-z]{2,}/i.test(s);
       const toUrl = (s: string) => (s && /^(https?:\/\/)/i.test(s)) ? s : (isLikelyUrl(s) ? `https://${s}` : s);
+      const normalizeUrl = (s: string) => {
+        try {
+          const u = new URL(toUrl(s));
+          u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
+          u.hash = '';
+          const params = Array.from(u.searchParams.entries())
+            .filter(([k]) => !k.toLowerCase().startsWith('utm_') && k.toLowerCase() !== 'ref' && k.toLowerCase() !== 'source')
+            .sort((a, b) => a[0].localeCompare(b[0]));
+          u.search = '';
+          if (params.length) u.search = `?${new URLSearchParams(params).toString()}`;
+          u.pathname = u.pathname.replace(/\/+$/, '');
+          return u.toString();
+        } catch {
+          return s?.trim();
+        }
+      };
+      const registrableDomain = (s: string) => {
+        try {
+          const h = new URL(toUrl(s)).hostname.replace(/^www\./, '').toLowerCase();
+          const parts = h.split('.');
+          if (parts.length <= 2) return h;
+          return parts.slice(-2).join('.');
+        } catch {
+          return s;
+        }
+      };
+      const uniqueByUrl = Array.from(new Map(sources.map((s) => [normalizeUrl(s) || s, s])).values());
+      const seen = new Set<string>();
+      const uniqueByDomain = uniqueByUrl.filter((s) => {
+        const d = registrableDomain(s);
+        if (seen.has(d)) return false;
+        seen.add(d);
+        return true;
+      }).slice(0, 3);
+
       const displayForSource = (s: string) => {
         try {
           const u = new URL(toUrl(s));
@@ -78,10 +113,10 @@ const CBSATableRow: React.FC<CBSATableRowProps> = ({
         <div key={column.id} className="mb-2">
           <div className="font-medium inline">{column.title}:</div>{' '}
           <span className="text-foreground/90">{scoreData.reasoning}</span>
-          {sources.length > 0 && (
+          {uniqueByDomain.length > 0 && (
             <div className="mt-1 text-xs text-muted-foreground">
               Sources:{' '}
-              {sources.map((src, idx) => (
+              {uniqueByDomain.map((src, idx) => (
                 <a
                   key={`${column.id}-src-${idx}`}
                   href={toUrl(src)}
