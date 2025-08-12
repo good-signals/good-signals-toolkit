@@ -1,4 +1,4 @@
-
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -147,6 +147,41 @@ function validateResponse(data: any): boolean {
   return true;
 }
 
+// Normalize and salvage AI responses into our expected structure
+function normalizeScoreItem(item: any): { market: string; score: number; reasoning?: string; sources?: string[] } | null {
+  if (!item || typeof item !== 'object') return null;
+  const market = item.market || item.market_name || item.cbsa || item.name;
+  let score: any = item.score ?? item.rating ?? item.value;
+  if (typeof score === 'string') {
+    // Extract number from strings like "85%" or "Score: 85/100"
+    const numMatch = score.match(/\d+(?:\.\d+)?/);
+    score = numMatch ? parseFloat(numMatch[0]) : NaN;
+  }
+  if (typeof score !== 'number' || Number.isNaN(score)) return null;
+  // Clamp 0-100
+  score = Math.max(0, Math.min(100, score));
+  const reasoning = item.reasoning || item.explanation || item.notes || item.justification || '';
+  const sources = Array.isArray(item.sources) ? item.sources : [];
+  if (!market || typeof market !== 'string') return null;
+  return { market, score, reasoning, sources };
+}
+
+function normalizeParsedResponse(data: any, fallbackTitle: string, fallbackSummary: string) {
+  const title = typeof data?.suggested_title === 'string' && data.suggested_title.trim() !== ''
+    ? data.suggested_title
+    : fallbackTitle;
+  const summary = typeof data?.prompt_summary === 'string' && data.prompt_summary.trim() !== ''
+    ? data.prompt_summary
+    : fallbackSummary;
+  const rawScores = Array.isArray(data?.scores)
+    ? data.scores
+    : (Array.isArray(data?.results) ? data.results : (Array.isArray(data?.markets) ? data.markets : []));
+  const scores = rawScores
+    .map((s: any) => normalizeScoreItem(s))
+    .filter((s: any) => s !== null);
+  return { suggested_title: title || 'Analysis Results', prompt_summary: summary || '', scores };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -221,7 +256,7 @@ Guidelines:
 - ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Include sources in your reasoning where possible and list them in the sources array'}.
 - ENSURE your JSON response is complete and properly terminated.
 
-Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} (Population: ${cbsa.population.toLocaleString()})`).join(', ')}`;
+Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => cbsa.name).join(', ')}`;
     };
 
     console.log('Sending request to Perplexity API...');
@@ -284,25 +319,75 @@ Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => `${cbsa.name} 
     console.log('First 200 chars:', aiContent.substring(0, 200));
     console.log('Last 200 chars:', aiContent.substring(Math.max(0, aiContent.length - 200)));
 
-    // Extract and validate JSON from AI response
-    let parsedResponse;
-    try {
-      parsedResponse = extractJSON(aiContent);
-      
-      if (!validateResponse(parsedResponse)) {
-        throw new Error('Response validation failed - invalid structure');
-      }
-      
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError.message);
-      console.error('Raw AI content (first 1000 chars):', aiContent.substring(0, 1000));
-      console.error('Raw AI content (last 1000 chars):', aiContent.substring(Math.max(0, aiContent.length - 1000)));
-      
-      // Return a more helpful error message with full response for debugging
-      throw new Error(`Failed to parse AI response: ${parseError.message}. Full response: ${aiContent}`);
-    }
+// Extract, normalize, and validate JSON from AI response
+let parsedResponse;
+try {
+  const raw = extractJSON(aiContent);
+  const normalized = normalizeParsedResponse(
+    raw,
+    isChunked && chunkIndex > 0 ? '' : 'Analysis Results',
+    isChunked && chunkIndex > 0 ? '' : `Summary for: ${userPrompt.substring(0, 80)}...`
+  );
+  if (!validateResponse(normalized)) {
+    throw new Error('Response validation failed - invalid structure');
+  }
+  parsedResponse = normalized;
+} catch (parseError) {
+  console.error('Failed to parse Perplexity response:', parseError.message);
+  console.error('Raw AI content (first 1000 chars):', aiContent.substring(0, 1000));
+  console.error('Raw AI content (last 1000 chars):', aiContent.substring(Math.max(0, aiContent.length - 1000)));
 
-    console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
+  // Fallback to OpenAI if available
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (openaiKey) {
+    try {
+      console.log('Attempting fallback via OpenAI (gpt-4o-mini)...');
+      const oaRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: getSystemPrompt(analysisMode, isChunked) },
+            { role: 'user', content: `User's scoring criteria: ${userPrompt}` },
+          ],
+          temperature: 0.2,
+          top_p: 0.9,
+          max_tokens: 2000,
+        })
+      });
+      if (!oaRes.ok) {
+        const t = await oaRes.text();
+        throw new Error(`OpenAI returned ${oaRes.status}: ${oaRes.statusText}. Details: ${t}`);
+      }
+      const oaJson = await oaRes.json();
+      const oaContent = oaJson.choices?.[0]?.message?.content || '';
+      if (!oaContent) throw new Error('OpenAI returned empty content');
+      const raw2 = extractJSON(oaContent);
+      const normalized2 = normalizeParsedResponse(
+        raw2,
+        'Analysis Results',
+        `Summary for: ${userPrompt.substring(0, 80)}...`
+      );
+      if (!validateResponse(normalized2)) {
+        throw new Error('OpenAI response validation failed - invalid structure');
+      }
+      parsedResponse = normalized2;
+      console.log('OpenAI fallback succeeded.');
+    } catch (oaError) {
+      console.error('OpenAI fallback failed:', oaError.message);
+      throw new Error(`Failed to parse AI responses. Perplexity error: ${parseError.message}. OpenAI fallback error: ${oaError.message}`);
+    }
+  } else {
+    // No fallback possible
+    throw new Error(`Failed to parse AI response and no OpenAI fallback configured: ${parseError.message}`);
+  }
+}
+
+console.log(`Successfully processed ${parsedResponse.scores.length} market scores in ${analysisMode} mode`);
 
     return new Response(JSON.stringify({
       success: true,

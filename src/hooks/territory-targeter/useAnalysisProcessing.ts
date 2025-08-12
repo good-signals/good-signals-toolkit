@@ -34,58 +34,64 @@ export const useAnalysisProcessing = () => {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
-        
-        // Check if request was aborted before processing each chunk
-        if (analysisRequestRef.current?.signal.aborted) {
-          console.log('Analysis was cancelled during chunk processing');
-          throw new Error('Analysis was cancelled');
-        }
-        
-        try {
-          const { data, error } = await supabase.functions.invoke('territory-scoring', {
-            body: {
-              userPrompt: prompt,
-              cbsaData: chunk,
-              analysisMode: mode,
-              isChunked: chunks.length > 1,
-              chunkIndex: i,
-              totalChunks: chunks.length
-            }
-          });
+        // Helper: adaptively process a chunk, splitting if needed
+        const processAdaptive = async (chunk: CBSAData[], label: string): Promise<void> => {
+          try {
+            const { data, error } = await supabase.functions.invoke('territory-scoring', {
+              body: {
+                userPrompt: prompt,
+                cbsaData: chunk.map(({ id, name, state, region, population, populationGrowth }) => ({ id, name, state, region, population, populationGrowth })),
+                analysisMode: mode,
+                isChunked: chunks.length > 1,
+                chunkIndex: i,
+                totalChunks: chunks.length
+              }
+            });
 
-          if (error) {
-            console.error(`Chunk ${i + 1} error:`, error);
-            // Don't throw immediately for single chunk failures, try to continue
-            if (chunks.length === 1) {
-              throw new Error(`Analysis failed: ${error.message}`);
+            if (error) {
+              throw new Error(error.message || `Chunk ${label} failed`);
+            }
+            if (!data?.success) {
+              throw new Error(data?.error || `Chunk ${label} returned failure`);
+            }
+
+            console.log(`Chunk ${label} completed successfully with ${data.data.scores?.length || 0} scores`);
+
+            if (data.data.scores && Array.isArray(data.data.scores)) {
+              allScores = [...allScores, ...data.data.scores];
+            }
+            if (i === 0 && !combinedSummary && !suggestedTitle) {
+              combinedSummary = data.data.prompt_summary || '';
+              suggestedTitle = data.data.suggested_title || 'Analysis Results';
+            }
+          } catch (err) {
+            console.warn(`Chunk ${label} error:`, err);
+            // If too big or parsing error, split and retry
+            if (chunk.length > 5) {
+              const mid = Math.floor(chunk.length / 2);
+              const first = chunk.slice(0, mid);
+              const second = chunk.slice(mid);
+              console.log(`Splitting chunk ${label} into ${label}a (${first.length}) and ${label}b (${second.length})`);
+              await processAdaptive(first, `${label}a`);
+              await processAdaptive(second, `${label}b`);
             } else {
-              console.log(`Chunk ${i + 1} failed, continuing with remaining chunks...`);
-              continue;
+              // Give up on very small chunks but continue overall processing
+              console.error(`Chunk ${label} too small to split further; skipping these ${chunk.length} markets.`);
             }
           }
+        };
 
-          if (!data?.success) {
-            console.error(`Chunk ${i + 1} returned failure:`, data?.error);
-            if (chunks.length === 1) {
-              throw new Error(`Analysis returned error: ${data?.error || 'Unknown error'}`);
-            } else {
-              console.log(`Chunk ${i + 1} failed, continuing with remaining chunks...`);
-              continue;
-            }
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} markets`);
+
+          // Check if request was aborted before processing each chunk
+          if (analysisRequestRef.current?.signal.aborted) {
+            console.log('Analysis was cancelled during chunk processing');
+            throw new Error('Analysis was cancelled');
           }
 
-          console.log(`Chunk ${i + 1} completed successfully with ${data.data.scores?.length || 0} scores`);
-          
-          if (data.data.scores && Array.isArray(data.data.scores)) {
-            allScores = [...allScores, ...data.data.scores];
-          }
-          
-          if (i === 0) {
-            combinedSummary = data.data.prompt_summary || '';
-            suggestedTitle = data.data.suggested_title || 'Analysis Results';
-          }
+          await processAdaptive(chunk, `${i + 1}/${chunks.length}`);
 
           if (chunks.length > 1) {
             toast({
@@ -93,21 +99,6 @@ export const useAnalysisProcessing = () => {
               description: `Completed ${i + 1} of ${chunks.length} chunks (${allScores.length}/${cbsaData.length} markets scored)`,
             });
           }
-        } catch (chunkError) {
-          console.error(`Chunk ${i + 1} processing failed:`, chunkError);
-          
-          // If it's a cancellation, re-throw it
-          if (chunkError instanceof Error && (chunkError.message.includes('cancelled') || chunkError.message.includes('abort'))) {
-            throw chunkError;
-          }
-          
-          // For single chunk operations, throw the error
-          if (chunks.length === 1) {
-            throw chunkError;
-          }
-          
-          // For multi-chunk operations, log and continue
-          console.log(`Continuing processing despite chunk ${i + 1} failure...`);
         }
       }
 
