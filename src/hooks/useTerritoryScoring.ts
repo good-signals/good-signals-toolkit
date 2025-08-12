@@ -39,7 +39,8 @@ export const useTerritoryScoring = () => {
     refreshColumn: refreshColumnOperation,
     applyManualOverride: applyOverride,
     toggleColumnInSignalScore: toggleColumn,
-    deleteColumn: deleteColumnOperation
+    deleteColumn: deleteColumnOperation,
+    renameColumn: renameColumnOperation
   } = useColumnOperations();
 
   // Improved startup state check
@@ -380,6 +381,13 @@ export const useTerritoryScoring = () => {
     }
   };
 
+  const renameColumn = (columnId: string, newTitle: string) => {
+    if (!currentAnalysis) return;
+    const updatedAnalysis = renameColumnOperation(columnId, newTitle, currentAnalysis);
+    if (updatedAnalysis) {
+      setCurrentAnalysis(updatedAnalysis);
+    }
+  };
   const updateIncludedColumns = (columnToggleSettings: { [columnId: string]: boolean }) => {
     if (!currentAnalysis) return;
 
@@ -427,6 +435,7 @@ export const useTerritoryScoring = () => {
     updateIncludedColumns,
     toggleColumnInSignalScore,
     deleteColumn,
+    renameColumn,
     clearAnalysis: handleClearAnalysis,
     setAnalysisMode
   };

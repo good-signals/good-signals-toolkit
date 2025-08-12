@@ -21,6 +21,7 @@ interface AnalysisSectionsContainerProps {
   onRefreshColumn: (columnId: string, type: 'all' | 'na-only') => void;
   onToggleColumn: (columnId: string, included: boolean) => void;
   onDeleteColumn: (columnId: string) => void;
+  onRenameColumn: (columnId: string, newTitle: string) => void;
   onClearAnalysis: () => void;
   onExportCSV: () => void;
   onExportExcel: () => void;
@@ -46,7 +47,8 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
   onExportCSV,
   onExportExcel,
   onGenerateExecutiveSummary,
-  onUpdateExecutiveSummary
+  onUpdateExecutiveSummary,
+  onRenameColumn
 }) => {
   // Always show the CBSA table with basic data
   const criteriaColumns = currentAnalysis?.criteriaColumns || [];
@@ -74,6 +76,7 @@ const AnalysisSectionsContainer: React.FC<AnalysisSectionsContainerProps> = ({
             criteriaColumns={criteriaColumns}
             onToggleColumn={onToggleColumn}
             onDeleteColumn={onDeleteColumn}
+            onRenameColumn={onRenameColumn}
           />
 
           <ExportControls

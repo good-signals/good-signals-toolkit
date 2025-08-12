@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Trash2, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Settings, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CriteriaColumn } from '@/types/territoryTargeterTypes';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,14 +30,18 @@ interface ColumnManagementProps {
   criteriaColumns: CriteriaColumn[];
   onToggleColumn: (columnId: string, included: boolean) => void;
   onDeleteColumn: (columnId: string) => void;
+  onRenameColumn: (columnId: string, newTitle: string) => void;
 }
 
 const ColumnManagement: React.FC<ColumnManagementProps> = ({
   criteriaColumns,
   onToggleColumn,
-  onDeleteColumn
+  onDeleteColumn,
+  onRenameColumn
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState<string>('');
 
   if (criteriaColumns.length === 0) {
     return null;
@@ -89,7 +94,51 @@ const ColumnManagement: React.FC<ColumnManagementProps> = ({
                         disabled={criteriaColumns.length === 1}
                       />
                       <div className="flex-1">
-                        <div className="font-medium">{column.title}</div>
+                        {editingId === column.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              placeholder="Enter column title"
+                              className="max-w-sm"
+                              autoFocus
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                onRenameColumn(column.id, editTitle);
+                                setEditingId(null);
+                              }}
+                              disabled={!editTitle.trim()}
+                              aria-label="Save column title"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingId(null)}
+                              aria-label="Cancel edit"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium truncate" title={column.title}>{column.title}</div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingId(column.id);
+                                setEditTitle(column.title);
+                              }}
+                              aria-label="Edit column title"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                         <div className="text-sm text-muted-foreground line-clamp-1">
                           {column.logicSummary}
                         </div>

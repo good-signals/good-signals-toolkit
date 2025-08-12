@@ -58,7 +58,8 @@ const TerritoryTargeterPageContent: React.FC = () => {
     toggleColumnInSignalScore,
     deleteColumn,
     clearAnalysis,
-    setAnalysisMode: setScoringAnalysisMode
+    setAnalysisMode: setScoringAnalysisMode,
+    renameColumn
   } = useTerritoryScoring();
 
   const {
@@ -230,6 +231,7 @@ const TerritoryTargeterPageContent: React.FC = () => {
           criteriaColumns={currentAnalysis.criteriaColumns}
           onToggleColumn={toggleColumnInSignalScore}
           onDeleteColumn={deleteColumn}
+          onRenameColumn={renameColumn}
         />
       )}
 

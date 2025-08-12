@@ -206,12 +206,44 @@ export const useColumnOperations = () => {
     return updatedAnalysis.criteriaColumns.length === 0 ? null : updatedAnalysis;
   };
 
+  const renameColumn = (columnId: string, newTitle: string, currentAnalysis: TerritoryAnalysis) => {
+    if (!currentAnalysis) return;
+
+    const trimmed = (newTitle || '').trim();
+    if (!trimmed) {
+      toast({
+        title: "Invalid Title",
+        description: "Please enter a non-empty title.",
+        variant: "destructive",
+      });
+      return currentAnalysis;
+    }
+
+    const exists = currentAnalysis.criteriaColumns.some(c => c.title === trimmed && c.id !== columnId);
+    const updatedAnalysis = {
+      ...currentAnalysis,
+      criteriaColumns: currentAnalysis.criteriaColumns.map(c =>
+        c.id === columnId ? { ...c, title: trimmed } : c
+      )
+    };
+
+    toast({
+      title: "Column Renamed",
+      description: exists
+        ? `Title updated to "${trimmed}" (duplicate titles are allowed).`
+        : `Title updated to "${trimmed}".`,
+    });
+
+    return updatedAnalysis;
+  };
+
   return {
     refreshingColumnId,
     refreshStartTime,
     refreshColumn,
     applyManualOverride,
     toggleColumnInSignalScore,
-    deleteColumn
+    deleteColumn,
+    renameColumn
   };
 };
