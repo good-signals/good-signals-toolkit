@@ -14,6 +14,7 @@ import ProgressCounter from '@/components/territory-targeter/ProgressCounter';
 import FinalExecutiveSummary from '@/components/territory-targeter/FinalExecutiveSummary';
 import ExecutiveSummary from '@/components/territory-targeter/ExecutiveSummary';
 import ColumnManagement from '@/components/territory-targeter/ColumnManagement';
+import ExportControls from '@/components/territory-targeter/ExportControls';
 import CBSATable from '@/components/territory-targeter/CBSATable';
 import ErrorDisplay from '@/components/territory-targeter/ErrorDisplay';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
@@ -232,6 +233,15 @@ const TerritoryTargeterPageContent: React.FC = () => {
           onToggleColumn={toggleColumnInSignalScore}
           onDeleteColumn={deleteColumn}
           onRenameColumn={renameColumn}
+        />
+      )}
+
+      {/* Export Controls */}
+      {hasAnalysisData && (
+        <ExportControls
+          onClearAnalysis={handleClearAnalysis}
+          onExportCSV={handleExportCSV}
+          onExportExcel={handleExportExcel}
         />
       )}
 
