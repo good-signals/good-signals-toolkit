@@ -161,7 +161,22 @@ function normalizeScoreItem(item: any): { market: string; score: number; reasoni
   // Clamp 0-100
   score = Math.max(0, Math.min(100, score));
   const reasoning = item.reasoning || item.explanation || item.notes || item.justification || '';
-  const sources = Array.isArray(item.sources) ? item.sources : [];
+  let sources: string[] = [];
+  if (Array.isArray(item.sources)) {
+    sources = item.sources
+      .map((s: any) => {
+        if (typeof s === 'string') return s;
+        if (s && typeof s.url === 'string') return s.url;
+        return '';
+      })
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0);
+  } else if (typeof item.sources === 'string') {
+    sources = item.sources
+      .split(/[;,|\n]/)
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0);
+  }
   if (!market || typeof market !== 'string') return null;
   return { market, score, reasoning, sources };
 }
@@ -212,9 +227,9 @@ CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, ex
 
       const speedOptimizations = mode === 'fast' 
         ? `
-SPEED MODE: Provide quick, efficient scoring with concise reasoning. Focus on the most obvious and direct factors related to the user's criteria. Keep reasoning brief (1-2 sentences max).`
+SPEED MODE: Provide quick, efficient scoring with concise reasoning. Focus on the most obvious and direct factors related to the user's criteria. Keep reasoning brief (1-2 sentences max). ALWAYS include at least 1-3 authoritative source URLs per market.`
         : `
-DETAILED MODE: Provide comprehensive analysis with thorough research-based scoring. Include multiple factors and data sources in your reasoning. When possible, include specific sources or data points you reference.`;
+DETAILED MODE: Provide comprehensive analysis with thorough research-based scoring. Include multiple factors and data sources in your reasoning. ALWAYS include at least 1-3 authoritative source URLs per market.`;
 
       const chunkingInstructions = isChunked
         ? `
@@ -227,7 +242,7 @@ Your task:
 1. Interpret the user's criteria prompt (e.g., "Score markets based on Gen Z presence and cultural fit for a youth-oriented sneaker brand").
 2. Generate a short, catchy title for this analysis (e.g., "Gen Z Sneaker Culture" or "Taco Affinity").
 3. Score the provided U.S. markets (by CBSA) from 0–100, where 100 = strongest fit and 0 = weakest.
-4. For each market, provide ${mode === 'fast' ? 'brief' : 'detailed'} explanation of the score${mode === 'detailed' ? ' and include sources when possible' : ''}.
+4. For each market, provide ${mode === 'fast' ? 'brief' : 'detailed'} explanation of the score and include 1–3 authoritative source URLs in the "sources" array.
 5. Add a ${mode === 'fast' ? 'concise' : 'comprehensive'} paragraph to the executive summary section explaining your logic, the data you considered, and any key assumptions.
 6. Use a professional but clear and approachable tone (no jargon, plain English).
 
@@ -241,19 +256,19 @@ Return EXACTLY this JSON structure with NO additional text or formatting:
       "market": "Los Angeles-Long Beach-Anaheim, CA",
       "score": 87,
       "reasoning": "${mode === 'fast' ? 'Strong Gen Z population and vibrant sneaker culture.' : 'Strong Gen Z population (32% under 25), vibrant sneaker culture with major retailers like Flight Club and Stadium Goods, and high social media engagement rates.'}",
-      "sources": ${mode === 'detailed' ? '["U.S. Census Bureau", "Social Media Analytics Report 2024"]' : '[]'}
+      "sources": ["https://www.census.gov", "https://www.bls.gov"]
     }
   ]
 }
 
 Guidelines:
 - Keep the suggested_title short, memorable, and relevant to the criteria (2-4 words max)
-- ${mode === 'fast' ? 'Prioritize speed over exhaustive research' : 'Use comprehensive research and multiple data sources'}
-- ${mode === 'detailed' ? 'Include specific sources in the sources array when you reference data' : 'Keep sources array empty for fast mode'}
+- ${mode === 'fast' ? 'Prioritize speed, but still cite sources' : 'Use comprehensive research and multiple data sources'}
+- Include specific sources in the sources array for each market (1–3 authoritative URLs)
 - If data is missing, give a conservative score and explain.
 - Do not make specific business recommendations—only assess signal strength.
 - Stay consistent in your scoring logic${isChunked ? ' across all chunks' : ''}.
-- ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Include sources in your reasoning where possible and list them in the sources array'}.
+- ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Provide thorough reasoning (2-4 sentences)'}
 - ENSURE your JSON response is complete and properly terminated.
 
 Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => cbsa.name).join(', ')}`;
