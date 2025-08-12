@@ -31,15 +31,42 @@ export const useColumnOperations = () => {
     }
     
     try {
-      // Determine which markets to refresh
+      // Import market name matching utility
+      const { findMarketMatch } = await import('@/services/marketNameMatcher');
+      const availableMarketNames = cbsaData.map(cbsa => cbsa.name);
+      
+      // Determine which markets to refresh using intelligent matching
       let marketsToRefresh = cbsaData;
       if (type === 'na-only') {
-        // Find markets that have N/A scores in this column
+        // Find markets that have N/A scores in this column using smart matching
         const naMarkets = cbsaData.filter(cbsa => {
-          const score = column.scores.find(s => s.market === cbsa.name);
+          // Try exact match first
+          let score = column.scores.find(s => s.market === cbsa.name);
+          
+          // If no exact match, try intelligent matching
+          if (!score) {
+            const naMatchResult = findMarketMatch(cbsa.name, { 
+              availableMarkets: column.scores.map(s => s.market),
+              threshold: 0.9,
+              enableFuzzy: true,
+              enableKeyword: true
+            });
+            
+            if (naMatchResult.matched) {
+              score = column.scores.find(s => s.market === naMatchResult.normalizedMarketName);
+              console.log(`🎯 Market name match found: "${cbsa.name}" → "${naMatchResult.normalizedMarketName}" (${naMatchResult.matchType}, confidence: ${naMatchResult.confidence})`);
+            } else {
+              console.log(`⚠️ No match found for market: "${cbsa.name}". Available scores for: ${column.scores.map(s => s.market).join(', ')}`);
+            }
+          }
+          
           return !score || score.score === null || score.score === undefined;
         });
         marketsToRefresh = naMarkets;
+        
+        console.log(`🔄 Refresh analysis for column "${column.title}":`);
+        console.log(`   Markets to refresh: ${marketsToRefresh.length}/${cbsaData.length}`);
+        console.log(`   Markets needing refresh: ${marketsToRefresh.map(m => m.name).join(', ')}`);
       }
 
       if (marketsToRefresh.length === 0) {
@@ -73,16 +100,56 @@ export const useColumnOperations = () => {
         throw new Error(data.error || 'Unknown error occurred during refresh');
       }
 
-      // Update the column with new scores
+      // Update the column with new scores using intelligent matching
       const updatedColumn = { ...column };
+      
+      let successfulUpdates = 0;
+      let totalNewScores = data.data.scores.length;
+      
       data.data.scores.forEach((newScore: any) => {
-        const existingIndex = updatedColumn.scores.findIndex(s => s.market === newScore.market);
+        // Try exact match first
+        let existingIndex = updatedColumn.scores.findIndex(s => s.market === newScore.market);
+        let targetMarketName = newScore.market;
+        let responseMatchResult = null;
+        
+        // If no exact match, try intelligent matching
+        if (existingIndex === -1) {
+          responseMatchResult = findMarketMatch(newScore.market, {
+            availableMarkets: availableMarketNames,
+            threshold: 0.8,
+            enableFuzzy: true,
+            enableKeyword: true
+          });
+          
+          if (responseMatchResult.matched) {
+            targetMarketName = responseMatchResult.normalizedMarketName;
+            existingIndex = updatedColumn.scores.findIndex(s => s.market === targetMarketName);
+            console.log(`🎯 AI response market name matched: "${newScore.market}" → "${targetMarketName}" (${responseMatchResult.matchType}, confidence: ${responseMatchResult.confidence})`);
+          } else {
+            console.warn(`⚠️ Could not match AI response market "${newScore.market}" to any available market. Suggestions: ${responseMatchResult.suggestions?.join(', ') || 'none'}`);
+          }
+        }
+        
+        // Update or add the score
+        const scoreToUpdate = {
+          ...newScore,
+          market: targetMarketName
+        };
+        
         if (existingIndex !== -1) {
-          updatedColumn.scores[existingIndex] = newScore;
-        } else {
-          updatedColumn.scores.push(newScore);
+          updatedColumn.scores[existingIndex] = scoreToUpdate;
+          successfulUpdates++;
+        } else if (responseMatchResult?.matched) {
+          updatedColumn.scores.push(scoreToUpdate);
+          successfulUpdates++;
         }
       });
+      
+      console.log(`✅ Column refresh completed: ${successfulUpdates}/${totalNewScores} scores successfully updated`);
+      
+      if (successfulUpdates === 0) {
+        throw new Error(`No scores could be matched to available markets. This may indicate a data format issue.`);
+      }
 
       // Update the analysis
       const updatedAnalysis = {

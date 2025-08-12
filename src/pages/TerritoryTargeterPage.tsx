@@ -19,6 +19,7 @@ import CBSATable from '@/components/territory-targeter/CBSATable';
 import ErrorDisplay from '@/components/territory-targeter/ErrorDisplay';
 import { exportTerritoryAnalysisToCSV, exportTerritoryAnalysisToExcel } from '@/services/territoryExportService';
 import { toast } from '@/hooks/use-toast';
+import { TerritoryAnalysisMetrics } from '@/components/territory-targeter/TerritoryAnalysisMetrics';
 
 const TerritoryTargeterPageContent: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -208,6 +209,13 @@ const TerritoryTargeterPageContent: React.FC = () => {
       )}
 
       <ErrorDisplay error={error} />
+
+      {/* Analysis Completion Metrics */}
+      <TerritoryAnalysisMetrics 
+        cbsaData={cbsaData}
+        currentAnalysis={currentAnalysis}
+        isAnalyzing={isLoading}
+      />
 
       {/* Executive Summary */}
       <FinalExecutiveSummary

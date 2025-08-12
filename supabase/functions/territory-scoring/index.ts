@@ -324,11 +324,21 @@ serve(async (req) => {
       console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}`);
     }
 
+    // Extract exact market names for consistency
+    const exactMarketNames = cbsaData.map((market: any) => market.name);
+    
     // Enhanced system prompt optimized for speed and chunked processing
     const getSystemPrompt = (mode: string, isChunked: boolean) => {
       const basePrompt = `You are part of the Territory Targeter tool inside the Good Signals platform. Your job is to help users assess and score U.S. markets based on criteria they provide in natural language.
 
-CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, explanations, or text outside the JSON object. Ensure your JSON is complete and properly formatted.`;
+CRITICAL: You MUST respond with ONLY valid JSON. Do not include any markdown, explanations, or text outside the JSON object. Ensure your JSON is complete and properly formatted.
+
+CRITICAL MARKET NAME REQUIREMENTS:
+- Use ONLY the exact market names provided below. Do not modify, abbreviate, or paraphrase them.
+- Copy the market names character-for-character from this list:
+${exactMarketNames.join('\n')}
+
+IMPORTANT: Every market in the above list must receive a score. Use the exact spelling and capitalization shown.`;
 
       const speedOptimizations = mode === 'fast' 
         ? `
@@ -376,7 +386,7 @@ Guidelines:
 - ${mode === 'fast' ? 'Keep reasoning concise (1-2 sentences)' : 'Provide thorough reasoning (2-4 sentences)'}
 - ENSURE your JSON response is complete and properly terminated.
 
-Here are the CBSA markets to score: ${cbsaData.map((cbsa: any) => cbsa.name).join(', ')}`;
+Remember: Use the EXACT market names from the list above. Every market must be scored using its precise name.`;
     };
 
     console.log('Sending request to Perplexity API...');
