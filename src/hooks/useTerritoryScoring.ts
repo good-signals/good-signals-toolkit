@@ -201,13 +201,21 @@ export const useTerritoryScoring = () => {
       if (!aiResponse.scores || !Array.isArray(aiResponse.scores) || aiResponse.scores.length === 0) {
         throw new Error('No market scores were returned. Please try rephrasing your criteria.');
       }
-
+      // Deduplicate scores by market name
+      const seenMarkets = new Set<string>();
+      const dedupedScores = aiResponse.scores.filter((item) => {
+        const key = typeof item?.market === 'string' ? item.market.trim().toLowerCase() : '';
+        if (!key) return false;
+        if (seenMarkets.has(key)) return false;
+        seenMarkets.add(key);
+        return true;
+      });
       // Create new criteria column
       const newColumn: CriteriaColumn = {
         id: crypto.randomUUID(),
         title: aiResponse.suggested_title || 'Analysis Results',
         prompt: prompt,
-        scores: aiResponse.scores,
+        scores: dedupedScores,
         logicSummary: aiResponse.prompt_summary || '',
         analysisMode: mode,
         createdAt: new Date(),
@@ -230,7 +238,7 @@ export const useTerritoryScoring = () => {
       const updatedColumns = [...currentAnalysis.criteriaColumns];
       updatedColumns[existingColumnIndex] = {
         ...updatedColumns[existingColumnIndex],
-        scores: aiResponse.scores,
+        scores: dedupedScores,
         logicSummary: aiResponse.prompt_summary || updatedColumns[existingColumnIndex].logicSummary,
         analysisMode: mode
       };
@@ -249,7 +257,7 @@ export const useTerritoryScoring = () => {
     }
   } else {
     console.log('Creating new analysis');
-        const averageScore = aiResponse.scores.reduce((sum, score) => sum + (score.score || 0), 0) / aiResponse.scores.length;
+        const averageScore = dedupedScores.reduce((sum, score) => sum + (score.score || 0), 0) / dedupedScores.length;
         updatedAnalysis = {
           id: analysisId,
           criteriaColumns: [newColumn],
@@ -276,7 +284,7 @@ export const useTerritoryScoring = () => {
       
       toast({
         title: "Analysis Complete",
-        description: `Successfully added "${aiResponse.suggested_title}" with ${aiResponse.scores.length} market scores.`,
+        description: `Successfully added "${aiResponse.suggested_title}" with ${dedupedScores.length} market scores.`,
       });
 
       console.log('=== RUN SCORING SUCCESS ===');

@@ -84,6 +84,9 @@ const ColumnManagement: React.FC<ColumnManagementProps> = ({
             <div className="space-y-3">
               {criteriaColumns.map((column) => {
                 const isIncluded = column.isIncludedInSignalScore !== false;
+                const uniqueMarketCount = new Set(
+                  (column.scores || []).map((s) => (typeof s.market === 'string' ? s.market.trim().toLowerCase() : ''))
+                ).size;
                 
                 return (
                   <div key={column.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -147,7 +150,7 @@ const ColumnManagement: React.FC<ColumnManagementProps> = ({
                             {column.analysisMode}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
-                            {column.scores.length} markets
+                            {uniqueMarketCount} markets
                           </Badge>
                         </div>
                       </div>
