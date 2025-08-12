@@ -18,15 +18,41 @@ Deno.serve(async (req) => {
 
   try {
     const {
-      userId,
+      userId: _ignoredUserId,
       companyName,
       companyAddress,
       companyCategory,
       companySubcategory,
     }: CompanyDetails = await req.json();
 
-    if (!userId || !companyName) {
-      return new Response(JSON.stringify({ error: 'Missing required fields: userId and companyName' }), {
+    // Require authenticated caller and derive userId from JWT, not body
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const authHeader = req.headers.get('Authorization') ?? '';
+
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    const callerUserId = user.id;
+
+    if (!callerUserId || !companyName) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: user and companyName' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
@@ -59,11 +85,11 @@ Deno.serve(async (req) => {
 
     const accountId = accountData.id;
 
-    // 2. Create the account membership for the user as 'account_admin'
+    // 2. Create the account membership for the caller as 'account_admin'
     const { error: membershipError } = await supabaseAdmin
       .from('account_memberships')
       .insert({
-        user_id: userId,
+        user_id: callerUserId,
         account_id: accountId,
         role: 'account_admin',
       });
