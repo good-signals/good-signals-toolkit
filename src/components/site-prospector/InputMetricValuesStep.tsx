@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { Form } from '@/components/ui/form';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { getEnabledCategories, sortCategoriesByOrder, predefinedMetricsConfig } from '@/config/targetMetricsConfig';
+import { getEnabledCategories, sortCategoriesByOrder, sortMetricsWithinCategory } from '@/config/targetMetricsConfig';
 import { getTargetMetricSetById } from '@/services/targetMetrics/targetMetricSetService';
 import { saveAssessmentMetricValues, getAssessmentMetricValues } from '@/services/siteAssessment/metricValues';
 import { recalculateAssessmentScoresForMetricSet } from '@/services/assessmentRecalculationService';
@@ -311,22 +311,6 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
     );
   }
 
-  // Helper function to sort metrics within a category based on predefined order
-  const sortMetricsWithinCategory = (metrics: any[]) => {
-    return metrics.sort((a, b) => {
-      const indexA = predefinedMetricsConfig.findIndex(config => config.metric_identifier === a.metric_identifier);
-      const indexB = predefinedMetricsConfig.findIndex(config => config.metric_identifier === b.metric_identifier);
-      
-      if (indexA !== -1 && indexB !== -1) {
-        return indexA - indexB;
-      }
-      
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-      
-      return a.label.localeCompare(b.label);
-    });
-  };
 
   // Get enabled categories for organizing metrics and sort them in the correct order
   const enabledCategories = sortCategoriesByOrder(getEnabledCategories(metricSet.enabled_optional_sections || []));

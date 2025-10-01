@@ -182,3 +182,28 @@ export const getEnabledCategories = (enabledSections: string[]): string[] => {
   console.log('[getEnabledCategories] Final enabled categories:', allEnabledCategories);
   return allEnabledCategories;
 };
+
+/**
+ * Sorts metrics within a category based on their order in predefinedMetricsConfig.
+ * Predefined metrics come first in their configured order, custom metrics follow alphabetically.
+ */
+export const sortMetricsWithinCategory = <T extends { metric_identifier: string; label: string }>(metrics: T[]): T[] => {
+  return metrics.sort((a, b) => {
+    const indexA = predefinedMetricsConfig.findIndex(config => config.metric_identifier === a.metric_identifier);
+    const indexB = predefinedMetricsConfig.findIndex(config => config.metric_identifier === b.metric_identifier);
+    
+    // Both are predefined metrics - sort by their predefined order
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    
+    // Only A is predefined - A comes first
+    if (indexA !== -1) return -1;
+    
+    // Only B is predefined - B comes first
+    if (indexB !== -1) return 1;
+    
+    // Both are custom metrics - sort alphabetically by label
+    return a.label.localeCompare(b.label);
+  });
+};

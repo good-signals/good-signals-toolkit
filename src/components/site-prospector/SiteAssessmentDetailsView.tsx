@@ -12,7 +12,7 @@ import AddressMapDisplay from './AddressMapDisplay';
 import EditableExecutiveSummary from './EditableExecutiveSummary';
 import MetricDisplaySection from './display/MetricDisplaySection';
 import SiteVisitRatingsSection from './SiteVisitRatingsSection';
-import { sortCategoriesByOrder } from '@/config/targetMetricsConfig';
+import { sortCategoriesByOrder, sortMetricsWithinCategory } from '@/config/targetMetricsConfig';
 import { useSiteAssessmentDetailsEnhanced } from '@/hooks/useSiteAssessmentDetailsEnhanced';
 import { getTargetMetricSetById } from '@/services/targetMetricsService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -498,14 +498,17 @@ const SiteAssessmentDetailsView: React.FC<SiteAssessmentDetailsProps> = ({
                   metric => metric.category === category
                 ) || [];
                 
-                console.log('[DEBUG] Using enhanced metrics for category:', category, enhancedMetrics);
+                // Sort metrics within the category to maintain consistent order
+                const sortedEnhancedMetrics = sortMetricsWithinCategory(enhancedMetrics);
+                
+                console.log('[DEBUG] Using enhanced metrics for category:', category, sortedEnhancedMetrics);
                 
                 return (
                   <MetricDisplaySection
                     key={category}
                     categoryName={category}
-                    categoryDescription={`${enhancedMetrics.length} metric${enhancedMetrics.length !== 1 ? 's' : ''}`}
-                    categoryMetrics={enhancedMetrics}
+                    categoryDescription={`${sortedEnhancedMetrics.length} metric${sortedEnhancedMetrics.length !== 1 ? 's' : ''}`}
+                    categoryMetrics={sortedEnhancedMetrics}
                   />
                 );
               })}
