@@ -483,13 +483,17 @@ const TargetMetricsBuilderPage = () => {
       ? [...currentSections.filter(s => s !== sectionName), sectionName]
       : currentSections.filter(s => s !== sectionName);
     form.setValue('enabled_optional_sections', updatedSections);
-    
-    // When toggling a section, also update the predefined metrics if we're starting from scratch
-    if (selectedTemplateId === null) {
-      const emptyPredefinedMetrics = generateEmptyPredefinedMetrics(updatedSections);
-      form.setValue('predefined_metrics', emptyPredefinedMetrics);
+
+    // Only regenerate predefined metrics when creating a new set from scratch
+    // and when toggling a true optional predefined section (not special sections)
+    if (!metricSetId && selectedTemplateId === null) {
+      if (sectionName !== VISITOR_PROFILE_CATEGORY && sectionName !== 'Site Visit') {
+        const emptyPredefinedMetrics = generateEmptyPredefinedMetrics(updatedSections);
+        form.setValue('predefined_metrics', emptyPredefinedMetrics);
+      }
     }
   };
+
 
   const handleAddCustomMetric = () => {
     setCustomMetricFormOpen(true);
