@@ -172,7 +172,15 @@ export const CollapsibleMetricSection: React.FC<CollapsibleMetricSectionProps> =
                                   type="number"
                                   placeholder="Enter target value"
                                   {...field}
-                                  onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                  onChange={e => {
+                                    const value = e.target.value;
+                                    if (value === '' || value === null) {
+                                      field.onChange(undefined);
+                                    } else {
+                                      const parsed = parseFloat(value);
+                                      field.onChange(isNaN(parsed) ? undefined : parsed);
+                                    }
+                                  }}
                                   disabled={!isEnabled}
                                 />
                               )}

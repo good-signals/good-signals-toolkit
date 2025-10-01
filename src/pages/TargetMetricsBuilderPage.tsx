@@ -323,10 +323,28 @@ const TargetMetricsBuilderPage = () => {
   const onSubmit = (data: TargetMetricsFormData) => {
     console.log('[TargetMetricsBuilderPage] Submitting form data:', data);
     
-    // Validate that all metrics have target values
-    const predefinedMetricsWithoutTargets = data.predefined_metrics?.filter(m => !m.target_value || m.target_value === 0) || [];
-    const customMetricsWithoutTargets = data.custom_metrics?.filter(m => !m.target_value || m.target_value === 0) || [];
-    const visitorProfileMetricsWithoutTargets = data.visitor_profile_metrics?.filter(m => !m.target_value || m.target_value === 0) || [];
+    // Dropdown metrics that can legitimately have 0 as a value
+    const dropdownMetricsAllowingZero = [
+      'market_saturation_trade_area_overlap',
+      'market_saturation_heat_map_intersection', 
+      'demand_supply_balance'
+    ];
+    
+    // Validate that all metrics have target values (allow 0 for dropdown metrics)
+    const predefinedMetricsWithoutTargets = data.predefined_metrics?.filter(m => {
+      if (m.target_value === undefined || m.target_value === null) return true;
+      // For dropdown metrics, 0 is valid; for others, it's not
+      if (dropdownMetricsAllowingZero.includes(m.metric_identifier)) return false;
+      return m.target_value <= 0;
+    }) || [];
+    
+    const customMetricsWithoutTargets = data.custom_metrics?.filter(m => 
+      m.target_value === undefined || m.target_value === null || m.target_value <= 0
+    ) || [];
+    
+    const visitorProfileMetricsWithoutTargets = data.visitor_profile_metrics?.filter(m => 
+      m.target_value === undefined || m.target_value === null || m.target_value <= 0
+    ) || [];
     
     const allMissingTargets = [
       ...predefinedMetricsWithoutTargets,

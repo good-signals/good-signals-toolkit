@@ -101,9 +101,24 @@ const PredefinedMetricFormSchema = z.object({
   target_value: z.coerce.number({ 
     invalid_type_error: "Target value must be a number.",
     required_error: "Target value is required."
-  }).positive("Target value must be greater than 0"),
+  }),
   higher_is_better: z.boolean(),
   id: z.string().optional(), // Add optional id for database records
+}).superRefine((data, ctx) => {
+  // Allow 0 for specific dropdown metrics that legitimately use it
+  const dropdownMetricsAllowingZero = [
+    'market_saturation_trade_area_overlap',
+    'market_saturation_heat_map_intersection', 
+    'demand_supply_balance'
+  ];
+  
+  if (!dropdownMetricsAllowingZero.includes(data.metric_identifier) && data.target_value <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Target value must be greater than 0",
+      path: ['target_value']
+    });
+  }
 });
 
 const CustomMetricFormSchema = z.object({
@@ -113,11 +128,19 @@ const CustomMetricFormSchema = z.object({
   target_value: z.coerce.number({ 
     invalid_type_error: "Target value must be a number.",
     required_error: "Target value is required."
-  }).positive("Target value must be greater than 0"),
+  }),
   higher_is_better: z.boolean(),
   units: z.string().optional(),
   is_custom: z.literal(true),
   id: z.string().optional(), // Add optional id for database records
+}).superRefine((data, ctx) => {
+  if (data.target_value <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Target value must be greater than 0",
+      path: ['target_value']
+    });
+  }
 });
 
 const VisitorProfileMetricFormSchema = z.object({
@@ -127,10 +150,18 @@ const VisitorProfileMetricFormSchema = z.object({
   target_value: z.coerce.number({ 
     invalid_type_error: "Target value must be a number.",
     required_error: "Target value is required."
-  }).positive("Target value must be greater than 0"),
+  }),
   measurement_type: z.enum(MEASUREMENT_TYPES, { required_error: "Measurement type is required."}),
   higher_is_better: z.boolean(),
   id: z.string().optional(), // Add optional id for database records
+}).superRefine((data, ctx) => {
+  if (data.target_value <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Target value must be greater than 0",
+      path: ['target_value']
+    });
+  }
 });
 export type VisitorProfileMetricFormData = z.infer<typeof VisitorProfileMetricFormSchema>;
 

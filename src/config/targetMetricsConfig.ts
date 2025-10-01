@@ -113,7 +113,7 @@ export const generateEmptyPredefinedMetrics = (enabledOptionalSections: string[]
       metric_identifier: config.metric_identifier,
       label: config.label,
       category: config.category,
-      target_value: 0, // Default target value for start from scratch
+      target_value: undefined as any, // Start with undefined so user must enter a value
       higher_is_better: config.higher_is_better,
     }));
 };
@@ -125,7 +125,7 @@ export function getDefaultMetricValue(metricIdentifier: string): UserCustomMetri
       metric_identifier: config.metric_identifier,
       category: config.category,
       label: config.label,
-      target_value: 0, // Default target value, user will set this
+      target_value: undefined as any, // Start with undefined so user must enter a value
       higher_is_better: config.higher_is_better,
       measurement_type: null,
     };
