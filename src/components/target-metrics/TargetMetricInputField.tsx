@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Control } from 'react-hook-form';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -75,8 +74,14 @@ const TargetMetricInputField: React.FC<TargetMetricInputFieldProps> = ({
                     {...field}
                     onChange={e => {
                       const value = e.target.value;
-                      // Only update if value is not empty, otherwise set to undefined
-                      field.onChange(value === '' ? undefined : parseFloat(value) || 0);
+                      // Handle empty string as undefined
+                      if (value === '') {
+                        field.onChange(undefined);
+                        return;
+                      }
+                      // Parse the number - if valid, set it, otherwise keep undefined
+                      const parsed = parseFloat(value);
+                      field.onChange(!isNaN(parsed) ? parsed : undefined);
                     }}
                     disabled={disabled}
                     className={!field.value ? "border-warning" : ""}
