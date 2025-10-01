@@ -77,6 +77,8 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
   };
 
   const handleAddMetric = async (data: any) => {
+    console.log('[VisitorProfileMetrics] Adding metric:', data);
+    
     if (!metricSetId || !user?.id) {
       // If no metricSetId, just add to form (draft mode)
       const newMetric = {
@@ -89,6 +91,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       };
       append(newMetric);
       setIsFormOpen(false);
+      console.log('[VisitorProfileMetrics] Metric added to form (draft mode)');
       return;
     }
 
@@ -103,7 +106,9 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
         higher_is_better: data.higher_is_better,
       };
 
+      console.log('[VisitorProfileMetrics] Saving metric to database:', metricData);
       const savedMetric = await saveIndividualMetric(user.id, metricSetId, metricData);
+      console.log('[VisitorProfileMetrics] Metric saved with ID:', savedMetric.id);
       
       // Add to form with database ID
       append({
@@ -119,7 +124,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       });
       setIsFormOpen(false);
     } catch (error) {
-      console.error('Error adding visitor profile metric:', error);
+      console.error('[VisitorProfileMetrics] Error adding metric:', error);
       toast({
         title: "Error",
         description: "Failed to add visitor profile metric",
@@ -132,6 +137,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
 
   const handleEditMetric = async (index: number, data: any) => {
     const existingMetric = fields[index];
+    console.log('[VisitorProfileMetrics] Editing metric at index', index, ':', data);
     
     if (!metricSetId || !user?.id || !existingMetric.id) {
       // If no metricSetId or database ID, just update form (draft mode)
@@ -145,11 +151,13 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       update(index, updatedMetric);
       setEditingIndex(null);
       setIsFormOpen(false);
+      console.log('[VisitorProfileMetrics] Metric updated in form (draft mode)');
       return;
     }
 
     try {
       setIsLoading(true);
+      console.log('[VisitorProfileMetrics] Updating metric in database, ID:', existingMetric.id);
       await updateIndividualMetric(user.id, existingMetric.id, {
         label: data.label,
         target_value: data.target_value,
@@ -166,6 +174,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
         higher_is_better: data.higher_is_better,
       };
       update(index, updatedMetric);
+      console.log('[VisitorProfileMetrics] Metric updated successfully');
 
       toast({
         title: "Success",
@@ -174,7 +183,7 @@ const VisitorProfileMetricsSection: React.FC<VisitorProfileMetricsSectionProps> 
       setEditingIndex(null);
       setIsFormOpen(false);
     } catch (error) {
-      console.error('Error updating visitor profile metric:', error);
+      console.error('[VisitorProfileMetrics] Error updating metric:', error);
       toast({
         title: "Error",
         description: "Failed to update visitor profile metric",

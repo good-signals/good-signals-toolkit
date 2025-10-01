@@ -44,6 +44,8 @@ const TargetMetricsBuilderPage = () => {
 
   const form = useForm<TargetMetricsFormData>({
     resolver: zodResolver(TargetMetricsFormSchema),
+    mode: 'onSubmit',
+    reValidateMode: 'onSubmit',
     defaultValues: {
       metric_set_name: '',
       predefined_metrics: [],
@@ -322,7 +324,16 @@ const TargetMetricsBuilderPage = () => {
   });
 
   const onSubmit = (data: TargetMetricsFormData) => {
-    console.log('[TargetMetricsBuilderPage] Submitting form data:', data);
+    console.log('[TargetMetricsBuilderPage] Submitting form data:', {
+      predefined_count: data.predefined_metrics?.length || 0,
+      custom_count: data.custom_metrics?.length || 0,
+      visitor_profile_count: data.visitor_profile_metrics?.length || 0,
+    });
+    
+    // Log all metrics for debugging
+    console.log('[TargetMetricsBuilderPage] Predefined metrics:', data.predefined_metrics);
+    console.log('[TargetMetricsBuilderPage] Custom metrics:', data.custom_metrics);
+    console.log('[TargetMetricsBuilderPage] Visitor profile metrics:', data.visitor_profile_metrics);
     
     // Dropdown metrics that can legitimately have 0 as a value
     const dropdownMetricsAllowingZero = [
@@ -347,6 +358,22 @@ const TargetMetricsBuilderPage = () => {
       m.target_value === undefined || m.target_value === null || m.target_value <= 0
     ) || [];
     
+    console.log('[TargetMetricsBuilderPage] Validation results:', {
+      predefined_missing: predefinedMetricsWithoutTargets.length,
+      custom_missing: customMetricsWithoutTargets.length,
+      visitor_profile_missing: visitorProfileMetricsWithoutTargets.length,
+    });
+    
+    if (predefinedMetricsWithoutTargets.length > 0) {
+      console.log('[TargetMetricsBuilderPage] Predefined metrics missing targets:', predefinedMetricsWithoutTargets.map(m => m.label));
+    }
+    if (customMetricsWithoutTargets.length > 0) {
+      console.log('[TargetMetricsBuilderPage] Custom metrics missing targets:', customMetricsWithoutTargets.map(m => m.label));
+    }
+    if (visitorProfileMetricsWithoutTargets.length > 0) {
+      console.log('[TargetMetricsBuilderPage] Visitor profile metrics missing targets:', visitorProfileMetricsWithoutTargets.map(m => m.label));
+    }
+    
     const allMissingTargets = [
       ...predefinedMetricsWithoutTargets,
       ...customMetricsWithoutTargets, 
@@ -354,9 +381,11 @@ const TargetMetricsBuilderPage = () => {
     ];
     
     if (allMissingTargets.length > 0) {
+      const missingLabels = allMissingTargets.map(m => m.label).join(', ');
+      console.log('[TargetMetricsBuilderPage] Metrics missing target values:', missingLabels);
       toast({
         title: "Missing Target Values", 
-        description: `Please enter target values for all metrics. ${allMissingTargets.length} metric(s) are missing target values.`,
+        description: `Please enter target values for: ${missingLabels}`,
         variant: "destructive",
       });
       return;
