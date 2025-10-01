@@ -98,13 +98,28 @@ const PredefinedMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string(),
   category: z.string(),
-  target_value: z.coerce.number({ 
-    invalid_type_error: "Target value must be a number.",
-    required_error: "Target value is required."
-  }),
+  target_value: z.union([
+    z.number(),
+    z.string().transform((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    }),
+    z.undefined(),
+  ]).optional(),
   higher_is_better: z.boolean(),
-  id: z.string().optional(), // Add optional id for database records
+  id: z.string().optional(),
 }).superRefine((data, ctx) => {
+  // Check if target_value is missing or invalid
+  if (data.target_value === undefined || data.target_value === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Target value is required",
+      path: ['target_value']
+    });
+    return;
+  }
+
   // Allow 0 for specific dropdown metrics that legitimately use it
   const dropdownMetricsAllowingZero = [
     'market_saturation_trade_area_overlap',
@@ -125,15 +140,29 @@ const CustomMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string(),
   category: z.string(),
-  target_value: z.coerce.number({ 
-    invalid_type_error: "Target value must be a number.",
-    required_error: "Target value is required."
-  }),
+  target_value: z.union([
+    z.number(),
+    z.string().transform((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    }),
+    z.undefined(),
+  ]).optional(),
   higher_is_better: z.boolean(),
   units: z.string().optional(),
   is_custom: z.literal(true),
-  id: z.string().optional(), // Add optional id for database records
+  id: z.string().optional(),
 }).superRefine((data, ctx) => {
+  if (data.target_value === undefined || data.target_value === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Target value is required",
+      path: ['target_value']
+    });
+    return;
+  }
+  
   if (data.target_value <= 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -147,14 +176,28 @@ const VisitorProfileMetricFormSchema = z.object({
   metric_identifier: z.string(),
   label: z.string().min(1, "Attribute name is required."),
   category: z.literal(VISITOR_PROFILE_CATEGORY),
-  target_value: z.coerce.number({ 
-    invalid_type_error: "Target value must be a number.",
-    required_error: "Target value is required."
-  }),
+  target_value: z.union([
+    z.number(),
+    z.string().transform((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    }),
+    z.undefined(),
+  ]).optional(),
   measurement_type: z.enum(MEASUREMENT_TYPES, { required_error: "Measurement type is required."}),
   higher_is_better: z.boolean(),
-  id: z.string().optional(), // Add optional id for database records
+  id: z.string().optional(),
 }).superRefine((data, ctx) => {
+  if (data.target_value === undefined || data.target_value === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Target value is required",
+      path: ['target_value']
+    });
+    return;
+  }
+  
   if (data.target_value <= 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
