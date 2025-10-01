@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TargetMetricSet, CreateTargetMetricSetData, TargetMetricsFormData, OPTIONAL_METRIC_CATEGORIES, VISITOR_PROFILE_CATEGORY } from '@/types/targetMetrics';
 import { getAccountForUser } from './accountHelpers';
+import { sortPredefinedMetricsByCanonicalOrder } from './dataRepairService';
 
 const saveUserCustomMetricSettings = async (userId: string, metricSetId: string, formData: TargetMetricsFormData) => {
   console.log('[saveUserCustomMetricSettings] Saving metrics for user:', userId, 'metric set:', metricSetId);
@@ -29,9 +30,12 @@ const saveUserCustomMetricSettings = async (userId: string, metricSetId: string,
   // Prepare all metrics to insert
   const metricsToInsert = [];
 
-  // Add predefined metrics
+  // Add predefined metrics - SORT THEM FIRST to maintain canonical order
   if (formData.predefined_metrics && formData.predefined_metrics.length > 0) {
-    formData.predefined_metrics.forEach(metric => {
+    console.log('[saveUserCustomMetricSettings] Sorting predefined metrics by canonical order');
+    const sortedPredefinedMetrics = sortPredefinedMetricsByCanonicalOrder(formData.predefined_metrics);
+    
+    sortedPredefinedMetrics.forEach(metric => {
       metricsToInsert.push({
         user_id: userId,
         account_id: accountId,

@@ -25,6 +25,7 @@ import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import StandardMetricsListPage from "./pages/StandardMetricsListPage";
 import StandardMetricsBuilderPage from "./pages/StandardMetricsBuilderPage";
 import SignalSettingsPage from "./pages/SignalSettingsPage";
+import DataRepairPage from "./pages/DataRepairPage";
 import UpdatePasswordForm from "./components/auth/UpdatePasswordForm";
 import { useAuth } from "./contexts/AuthContext";
 import CompanySetupPage from "./pages/CompanySetupPage";
@@ -102,6 +103,10 @@ const AppContent = () => {
           <Route 
             path="target-metric-sets" 
             element={<ProtectedRoute><TargetMetricSetsListPage /></ProtectedRoute>} 
+          />
+          <Route 
+            path="data-repair" 
+            element={<ProtectedRoute><DataRepairPage /></ProtectedRoute>} 
           />
           <Route 
             path="super-admin" 
