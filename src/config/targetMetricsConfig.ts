@@ -185,9 +185,16 @@ export const getEnabledCategories = (enabledSections: string[]): string[] => {
 
 /**
  * Sorts metrics within a category based on their order in predefinedMetricsConfig.
- * Predefined metrics come first in their configured order, custom metrics follow alphabetically.
+ * Predefined metrics come first in their configured order.
+ * Visitor Profile custom metrics follow by creation order (created_at).
+ * Other custom metrics follow alphabetically.
  */
-export const sortMetricsWithinCategory = <T extends { metric_identifier: string; label: string }>(metrics: T[]): T[] => {
+export const sortMetricsWithinCategory = <T extends { 
+  metric_identifier: string; 
+  label: string; 
+  category?: string;
+  created_at?: string;
+}>(metrics: T[]): T[] => {
   return metrics.sort((a, b) => {
     const indexA = predefinedMetricsConfig.findIndex(config => config.metric_identifier === a.metric_identifier);
     const indexB = predefinedMetricsConfig.findIndex(config => config.metric_identifier === b.metric_identifier);
@@ -203,7 +210,15 @@ export const sortMetricsWithinCategory = <T extends { metric_identifier: string;
     // Only B is predefined - B comes first
     if (indexB !== -1) return 1;
     
-    // Both are custom metrics - sort alphabetically by label
+    // Both are custom metrics
+    // Special handling for Visitor Profile metrics - sort by creation order
+    if (a.category === VISITOR_PROFILE_CATEGORY && b.category === VISITOR_PROFILE_CATEGORY) {
+      if (a.created_at && b.created_at) {
+        return a.created_at.localeCompare(b.created_at);
+      }
+    }
+    
+    // Other custom metrics - sort alphabetically by label
     return a.label.localeCompare(b.label);
   });
 };
