@@ -306,6 +306,7 @@ const TargetMetricsBuilderPage = () => {
         description: `Target metric set ${metricSetId ? 'updated' : 'created'} successfully!`,
       });
       queryClient.invalidateQueries({ queryKey: ['targetMetricSets'] });
+      queryClient.invalidateQueries({ queryKey: ['targetMetricSet', metricSetId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['siteAssessments'] });
       queryClient.invalidateQueries({ queryKey: ['assessmentDetails'] });
       navigate('/target-metric-sets');
