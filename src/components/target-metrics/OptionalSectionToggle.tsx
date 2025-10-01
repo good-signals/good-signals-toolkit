@@ -31,6 +31,8 @@ export const OptionalSectionToggle: React.FC<OptionalSectionToggleProps> = ({
 
   const getSectionDescription = (section: string): string => {
     switch (section) {
+      case 'Trade Area':
+        return 'Define the geographic area and population metrics';
       case 'Market Coverage & Saturation':
         return 'Analyze competitor overlap and market positioning';
       case 'Demand & Spending':

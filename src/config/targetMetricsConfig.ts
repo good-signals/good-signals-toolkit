@@ -72,9 +72,9 @@ export const nonEditableMetricIdentifiers: string[] = [
 export const SECTION_ORDER = [
   // Required sections (always shown first)
   "Traffic",
-  "Trade Area", 
   "Financial Performance",
   // Optional sections (user can toggle)
+  "Trade Area",
   "Visitor Profile",
   "Market Coverage & Saturation",
   "Demand & Spending", 

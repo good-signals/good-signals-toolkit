@@ -3,11 +3,11 @@ import { z } from 'zod';
 
 export const REQUIRED_METRIC_CATEGORIES = [
   "Traffic",
-  "Trade Area", 
   "Financial Performance",
 ] as const;
 
 export const OPTIONAL_METRIC_CATEGORIES = [
+  "Trade Area",
   "Market Coverage & Saturation",
   "Demand & Spending",
   "Expenses",
