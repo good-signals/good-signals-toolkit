@@ -126,9 +126,46 @@ const InputMetricValuesStep: React.FC<InputMetricValuesStepProps> = ({
           console.log('[InputMetricValuesStep] No existing values found or error loading them:', err);
         }
 
-        // Step 4: Reset form with complete data (metrics + existing values)
-        console.log('[InputMetricValuesStep] Resetting form with complete data');
-        form.reset({ metrics: initialMetrics });
+        // Step 3.5: Sort the metrics to match display order BEFORE setting form data
+        // This ensures form array indices match the display order
+        const enabledCategories = sortCategoriesByOrder(getEnabledCategories(fetchedMetricSet.enabled_optional_sections || []));
+        
+        const sortedInitialMetrics = [...initialMetrics].sort((a, b) => {
+          // Find the settings for both metrics
+          const settingA = fetchedMetricSet.user_custom_metrics_settings.find((s: any) => s.metric_identifier === a.metric_identifier);
+          const settingB = fetchedMetricSet.user_custom_metrics_settings.find((s: any) => s.metric_identifier === b.metric_identifier);
+          
+          // First sort by category order
+          const categoryIndexA = enabledCategories.indexOf(settingA?.category || '');
+          const categoryIndexB = enabledCategories.indexOf(settingB?.category || '');
+          
+          if (categoryIndexA !== categoryIndexB) {
+            return categoryIndexA - categoryIndexB;
+          }
+          
+          // Within same category, sort by metric order using sortMetricsWithinCategory
+          // Get all metrics in this category
+          const categoryMetrics = fetchedMetricSet.user_custom_metrics_settings.filter(
+            (m: any) => m.category === settingA?.category
+          );
+          
+          // Sort them using the utility function (cast to satisfy TypeScript)
+          const sortedCategoryMetrics = sortMetricsWithinCategory(
+            categoryMetrics.map((m: any) => ({ metric_identifier: m.metric_identifier || '', label: m.label || '' }))
+          );
+          
+          // Find positions of A and B in the sorted list
+          const metricIndexA = sortedCategoryMetrics.findIndex((m) => m.metric_identifier === a.metric_identifier);
+          const metricIndexB = sortedCategoryMetrics.findIndex((m) => m.metric_identifier === b.metric_identifier);
+          
+          return metricIndexA - metricIndexB;
+        });
+
+        console.log('[InputMetricValuesStep] Sorted initial metrics for form consistency');
+
+        // Step 4: Reset form with sorted data
+        console.log('[InputMetricValuesStep] Resetting form with sorted data');
+        form.reset({ metrics: sortedInitialMetrics });
         
         // Step 5: Mark form as ready
         setIsFormReady(true);
