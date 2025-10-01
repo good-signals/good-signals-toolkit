@@ -21,7 +21,7 @@ import {
   type TargetMetricsFormData,
   VISITOR_PROFILE_CATEGORY,
 } from '@/types/targetMetrics';
-import { getDefaultEnabledOptionalSections, generateEmptyPredefinedMetrics } from '@/config/targetMetricsConfig';
+import { getDefaultEnabledOptionalSections, generateEmptyPredefinedMetrics, predefinedMetricsConfig } from '@/config/targetMetricsConfig';
 import { getAccountForUser } from '@/services/targetMetrics/accountHelpers';
 import { getStandardMetricSettings } from '@/services/standardMetricsService';
 import PredefinedMetricsSection from '@/components/target-metrics/PredefinedMetricsSection';
@@ -180,53 +180,59 @@ const TargetMetricsBuilderPage = () => {
       if (existingMetricSet.user_custom_metrics_settings && existingMetricSet.user_custom_metrics_settings.length > 0) {
         console.log('[TargetMetricsBuilderPage] Processing metric settings:', existingMetricSet.user_custom_metrics_settings.length);
         
+        // Separate metrics into categories
+        const visitorProfileMetrics: any[] = [];
+        const customMetrics: any[] = [];
+        const predefinedMetrics: any[] = [];
+        
         existingMetricSet.user_custom_metrics_settings.forEach((setting) => {
           if (setting.category === VISITOR_PROFILE_CATEGORY) {
-            const currentMetrics = form.getValues('visitor_profile_metrics') || [];
-            form.setValue('visitor_profile_metrics', [
-              ...currentMetrics,
-              {
-                metric_identifier: setting.metric_identifier,
-                label: setting.label,
-                category: VISITOR_PROFILE_CATEGORY,
-                target_value: setting.target_value,
-                measurement_type: (setting.measurement_type as "Index" | "Amount" | "Percentage") || "Index",
-                higher_is_better: setting.higher_is_better,
-                id: setting.id,
-              },
-            ]);
+            visitorProfileMetrics.push({
+              metric_identifier: setting.metric_identifier,
+              label: setting.label,
+              category: VISITOR_PROFILE_CATEGORY,
+              target_value: setting.target_value,
+              measurement_type: (setting.measurement_type as "Index" | "Amount" | "Percentage") || "Index",
+              higher_is_better: setting.higher_is_better,
+              id: setting.id,
+            });
           } else if (setting.metric_identifier.startsWith('custom_')) {
-            // This is a custom metric
-            const currentMetrics = form.getValues('custom_metrics') || [];
-            form.setValue('custom_metrics', [
-              ...currentMetrics,
-              {
-                metric_identifier: setting.metric_identifier,
-                label: setting.label,
-                category: setting.category,
-                target_value: setting.target_value,
-                higher_is_better: setting.higher_is_better,
-                units: setting.measurement_type,
-                is_custom: true as const,
-                id: setting.id,
-              },
-            ]);
+            customMetrics.push({
+              metric_identifier: setting.metric_identifier,
+              label: setting.label,
+              category: setting.category,
+              target_value: setting.target_value,
+              higher_is_better: setting.higher_is_better,
+              units: setting.measurement_type,
+              is_custom: true as const,
+              id: setting.id,
+            });
           } else {
-            // This is a predefined metric
-            const currentMetrics = form.getValues('predefined_metrics') || [];
-            form.setValue('predefined_metrics', [
-              ...currentMetrics,
-              {
-                metric_identifier: setting.metric_identifier,
-                label: setting.label,
-                category: setting.category,
-                target_value: setting.target_value,
-                higher_is_better: setting.higher_is_better,
-                id: setting.id,
-              },
-            ]);
+            predefinedMetrics.push({
+              metric_identifier: setting.metric_identifier,
+              label: setting.label,
+              category: setting.category,
+              target_value: setting.target_value,
+              higher_is_better: setting.higher_is_better,
+              id: setting.id,
+            });
           }
         });
+        
+        // Sort predefined metrics to match the order in predefinedMetricsConfig
+        // This ensures form fields align with their correct values
+        predefinedMetrics.sort((a, b) => {
+          const indexA = predefinedMetricsConfig.findIndex(c => c.metric_identifier === a.metric_identifier);
+          const indexB = predefinedMetricsConfig.findIndex(c => c.metric_identifier === b.metric_identifier);
+          return indexA - indexB;
+        });
+        
+        console.log('[TargetMetricsBuilderPage] Sorted predefined metrics:', predefinedMetrics.map(m => m.metric_identifier));
+        
+        // Set all arrays at once
+        form.setValue('visitor_profile_metrics', visitorProfileMetrics);
+        form.setValue('custom_metrics', customMetrics);
+        form.setValue('predefined_metrics', predefinedMetrics);
       } else {
         console.warn('[TargetMetricsBuilderPage] No user_custom_metrics_settings found for metric set. This may indicate a data integrity issue.');
       }
